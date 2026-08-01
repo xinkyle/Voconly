@@ -2,10 +2,27 @@
 # Sign build artifacts using TAURI_SIGNING_PRIVATE_KEY
 
 param(
-    [string]$Version = "0.3.4"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# Auto-detect version from Cargo.toml if not provided
+if (-not $Version) {
+    $CargoToml = Join-Path $PSScriptRoot "src-tauri\Cargo.toml"
+    if (Test-Path $CargoToml) {
+        $VersionLine = Get-Content $CargoToml | Where-Object { $_ -match '^version\s*=' }
+        if ($VersionLine -match '"([^"]+)"') {
+            $Version = $Matches[1]
+            Write-Host "[INFO] Auto-detected version from Cargo.toml: $Version" -ForegroundColor Gray
+        }
+    }
+    if (-not $Version) {
+        Write-Host "[ERROR] Could not detect version from Cargo.toml" -ForegroundColor Red
+        Write-Host "Please specify version parameter: -Version '0.3.6'" -ForegroundColor Yellow
+        exit 1
+    }
+}
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -33,7 +50,6 @@ Write-Host ""
 Write-Host "[2/4] Checking build artifacts..." -ForegroundColor Yellow
 
 $NsisPath = "src-tauri/target/release/bundle/nsis/Voconly_" + $Version + "_x64-setup.exe"
-$MsiPath = "src-tauri/target/release/bundle/msi/Voconly_" + $Version + "_x64_en-US.msi"
 
 if (-not (Test-Path $NsisPath)) {
     Write-Host "[ERROR] NSIS not found: $NsisPath" -ForegroundColor Red
@@ -41,19 +57,12 @@ if (-not (Test-Path $NsisPath)) {
 }
 Write-Host "[OK] NSIS: $NsisPath" -ForegroundColor Green
 
-if (-not (Test-Path $MsiPath)) {
-    Write-Host "[ERROR] MSI not found: $MsiPath" -ForegroundColor Red
-    exit 1
-}
-Write-Host "[OK] MSI: $MsiPath" -ForegroundColor Green
-
-# Step 3: Sign files
+# Step 3: Sign NSIS installer
 Write-Host ""
 Write-Host "[3/4] Signing build artifacts..." -ForegroundColor Yellow
 Write-Host "Note: Enter password if key has one, or press Enter if empty" -ForegroundColor Gray
 Write-Host ""
 
-# Sign NSIS
 Write-Host "Signing NSIS installer..." -ForegroundColor Gray
 pnpm tauri signer sign $NsisPath
 if ($LASTEXITCODE -ne 0) {
@@ -62,22 +71,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "[OK] NSIS signed" -ForegroundColor Green
 
-# Sign MSI
-Write-Host "Signing MSI installer..." -ForegroundColor Gray
-pnpm tauri signer sign $MsiPath
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ERROR] MSI signing failed" -ForegroundColor Red
-    exit 1
-}
-Write-Host "[OK] MSI signed" -ForegroundColor Green
-
 # Step 4: Update latest.json
 Write-Host ""
 Write-Host "[4/4] Updating latest.json..." -ForegroundColor Yellow
 
 # Read signature file
 $NsisSigPath = $NsisPath + ".sig"
-$MsiSigPath = $MsiPath + ".sig"
 
 if (-not (Test-Path $NsisSigPath)) {
     Write-Host "[ERROR] NSIS signature file not found: $NsisSigPath" -ForegroundColor Red
@@ -112,7 +111,6 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Generated files:" -ForegroundColor Yellow
 Write-Host "  - $NsisPath.sig" -ForegroundColor Gray
-Write-Host "  - $MsiPath.sig" -ForegroundColor Gray
 Write-Host "  - latest.json (with signature)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Next step: run upload-release.ps1 to upload to GitHub" -ForegroundColor Yellow
