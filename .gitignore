@@ -5,6 +5,9 @@
 # Tauri signing keys (private key must NOT be uploaded)
 .tauri/signing.key
 
+# Local-only scripts (not for GitHub)
+build-release-local.bat
+
 # Dependencies
 node_modules/
 
@@ -46,6 +49,7 @@ Thumbs.db
 *.log
 *.tmp
 *.temp
+build-log.txt
 
 # 环境变量
 .env
