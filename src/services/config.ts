@@ -1,0 +1,502 @@
+import { invoke } from '../utils/tauri';
+import type { AppConfig, Model, Scene, BackendType, LlmConfig, LlmProviderConfig, LlmProfile, LlmProviderInstance } from '../types';
+
+// ============== Rust 数据结构 (与 Rust 后端完全匹配，camelCase) ==============
+
+export interface RustDownloadSource {
+  name: string;
+  url: string;
+  isChinaAccessible: boolean;
+  priority: number;
+}
+
+interface RustModel {
+  id: string;
+  name: string;
+  backend: string;  // "Whisper" | "Onnx"
+  size: string;
+  downloaded: boolean;
+  path?: string;
+  downloadUrls: RustDownloadSource[];
+  languages: string[];
+  description?: string;
+  supportsAutoDetect?: boolean;
+  defaultLanguage?: string;
+}
+
+// Rust LoadStrategy: 所有模型均为常驻内存模式
+type RustLoadStrategy = { type: 'Always' };
+
+interface RustScene {
+  id: string;
+  name: string;
+  shortcut: string;
+  modelId: string;
+  loadStrategy: RustLoadStrategy;
+  language: string;
+  autoType: boolean;
+  enabled: boolean;
+}
+
+// Rust UserDictionary 类型
+interface RustDictionaryEntry {
+  word: string;
+  aliases?: string[];
+}
+
+interface RustUserDictionary {
+  enabled: boolean;
+  entries: RustDictionaryEntry[];
+  threshold: number;
+  rawText?: string;
+}
+
+interface RustUserPromptPresets {
+  lightPolish: string;
+  translate: string;
+  professionalPolish: string;
+  meetingSecretary: string;
+  customPresets?: Record<string, string>;
+}
+
+interface RustAppConfig {
+  /// DEPRECATED: 模型列表已迁移到预设系统
+  models?: RustModel[];
+  /// 用户对每个 ASR 模型的默认语言偏好
+  modelLanguagePrefs?: Record<string, string>;
+  scenes: RustScene[];
+  llm: RustLlmConfig;
+  llmProfiles?: RustLlmProfile[];
+  llmPromptPresets?: RustUserPromptPresets;
+  llmProviders?: Record<string, RustLlmProviderInstance>;
+  userDictionary?: RustUserDictionary;
+  autoStart?: boolean;
+  defaultMicrophone?: string;
+  checkUpdates?: boolean;
+  showShortcutHint?: boolean;
+  maxHistoryRecords?: number;
+  maxRecordingDuration?: number;
+  segmentTranscribe?: boolean;
+  previewHeight?: 'high' | 'medium' | 'low';
+  tutorialCompleted?: boolean;
+  versionInfoUrl?: string;
+}
+
+// ============== Rust LLM 类型 ==============
+
+type RustLlmProviderType = 'ollama' | 'openai' | 'deepseek' | 'gemini' | 'custom';
+
+interface RustLlmProviderConfig {
+  providerType: RustLlmProviderType;
+  enabled: boolean;
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  timeoutSecs: number;
+}
+
+interface RustLlmConfig {
+  enabled: boolean;
+  provider: RustLlmProviderConfig;
+  userPromptTemplate: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+interface RustLlmProfile {
+  id: string;
+  sceneId: string;
+  enabled: boolean;
+  providerId?: string;
+  model: string;
+  userPromptType: string;
+  userPromptCustom: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+interface RustLlmProviderInstance {
+  metaId: string;
+  enabled: boolean;
+  baseUrl: string;
+  apiKey?: string;
+  defaultModel?: string;
+  nGpuLayers?: number;
+  contextLimit?: number;
+  maxTokens?: number;
+}
+
+// ============== 转换函数 ==============
+// 由于 Rust 端已使用 camelCase，转换函数更简单
+
+function convertModelFromRust(rust: RustModel): Model {
+  return {
+    id: rust.id,
+    name: rust.name,
+    backend: rust.backend as BackendType,
+    size: rust.size || '0MB',
+    downloaded: rust.downloaded ?? false,
+    path: rust.path,
+    downloadUrls: rust.downloadUrls?.map(url => ({
+      name: url.name,
+      url: url.url,
+      isChinaAccessible: url.isChinaAccessible,
+      priority: url.priority,
+    })) || [],
+    languages: rust.languages || [],
+    description: rust.description,
+    supportsAutoDetect: rust.supportsAutoDetect,
+    defaultLanguage: rust.defaultLanguage,
+  };
+}
+
+function convertSceneFromRust(rust: RustScene): Scene {
+  return {
+    id: rust.id,
+    name: rust.name,
+    shortcut: rust.shortcut,
+    modelId: rust.modelId,
+    language: rust.language || 'zh',
+    autoType: rust.autoType ?? true,
+    enabled: rust.enabled,
+  };
+}
+
+function convertModelToRust(model: Model): RustModel {
+  return {
+    id: model.id,
+    name: model.name,
+    backend: model.backend,
+    size: model.size,
+    downloaded: model.downloaded,
+    path: model.path,
+    downloadUrls: model.downloadUrls.map(url => ({
+      name: url.name,
+      url: url.url,
+      isChinaAccessible: url.isChinaAccessible,
+      priority: url.priority,
+    })),
+    languages: model.languages,
+    description: model.description,
+    supportsAutoDetect: model.supportsAutoDetect,
+    defaultLanguage: model.defaultLanguage,
+  };
+}
+
+function convertSceneToRust(scene: Scene): RustScene {
+  return {
+    id: scene.id,
+    name: scene.name,
+    shortcut: scene.shortcut,
+    modelId: scene.modelId,
+    loadStrategy: { type: 'Always' },
+    language: scene.language || 'zh',
+    autoType: scene.autoType ?? true,
+    enabled: scene.enabled,
+  };
+}
+
+function convertConfigFromRust(rust: RustAppConfig): AppConfig {
+  return {
+    // DEPRECATED: models 字段仅用于向后兼容，不再主动使用
+    models: rust.models?.map(convertModelFromRust),
+    // 新增：用户对每个模型的语言偏好
+    modelLanguagePrefs: rust.modelLanguagePrefs,
+    scenes: rust.scenes.map(convertSceneFromRust),
+    llm: rust.llm ? convertLlmConfigFromRust(rust.llm) : undefined,
+    llmProfiles: rust.llmProfiles?.map(convertLlmProfileFromRust),
+    llmPromptPresets: rust.llmPromptPresets,
+    llmProviders: rust.llmProviders ? Object.fromEntries(
+      Object.entries(rust.llmProviders).map(([key, value]) => [key, convertLlmProviderInstanceFromRust(value)])
+    ) : undefined,
+    userDictionary: rust.userDictionary,
+    autoStart: rust.autoStart,
+    defaultMicrophone: rust.defaultMicrophone,
+    checkUpdates: rust.checkUpdates,
+    showShortcutHint: rust.showShortcutHint,
+    maxHistoryRecords: rust.maxHistoryRecords,
+    maxRecordingDuration: rust.maxRecordingDuration,
+    segmentTranscribe: rust.segmentTranscribe,
+    previewHeight: rust.previewHeight,
+    tutorialCompleted: rust.tutorialCompleted,
+    versionInfoUrl: rust.versionInfoUrl,
+  };
+}
+
+function convertConfigToRust(config: AppConfig): RustAppConfig {
+  return {
+    // DEPRECATED: models 字段仅用于向后兼容，发送空数组
+    models: config.models?.map(convertModelToRust) || [],
+    // 新增：用户对每个模型的语言偏好
+    modelLanguagePrefs: config.modelLanguagePrefs || {},
+    scenes: config.scenes.map(convertSceneToRust),
+    llm: config.llm ? convertLlmConfigToRust(config.llm) : {
+      enabled: false,
+      provider: {
+        providerType: 'ollama',
+        enabled: true,
+        baseUrl: 'http://localhost:11434',
+        model: 'qwen2.5:3b',
+        timeoutSecs: 30,
+      },
+      userPromptTemplate: '{text}',
+      maxTokens: 1024,
+      temperature: 0.3,
+    },
+    llmProfiles: config.llmProfiles?.map(convertLlmProfileToRust),
+    llmPromptPresets: config.llmPromptPresets,
+    llmProviders: config.llmProviders ? Object.fromEntries(
+      Object.entries(config.llmProviders).map(([key, value]) => [key, convertLlmProviderInstanceToRust(value)])
+    ) : undefined,
+    userDictionary: config.userDictionary,
+    autoStart: config.autoStart,
+    defaultMicrophone: config.defaultMicrophone,
+    checkUpdates: config.checkUpdates,
+    showShortcutHint: config.showShortcutHint,
+    maxHistoryRecords: config.maxHistoryRecords,
+    maxRecordingDuration: config.maxRecordingDuration,
+    segmentTranscribe: config.segmentTranscribe ?? true,
+    previewHeight: config.previewHeight,
+    tutorialCompleted: config.tutorialCompleted,
+    versionInfoUrl: config.versionInfoUrl,
+  };
+}
+
+// ============== LLM 转换函数 ==============
+
+function convertLlmProviderConfigFromRust(rust: RustLlmProviderConfig): LlmProviderConfig {
+  return {
+    providerType: rust.providerType,
+    enabled: rust.enabled,
+    baseUrl: rust.baseUrl,
+    apiKey: rust.apiKey,
+    model: rust.model,
+    timeoutSecs: rust.timeoutSecs,
+  };
+}
+
+function convertLlmProviderConfigToRust(config: LlmProviderConfig): RustLlmProviderConfig {
+  return {
+    providerType: config.providerType,
+    enabled: config.enabled,
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    model: config.model,
+    timeoutSecs: config.timeoutSecs,
+  };
+}
+
+function convertLlmConfigFromRust(rust: RustLlmConfig): LlmConfig {
+  return {
+    enabled: rust.enabled,
+    provider: convertLlmProviderConfigFromRust(rust.provider),
+    userPromptTemplate: rust.userPromptTemplate,
+    maxTokens: rust.maxTokens,
+    temperature: rust.temperature,
+  };
+}
+
+function convertLlmConfigToRust(config: LlmConfig): RustLlmConfig {
+  return {
+    enabled: config.enabled,
+    provider: convertLlmProviderConfigToRust(config.provider),
+    userPromptTemplate: config.userPromptTemplate,
+    maxTokens: config.maxTokens,
+    temperature: config.temperature,
+  };
+}
+
+function convertLlmProfileFromRust(rust: RustLlmProfile): LlmProfile {
+  return {
+    id: rust.id,
+    sceneId: rust.sceneId,
+    enabled: rust.enabled,
+    providerId: rust.providerId,
+    model: rust.model,
+    userPromptType: rust.userPromptType,
+    userPromptCustom: rust.userPromptCustom,
+    maxTokens: rust.maxTokens,
+    temperature: rust.temperature,
+  };
+}
+
+function convertLlmProfileToRust(profile: LlmProfile): RustLlmProfile {
+  return {
+    id: profile.id,
+    sceneId: profile.sceneId,
+    enabled: profile.enabled,
+    providerId: profile.providerId,
+    model: profile.model,
+    userPromptType: profile.userPromptType,
+    userPromptCustom: profile.userPromptCustom,
+    maxTokens: profile.maxTokens,
+    temperature: profile.temperature,
+  };
+}
+
+function convertLlmProviderInstanceFromRust(rust: RustLlmProviderInstance): LlmProviderInstance {
+  return {
+    metaId: rust.metaId,
+    enabled: rust.enabled,
+    baseUrl: rust.baseUrl,
+    apiKey: rust.apiKey,
+    defaultModel: rust.defaultModel,
+    nGpuLayers: rust.nGpuLayers,
+    contextLimit: rust.contextLimit,
+    maxTokens: rust.maxTokens,
+  };
+}
+
+function convertLlmProviderInstanceToRust(instance: LlmProviderInstance): RustLlmProviderInstance {
+  return {
+    metaId: instance.metaId,
+    enabled: instance.enabled,
+    baseUrl: instance.baseUrl,
+    apiKey: instance.apiKey,
+    defaultModel: instance.defaultModel,
+    nGpuLayers: instance.nGpuLayers,
+    contextLimit: instance.contextLimit,
+    maxTokens: instance.maxTokens,
+  };
+}
+
+// ============== API 函数 ==============
+
+export async function loadConfig(): Promise<AppConfig> {
+  const rustConfig = await invoke<RustAppConfig>('load_config');
+  return convertConfigFromRust(rustConfig);
+}
+
+export async function saveConfig(config: AppConfig): Promise<void> {
+  const rustConfig = convertConfigToRust(config);
+  await invoke('save_config', { config: rustConfig });
+}
+
+export async function getModelStoragePath(): Promise<string> {
+  return invoke<string>('get_model_storage_path');
+}
+
+export async function configExists(): Promise<boolean> {
+  return invoke<boolean>('config_exists');
+}
+
+// ============== ModelPreset 类型 (与 Rust ModelPreset 完全匹配) ==============
+
+export interface PythonModelConfig {
+  modelId: string;
+  device?: string;
+  dtype?: string;
+}
+
+export interface ModelPreset {
+  id: string;
+  name: string;
+  size: string;
+  description?: string;
+  downloadUrls: RustDownloadSource[];
+  modelType: 'asr' | 'llm';
+  // ASR-specific fields
+  backend?: BackendType;
+  languages: string[];
+  supportsAutoDetect?: boolean;
+  pythonConfig?: PythonModelConfig;
+  // LLM-specific fields (not used for ASR)
+  nGpuLayers?: number;
+  nCtx?: number;
+  recommended?: boolean;
+  // Model file/directory path (set by scanner for discovered models)
+  // 扫描发现的模型实际路径（包括自定义目录中的模型）
+  path?: string;
+}
+
+/**
+ * Scan available ASR models from storage directory
+ * Returns both preset models (with download URLs) and user models (without download URLs)
+ */
+export async function scanAsrModels(): Promise<ModelPreset[]> {
+  return invoke<ModelPreset[]>('scan_asr_models');
+}
+
+/**
+ * Scan available LLM models from storage directory
+ * Returns both preset models (with download URLs) and user models (without download URLs)
+ */
+export async function scanLlmModels(): Promise<LlmModelPreset[]> {
+  return invoke<LlmModelPreset[]>('scan_llm_models');
+}
+
+/**
+ * LLM Model Preset (matches Rust LlmModelPreset)
+ */
+export interface LlmModelPreset {
+  id: string;
+  name: string;
+  size: string;
+  description: string;
+  downloadUrls: RustDownloadSource[];
+  nGpuLayers: number;
+  nCtx: number;
+  recommended: boolean;
+}
+
+/**
+ * ASR Model with Status (matches Rust AsrModelWithStatus)
+ */
+export interface AsrModelWithStatus {
+  preset: ModelPreset;
+  downloaded: boolean;
+  path?: string;
+  sizeMb?: number;
+}
+
+/**
+ * LLM Model with Status (matches Rust LlmModelWithStatus)
+ */
+export interface LlmModelWithStatus {
+  preset: LlmModelPreset;
+  downloaded: boolean;
+  path?: string;
+  sizeMb?: number;
+}
+
+/**
+ * Get ASR model list with download status
+ * Returns combined list of downloaded models and preset models not yet downloaded
+ */
+export async function getAsrModelList(): Promise<AsrModelWithStatus[]> {
+  return invoke<AsrModelWithStatus[]>('get_asr_model_list');
+}
+
+/**
+ * Get LLM model list with download status
+ * Returns combined list of downloaded models and preset models not yet downloaded
+ */
+export async function getLlmModelList(): Promise<LlmModelWithStatus[]> {
+  return invoke<LlmModelWithStatus[]>('get_llm_model_list');
+}
+
+/**
+ * Get custom ASR model directories
+ * Returns list of user-added directories containing custom ASR models
+ */
+export async function getCustomAsrModelDirs(): Promise<string[]> {
+  return invoke<string[]>('get_custom_asr_model_dirs');
+}
+
+/**
+ * Add a custom ASR model directory
+ * @param path Directory path to add
+ * @returns true if added successfully
+ */
+export async function addCustomAsrModelDir(path: string): Promise<boolean> {
+  return invoke<boolean>('add_custom_asr_model_dir', { path });
+}
+
+/**
+ * Remove a custom ASR model directory
+ * @param path Directory path to remove
+ * @returns true if removed successfully
+ */
+export async function removeCustomAsrModelDir(path: string): Promise<boolean> {
+  return invoke<boolean>('remove_custom_asr_model_dir', { path });
+}

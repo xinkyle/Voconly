@@ -1,0 +1,12 @@
+{
+  "version": "{{VERSION}}",
+  "releaseDate": "{{DATE}}",
+  "downloadUrl": "https://drive.google.com/uc?export=download&id={{FILE_ID}}",
+  "fileName": "Voconly_{{VERSION}}_x64-setup.exe",
+  "fileSize": {{SIZE}},
+  "changelog": [
+    "{{CHANGELOG_1}}",
+    "{{CHANGELOG_2}}"
+  ],
+  "minVersion": "0.1.0"
+}

@@ -1,0 +1,93 @@
+# Worktrees
+.worktrees/
+.claude/
+
+# Tauri signing keys (private key must NOT be uploaded)
+.tauri/signing.key
+
+# Dependencies
+node_modules/
+
+# Tauri/Rust 构建输出
+src-tauri/target/
+src-tauri/target-doc/
+rust_target/
+
+# whisper.cpp build sources (downloaded by scripts)
+build/whisper.cpp-src/
+build/whisper.cpp-vulkan/
+
+# Prebuilt libraries (downloaded from GitHub Releases)
+prebuilt/whisper-cpp/**/*.lib
+prebuilt/*.zip
+
+# 构建输出
+dist/
+.next/
+*.exe
+*.dll
+*.pdb
+
+# Tauri updater 生成的版本信息文件（发布时自动生成）
+latest.json
+
+
+# IDE 和编辑器
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志和临时文件
+*.log
+*.tmp
+*.temp
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 报告和测试文件
+summary-report-*.md
+task_test.json
+.gstack/
+
+# Windows reserved device name (accidentally created)
+nul
+src-tauri/nul
+
+# 测试目录（本地测试程序）
+test/
+
+# 依赖包（上传到平台，不加入版本管理）
+packages/
+
+# 临时文件目录
+temp_download/
+temp_package/
+temp_qwen_package/
+
+# API tokens（敏感信息）
+tokens/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# 临时工作文件
+prompt
+src/loglist
+public/icons/preview.html
+
+# AI 模型文件（太大不提交）
+models/
+
+# Claude Code 项目指令文件（本地配置）
+CLAUDE.md
+

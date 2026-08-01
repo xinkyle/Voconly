@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Voconly",
+  "identifier": "com.voconly.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1421",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/models/*": "resources/models/",
+      "resources/*.dll": ""
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./hooks/nsis-hooks.nsh",
+        "template": "nsis/installer.nsi"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNCQjU1M0Q1Qjc3RjQzMjEKUldRaFEzKzMxVk8xTzhMYmd5dGRGcnZLWXM4M0pBbkxKeWZTUTNTNVlTSnA2WktnWUdWTTl1UE4K",
+      "endpoints": [
+        "https://github.com/xinkyle/Voconly/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

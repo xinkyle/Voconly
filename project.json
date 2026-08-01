@@ -1,0 +1,30 @@
+{
+  "project": {
+    "name": "Voconly",
+    "description": "本地语音转文字桌面应用，集成 transcribe-cpp 支持 Qwen3-ASR GGUF 模型",
+    "tech_stack": {
+      "frontend": "Vue.js + TypeScript",
+      "backend": "Rust (Tauri)",
+      "asr_engine": "transcribe-cpp + transcribe-rs"
+    }
+  },
+  "init": {
+    "enabled": false,
+    "script": "",
+    "health_check_url": ""
+  },
+  "test": {
+    "lint_command": "cargo clippy --manifest-path src-tauri/Cargo.toml",
+    "build_command": "cargo build --manifest-path src-tauri/Cargo.toml",
+    "test_command": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "browser_test": false
+  },
+  "git": {
+    "auto_commit": true
+  },
+  "automation": {
+    "max_runs": 100,
+    "no_progress_limit": 3,
+    "delay_between_runs": 2
+  }
+}

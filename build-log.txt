@@ -1,0 +1,911 @@
+
+> voice-input@0.1.0 tauri
+> tauri build
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> voice-input@0.1.0 build
+> tsc && vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 134 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/core.js is dynamically imported by F:/projects/Voconly/src/utils/tauri.ts but also statically imported by F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/dpi.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/event.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/image.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/path.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/window.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+plugin-dialog@2.7.1/node_modules/@tauri-apps/plugin-dialog/dist-js/index.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+plugin-fs@2.5.1/node_modules/@tauri-apps/plugin-fs/dist-js/index.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+plugin-process@2.3.1/node_modules/@tauri-apps/plugin-process/dist-js/index.js, F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+plugin-updater@2.10.1/node_modules/@tauri-apps/plugin-updater/dist-js/index.js, F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/services/audio.ts, F:/projects/Voconly/src/services/updater.ts, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/event.js is dynamically imported by F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/services/llm.ts, F:/projects/Voconly/src/utils/tauri.ts, F:/projects/Voconly/src/utils/tauri.ts, F:/projects/Voconly/src/utils/tauri.ts but also statically imported by F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+api@2.11.1/node_modules/@tauri-apps/api/window.js, F:/projects/Voconly/src/services/downloader.ts, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) F:/projects/Voconly/node_modules/.pnpm/@tauri-apps+plugin-dialog@2.7.1/node_modules/@tauri-apps/plugin-dialog/dist-js/index.js is dynamically imported by F:/projects/Voconly/src/services/audio.ts but also statically imported by F:/projects/Voconly/src/components/ModelConfigPanel.tsx, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) F:/projects/Voconly/src/services/config.ts is dynamically imported by F:/projects/Voconly/src/services/downloader.ts but also statically imported by F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/components/HomePanel.tsx, F:/projects/Voconly/src/components/ModelConfigPanel.tsx, F:/projects/Voconly/src/components/SceneList.tsx, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) F:/projects/Voconly/src/services/downloader.ts is dynamically imported by F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/App.tsx but also statically imported by F:/projects/Voconly/src/App.tsx, F:/projects/Voconly/src/components/HomePanel.tsx, F:/projects/Voconly/src/components/ModelConfigPanel.tsx, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mfloat.html                      [39m[1m[2m  0.66 kB[22m[1m[22m[2m │ gzip:  0.42 kB[22m
+[2mdist/[22m[32mpreview.html                    [39m[1m[2m  0.83 kB[22m[1m[22m[2m │ gzip:  0.55 kB[22m
+[2mdist/[22m[32mindex.html                      [39m[1m[2m 57.89 kB[22m[1m[22m[2m │ gzip: 43.68 kB[22m
+[2mdist/[22m[35massets/preview-BJy3RnVo.css     [39m[1m[2m  1.33 kB[22m[1m[22m[2m │ gzip:  0.60 kB[22m
+[2mdist/[22m[35massets/float-BH_7ajBO.css       [39m[1m[2m  7.41 kB[22m[1m[22m[2m │ gzip:  1.99 kB[22m
+[2mdist/[22m[35massets/main-DYkP29IF.css        [39m[1m[2m 41.61 kB[22m[1m[22m[2m │ gzip:  7.68 kB[22m
+[2mdist/[22m[36massets/preview-ENE2g1Io.js      [39m[1m[2m  3.35 kB[22m[1m[22m[2m │ gzip:  1.17 kB[22m
+[2mdist/[22m[36massets/index-DSeIje41.js        [39m[1m[2m  6.83 kB[22m[1m[22m[2m │ gzip:  1.86 kB[22m
+[2mdist/[22m[36massets/float-CquCOLUM.js        [39m[1m[2m 21.97 kB[22m[1m[22m[2m │ gzip:  7.05 kB[22m
+[2mdist/[22m[36massets/performance-BoZ6y-IR.js  [39m[1m[2m105.58 kB[22m[1m[22m[2m │ gzip: 39.90 kB[22m
+[2mdist/[22m[36massets/window-BhNWVZZ5.js       [39m[1m[2m160.93 kB[22m[1m[22m[2m │ gzip: 50.68 kB[22m
+[2mdist/[22m[36massets/main-DcjviIwW.js         [39m[1m[2m236.77 kB[22m[1m[22m[2m │ gzip: 58.04 kB[22m
+[32m✓ built in 1.38s[39m
+   Compiling transcribe-cpp-sys v0.1.3 (F:\projects\Voconly\patches\transcribe-cpp-sys-0.1.3)
+warning: unexpected `cfg` condition value: `whisperfile`
+  --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\lib.rs:98:7
+   |
+98 | #[cfg(feature = "whisperfile")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+   = help: consider adding `whisperfile` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `openai`
+   --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\lib.rs:101:7
+    |
+101 | #[cfg(feature = "openai")]
+    |       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+    = help: consider adding `openai` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `openai`
+   --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\lib.rs:103:7
+    |
+103 | #[cfg(feature = "openai")]
+    |       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+    = help: consider adding `openai` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `AtomicI32`
+ --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\accel.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicI32, AtomicU8, Ordering};
+  |                         ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `vad-silero`
+  --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\error.rs:39:29
+   |
+39 | #[cfg(any(feature = "onnx", feature = "vad-silero"))]
+   |                             ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+   = help: consider adding `vad-silero` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `vad-silero`
+  --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\error.rs:46:39
+   |
+46 | #[cfg(any(feature = "audio-features", feature = "vad-silero"))]
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+   = help: consider adding `vad-silero` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `vad-silero`
+  --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\vad\mod.rs:20:7
+   |
+20 | #[cfg(feature = "vad-silero")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+   = help: consider adding `vad-silero` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `vad-silero`
+  --> F:\projects\Voconly\patches\transcribe-rs-0.3.2\src\vad\mod.rs:22:7
+   |
+22 | #[cfg(feature = "vad-silero")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio-features`, `default`, `onnx`, `ort-accel`, `ort-coreml`, `ort-cuda`, `ort-directml`, `ort-rocm`, `ort-tensorrt`, `ort-tracing`, `ort-webgpu`, and `ort-xnnpack`
+   = help: consider adding `vad-silero` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: `transcribe-rs` (lib) generated 8 warnings (run `cargo fix --lib -p transcribe-rs` to apply 1 suggestion)
+   Compiling transcribe-cpp v0.1.3
+   Compiling voconly-tauri v0.3.6 (F:\projects\Voconly\src-tauri)
+warning: voconly-tauri@0.3.6: Copied 13 DLL files to resources/
+warning: unused import: `StreamUpdate`
+  --> src\backends\transcribe_cpp.rs:49:83
+   |
+49 |     Backend, Model, ModelOptions, RunOptions, Session, StreamOptions, StreamText, StreamUpdate,
+   |                                                                                   ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `get_model_storage_dir`
+  --> src\model_manager.rs:11:48
+   |
+11 | use crate::utils::downloader::{get_model_path, get_model_storage_dir};
+   |                                                ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `config::DownloadSource`: Use presets::DownloadSourcePreset instead
+   --> src\config.rs:222:28
+    |
+222 |     pub download_urls: Vec<DownloadSource>,
+    |                            ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+   --> src\config.rs:290:21
+    |
+290 |     pub models: Vec<Model>,
+    |                     ^^^^^
+
+warning: use of deprecated struct `config::DownloadSource`: Use presets::DownloadSourcePreset instead
+ --> src\model_manager.rs:9:32
+  |
+9 | use crate::config::{AppConfig, DownloadSource, Model};
+  |                                ^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+ --> src\model_manager.rs:9:48
+  |
+9 | use crate::config::{AppConfig, DownloadSource, Model};
+  |                                                ^^^^^
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:171:52
+    |
+171 | fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
+    |                                                    ^^^^^
+
+warning: use of deprecated struct `config::DownloadSource`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:219:20
+    |
+219 |         .map(|src| DownloadSource {
+    |                    ^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `config::DownloadSource`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:216:28
+    |
+216 |     let download_urls: Vec<DownloadSource> = preset
+    |                            ^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:227:10
+    |
+227 |     Some(Model {
+    |          ^^^^^
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:300:62
+    |
+300 |     pub fn get_model_config(&self, model_id: &str) -> Result<Model, String> {
+    |                                                              ^^^^^
+
+warning: use of deprecated struct `config::Model`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:406:64
+    |
+406 |     fn check_memory_available(model_path: &str, model_config: &Model) -> Result<(), String> {
+    |                                                                ^^^^^
+
+warning: use of deprecated field `config::DownloadSource::name`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:220:13
+    |
+220 |             name: src.name.clone(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::DownloadSource::url`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:221:13
+    |
+221 |             url: src.url.clone(),
+    |             ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::DownloadSource::is_china_accessible`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:222:13
+    |
+222 |             is_china_accessible: src.is_china_accessible,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::DownloadSource::priority`: Use presets::DownloadSourcePreset instead
+   --> src\model_manager.rs:223:13
+    |
+223 |             priority: src.priority,
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::id`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:228:9
+    |
+228 |         id: preset.id.clone(),
+    |         ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::name`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:229:9
+    |
+229 |         name: preset.name.clone(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::backend`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:230:9
+    |
+230 |         backend,
+    |         ^^^^^^^
+
+warning: use of deprecated field `config::Model::size`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:231:9
+    |
+231 |         size: preset.size.clone(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::downloaded`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:232:9
+    |
+232 |         downloaded: true,
+    |         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::path`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:233:9
+    |
+233 |         path: Some(model_path.to_string_lossy().to_string()),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::download_urls`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:234:9
+    |
+234 |         download_urls,
+    |         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::languages`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:235:9
+    |
+235 |         languages: preset.languages.clone(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::description`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:236:9
+    |
+236 |         description: preset.description.clone(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::gguf_config`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:237:9
+    |
+237 |         gguf_config: None, // GGUF config not available from presets
+    |         ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::supports_auto_detect`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:238:9
+    |
+238 |         supports_auto_detect: preset.supports_auto_detect.unwrap_or(false),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::default_language`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:239:9
+    |
+239 |         default_language: "auto".to_string(),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::backend`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:285:12
+    |
+285 |         if model_config.backend != BackendType::TranscribeCpp {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::path`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:290:9
+    |
+290 |         model_config.path.map(std::path::PathBuf::from)
+    |         ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::path`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:307:31
+    |
+307 |                     model_id, model.path
+    |                               ^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::backend`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:426:39
+    |
+426 |         let memory_multiplier = match model_config.backend {
+    |                                       ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::name`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:447:17
+    |
+447 |                 model_config.name,
+    |                 ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::path`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:473:26
+    |
+473 |           let model_path = model_config
+    |  __________________________^
+474 | |             .path
+    | |_________________^
+
+warning: use of deprecated field `config::Model::backend`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:487:13
+    |
+487 |             model_config.backend, model_path
+    |             ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::backend`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:491:42
+    |
+491 |         let backend: BackendEnum = match model_config.backend {
+    |                                          ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `config::Model::path`: Model discovery is now handled by presets module
+   --> src\model_manager.rs:555:25
+    |
+555 |             model_path: model_config.path.clone(),
+    |                         ^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src\config.rs:132:13
+    |
+132 |         let mut signals = self.cancel_signals.lock().unwrap();
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `n_ctx`
+   --> src\llm\mod.rs:132:50
+    |
+132 |             let (model_path, default_gpu_layers, n_ctx) = if let Some(p) = preset {
+    |                                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_n_ctx`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `model_path`
+  --> src\model_manager.rs:29:13
+   |
+29 |     fn load(model_path: &Path) -> std::io::Result<Self> {
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_model_path`
+
+warning: unused variable: `preferred_source`
+   --> src\utils\downloader.rs:842:5
+    |
+842 |     preferred_source: Option<String>,
+    |     ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_preferred_source`
+
+warning: associated constants `WHISPER_LANGUAGES` and `CANARY_180M_LANGUAGES` are never used
+   --> src\backends\gguf_capabilities.rs:143:11
+    |
+140 | impl GgufCapabilities {
+    | --------------------- associated constants in this implementation
+...
+143 |     const WHISPER_LANGUAGES: &[&str] = &[
+    |           ^^^^^^^^^^^^^^^^^
+...
+254 |     const CANARY_180M_LANGUAGES: &[&str] = &["en", "de", "es", "fr"];
+    |           ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `config` is never read
+   --> src\backends\transcribe_cpp.rs:113:5
+    |
+107 | pub struct TranscribeCppBackend {
+    |            -------------------- field in this struct
+...
+113 |     config: Option<Arc<Mutex<AppConfig>>>,
+    |     ^^^^^^
+
+warning: constant `DEFAULT_INTERVAL_SHORT_MS` is never used
+  --> src\performance.rs:81:7
+   |
+81 | const DEFAULT_INTERVAL_SHORT_MS: f64 = 500.0; // 500ms
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `DEFAULT_INTERVAL_MEDIUM_MS` is never used
+  --> src\performance.rs:82:7
+   |
+82 | const DEFAULT_INTERVAL_MEDIUM_MS: f64 = 700.0; // 700ms
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `DEFAULT_INTERVAL_LONG_MS` is never used
+  --> src\performance.rs:83:7
+   |
+83 | const DEFAULT_INTERVAL_LONG_MS: f64 = 1000.0; // 1000ms
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `MIN_SAMPLES_THRESHOLD` is never used
+  --> src\performance.rs:86:7
+   |
+86 | const MIN_SAMPLES_THRESHOLD: u32 = 3;
+   |       ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_asr_presets_by_backend` is never used
+   --> src\presets\asr.rs:248:8
+    |
+248 | pub fn get_asr_presets_by_backend(backend: BackendType) -> Vec<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_asr_presets_by_language` is never used
+   --> src\presets\asr.rs:257:8
+    |
+257 | pub fn get_asr_presets_by_language(language: &str) -> Vec<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_recommended_llm_presets` is never used
+  --> src\presets\llm.rs:66:8
+   |
+66 | pub fn get_recommended_llm_presets() -> Vec<ModelPreset> {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_gpu_llm_presets` is never used
+  --> src\presets\llm.rs:75:8
+   |
+75 | pub fn get_gpu_llm_presets() -> Vec<ModelPreset> {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_cpu_llm_presets` is never used
+  --> src\presets\llm.rs:84:8
+   |
+84 | pub fn get_cpu_llm_presets() -> Vec<ModelPreset> {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: `voconly-tauri` (lib) generated 52 warnings (run `cargo fix --lib -p voconly-tauri` to apply 6 suggestions)
+warning: unused imports: `AtomicBool` and `Ordering`
+ --> src\main.rs:7:25
+  |
+7 | use std::sync::atomic::{AtomicBool, Ordering};
+  |                         ^^^^^^^^^^  ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Runtime`
+  --> src\main.rs:15:66
+   |
+15 |     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow,
+   |                                                                  ^^^^^^^
+
+warning: unused import: `StreamingTextEvent`
+  --> src\audio\capture.rs:12:43
+   |
+12 | use super::streaming::{run_stream_worker, StreamingTextEvent};
+   |                                           ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::PathBuf`
+  --> src\audio\capture.rs:17:5
+   |
+17 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `StreamRouter`
+  --> src\audio\mod.rs:16:36
+   |
+16 | pub use stream_router::{StreamCmd, StreamRouter};
+   |                                    ^^^^^^^^^^^^
+
+warning: unused imports: `StreamingErrorEvent`, `StreamingTextEvent`, `StreamingTranscription`, `drain_until_finalize`, `emit_streaming_text`, and `run_stream_worker`
+  --> src\audio\mod.rs:18:5
+   |
+18 |     drain_until_finalize, emit_streaming_text, run_stream_worker, StreamingErrorEvent,
+   |     ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+19 |     StreamingTextEvent, StreamingTranscription,
+   |     ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Compatibility`, `KNOWN_ARCHES`, and `get_architecture_capabilities`
+   --> src\backends\mod.rs:176:5
+    |
+176 |     get_architecture_capabilities, probe_gguf_capabilities, Compatibility, GgufCapabilities,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                           ^^^^^^^^^^^^^
+177 |     KNOWN_ARCHES,
+    |     ^^^^^^^^^^^^
+
+warning: unused import: `StreamUpdate`
+  --> src\backends\transcribe_cpp.rs:49:83
+   |
+49 |     Backend, Model, ModelOptions, RunOptions, Session, StreamOptions, StreamText, StreamUpdate,
+   |                                                                                   ^^^^^^^^^^^^
+
+warning: unused import: `init_transcribe_cpp_backend`
+   --> src\backends\mod.rs:182:26
+    |
+182 | pub use transcribe_cpp::{init_transcribe_cpp_backend, TranscribeCppBackend};
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `get_llm_model_path`
+ --> src\commands\model.rs:5:32
+  |
+5 | use crate::utils::downloader::{get_llm_model_path, get_model_storage_dir};
+  |                                ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::PathBuf`
+ --> src\history.rs:5:5
+  |
+5 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `update`
+   --> src\audio\streaming.rs:135:28
+    |
+135 |                         Ok(update) => {
+    |                            ^^^^^^ help: if this is intentional, prefix it with an underscore: `_update`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `services`
+   --> src\commands\model.rs:258:5
+    |
+258 |     services: &AppServices,
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_services`
+
+warning: unused variable: `n_ctx`
+   --> src\llm\mod.rs:132:50
+    |
+132 |             let (model_path, default_gpu_layers, n_ctx) = if let Some(p) = preset {
+    |                                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_n_ctx`
+
+warning: unused variable: `app_handle`
+   --> src\main.rs:129:9
+    |
+129 |     let app_handle = app.clone();
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_handle`
+
+warning: unused variable: `app`
+    --> src\main.rs:1280:38
+     |
+1280 |         .on_shortcut(shortcut, move |app, _shortcut, event| {
+     |                                      ^^^ help: if this is intentional, prefix it with an underscore: `_app`
+
+warning: unused variable: `app_handle`
+    --> src\main.rs:1839:21
+     |
+1839 |                 let app_handle = app.handle().clone();
+     |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_handle`
+
+warning: function `write_wav_file` is never used
+    --> src\main.rs:1484:4
+     |
+1484 | fn write_wav_file(path: &PathBuf, samples: &[f32], sample_rate: u32) -> Result<(), String> {
+     |    ^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `position_window` is never used
+    --> src\main.rs:1510:4
+     |
+1510 | fn position_window(window: &WebviewWindow) {
+     |    ^^^^^^^^^^^^^^^
+
+warning: method `is_open` is never used
+  --> src\audio\stream_router.rs:65:12
+   |
+31 | impl StreamRouter {
+   | ----------------- method in this implementation
+...
+65 |     pub fn is_open(&self) -> bool {
+   |            ^^^^^^^
+
+warning: struct `StreamingErrorEvent` is never constructed
+  --> src\audio\streaming.rs:55:12
+   |
+55 | pub struct StreamingErrorEvent {
+   |            ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `StreamingTranscription` is never constructed
+   --> src\audio\streaming.rs:273:12
+    |
+273 | pub struct StreamingTranscription {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new`, `process_frame`, `finalize`, `handle_error`, and `emit_text_update` are never used
+   --> src\audio\streaming.rs:302:12
+    |
+284 | impl StreamingTranscription {
+    | --------------------------- associated items in this implementation
+...
+302 |     pub fn new(app_handle: AppHandle, scene_id: String, language: Option<String>) -> Self {
+    |            ^^^
+...
+340 |     pub fn process_frame(&mut self, _pcm: &[f32]) -> bool {
+    |            ^^^^^^^^^^^^^
+...
+370 |     pub fn finalize(&mut self) {
+    |            ^^^^^^^^
+...
+398 |     pub fn handle_error(&self, error: &str) {
+    |            ^^^^^^^^^^^^
+...
+425 |     pub fn emit_text_update(&mut self, text: &StreamText, is_final: bool) {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `supports_streaming` is never used
+   --> src\backends\mod.rs:134:8
+    |
+114 | pub trait SpeechBackend: Send + Sync {
+    |           ------------- method in this trait
+...
+134 |     fn supports_streaming(&self) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: associated items `WHISPER_LANGUAGES`, `CANARY_180M_LANGUAGES`, `supports_language`, and `language_is_supported` are never used
+   --> src\backends\gguf_capabilities.rs:143:11
+    |
+140 | impl GgufCapabilities {
+    | --------------------- associated items in this implementation
+...
+143 |     const WHISPER_LANGUAGES: &[&str] = &[
+    |           ^^^^^^^^^^^^^^^^^
+...
+254 |     const CANARY_180M_LANGUAGES: &[&str] = &["en", "de", "es", "fr"];
+    |           ^^^^^^^^^^^^^^^^^^^^^
+...
+435 |     pub fn supports_language(&self, lang: &str) -> Option<bool> {
+    |            ^^^^^^^^^^^^^^^^^
+...
+446 |     pub fn language_is_supported(&self, lang: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `StreamingSession` is never constructed
+   --> src\backends\transcribe_cpp.rs:580:12
+    |
+580 | pub struct StreamingSession {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src\backends\transcribe_cpp.rs:591:12
+    |
+589 | impl StreamingSession {
+    | --------------------- associated items in this implementation
+590 |     /// Create a new streaming session state
+591 |     pub fn new() -> Self {
+    |            ^^^
+...
+600 |     pub fn activate(&mut self) {
+    |            ^^^^^^^^
+...
+605 |     pub fn deactivate(&mut self) {
+    |            ^^^^^^^^^^
+...
+610 |     pub fn is_active(&self) -> bool {
+    |            ^^^^^^^^^
+...
+618 |     pub fn update(&mut self, text: &StreamText) {
+    |            ^^^^^^
+...
+626 |     pub fn display_text(&self) -> String {
+    |            ^^^^^^^^^^^^
+...
+634 |     pub fn committed_only(&self) -> &str {
+    |            ^^^^^^^^^^^^^^
+
+warning: method `is_cancelled` is never used
+   --> src\config.rs:144:12
+    |
+104 | impl DownloadCancelManager {
+    | -------------------------- method in this implementation
+...
+144 |     pub fn is_cancelled(&self, model_id: &str) -> bool {
+    |            ^^^^^^^^^^^^
+
+warning: function `protected_execute` is never used
+   --> src\crash_report.rs:252:8
+    |
+252 | pub fn protected_execute<T, E, F>(f: F, operation_name: &str) -> Result<T, E>
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `get_last_recording_path_string` is never used
+  --> src\debug_audio.rs:60:8
+   |
+60 | pub fn get_last_recording_path_string() -> Option<String> {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variants `Loading`, `Tokenizing`, `Decoding`, and `Generating` are never constructed
+  --> src\llm\progress.rs:11:5
+   |
+ 9 | pub enum LlmStage {
+   |          -------- variants in this enum
+10 |     /// 模型加载（仅本地模型）
+11 |     Loading,
+   |     ^^^^^^^
+12 |     /// 输入分词
+13 |     Tokenizing,
+   |     ^^^^^^^^^^
+14 |     /// 解码输入 tokens
+15 |     Decoding,
+   |     ^^^^^^^^
+16 |     /// 生成输出 tokens
+17 |     Generating,
+   |     ^^^^^^^^^^
+   |
+   = note: `LlmStage` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated functions `loading`, `tokenizing`, `decoding`, and `generating` are never used
+  --> src\llm\progress.rs:47:12
+   |
+45 | impl LlmProgressEvent {
+   | --------------------- associated functions in this implementation
+46 |     /// 创建加载阶段进度
+47 |     pub fn loading() -> Self {
+   |            ^^^^^^^
+...
+61 |     pub fn tokenizing(tokens_count: u32) -> Self {
+   |            ^^^^^^^^^^
+...
+78 |     pub fn decoding(input_tokens: u32) -> Self {
+   |            ^^^^^^^^
+...
+95 |     pub fn generating(current: u32, total: u32, elapsed_secs: f64) -> Self {
+   |            ^^^^^^^^^^
+
+warning: method `add_duration_and_check_recreate` is never used
+   --> src\model_manager.rs:109:12
+    |
+ 70 | impl BackendEnum {
+    | ---------------- method in this implementation
+...
+109 |     pub fn add_duration_and_check_recreate(&self, duration_ms: u64) -> bool {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `touch` is never used
+   --> src\model_manager.rs:140:12
+    |
+138 | impl LoadedModel {
+    | ---------------- method in this implementation
+139 |     /// 更新最后使用时间
+140 |     pub fn touch(&mut self) {
+    |            ^^^^^
+
+warning: function `bundle_resource_dir` is never used
+  --> src\paths.rs:39:8
+   |
+39 | pub fn bundle_resource_dir() -> Result<PathBuf, String> {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `config_dir` is never used
+  --> src\paths.rs:94:8
+   |
+94 | pub fn config_dir() -> Result<PathBuf, String> {
+   |        ^^^^^^^^^^
+
+warning: function `history_file_path` is never used
+   --> src\paths.rs:104:8
+    |
+104 | pub fn history_file_path() -> Result<PathBuf, String> {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `archive_dir` is never used
+   --> src\paths.rs:109:8
+    |
+109 | pub fn archive_dir() -> Result<PathBuf, String> {
+    |        ^^^^^^^^^^^
+
+warning: function `stats_file_path` is never used
+   --> src\paths.rs:144:8
+    |
+144 | pub fn stats_file_path() -> Result<PathBuf, String> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: associated items `llm_preset`, `llm_preset_with_description`, `is_llm`, and `get_backend` are never used
+   --> src\presets\mod.rs:192:12
+    |
+125 | impl ModelPreset {
+    | ---------------- associated items in this implementation
+...
+192 |     pub fn llm_preset(
+    |            ^^^^^^^^^^
+...
+222 |     pub fn llm_preset_with_description(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+257 |     pub fn is_llm(&self) -> bool {
+    |            ^^^^^^
+...
+262 |     pub fn get_backend(&self) -> Option<BackendType> {
+    |            ^^^^^^^^^^^
+
+warning: function `get_all_presets` is never used
+   --> src\presets\mod.rs:268:8
+    |
+268 | pub fn get_all_presets() -> Vec<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: function `find_preset_by_id` is never used
+   --> src\presets\mod.rs:276:8
+    |
+276 | pub fn find_preset_by_id(id: &str) -> Option<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `find_asr_preset_by_id` is never used
+   --> src\presets\mod.rs:281:8
+    |
+281 | pub fn find_asr_preset_by_id(id: &str) -> Option<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `find_llm_preset_by_id` is never used
+   --> src\presets\mod.rs:286:8
+    |
+286 | pub fn find_llm_preset_by_id(id: &str) -> Option<ModelPreset> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_llm_presets` is never used
+  --> src\presets\llm.rs:12:8
+   |
+12 | pub fn get_llm_presets() -> Vec<ModelPreset> {
+   |        ^^^^^^^^^^^^^^^
+
+warning: function `select_best_source` is never used
+   --> src\utils\downloader.rs:485:8
+    |
+485 | pub fn select_best_source(
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: function `get_hf_cache_dir` is never used
+  --> src\utils\hf_cache.rs:15:4
+   |
+15 | fn get_hf_cache_dir() -> PathBuf {
+   |    ^^^^^^^^^^^^^^^^
+
+warning: function `repo_id_to_cache_name` is never used
+  --> src\utils\hf_cache.rs:34:4
+   |
+34 | fn repo_id_to_cache_name(repo_id: &str) -> String {
+   |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `hf_cached_path` is never used
+  --> src\utils\hf_cache.rs:47:8
+   |
+47 | pub fn hf_cached_path(repo_id: &str, filename: &str) -> Option<PathBuf> {
+   |        ^^^^^^^^^^^^^^
+
+warning: function `download_gguf_model` is never used
+  --> src\utils\hf_cache.rs:82:14
+   |
+82 | pub async fn download_gguf_model(repo_id: &str, filename: &str) -> Result<PathBuf, String> {
+   |              ^^^^^^^^^^^^^^^^^^^
+
+warning: function `download_from_hf_hub` is never used
+  --> src\utils\hf_cache.rs:96:10
+   |
+96 | async fn download_from_hf_hub(repo_id: &str, filename: &str) -> Result<PathBuf, String> {
+   |          ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_gguf_model_path` is never used
+   --> src\utils\hf_cache.rs:130:14
+    |
+130 | pub async fn get_gguf_model_path(repo_id: &str, filename: &str) -> Result<PathBuf, String> {
+    |              ^^^^^^^^^^^^^^^^^^^
+
+warning: function `hf_repo_cached` is never used
+   --> src\utils\hf_cache.rs:140:8
+    |
+140 | pub fn hf_repo_cached(repo_id: &str) -> bool {
+    |        ^^^^^^^^^^^^^^
+
+warning: function `get_cached_snapshots` is never used
+   --> src\utils\hf_cache.rs:154:8
+    |
+154 | pub fn get_cached_snapshots(repo_id: &str) -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: `voconly-tauri` (bin "voconly-tauri") generated 103 warnings (49 duplicates) (run `cargo fix --bin "voconly-tauri" -p voconly-tauri` to apply 17 suggestions)
+    Finished `release` profile [optimized] target(s) in 1m 16s
+       Built application at: F:\projects\Voconly\src-tauri\target\release\voconly-tauri.exe
+        Info Patching F:\projects\Voconly\src-tauri\target\release\voconly-tauri.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce F:\projects\Voconly\src-tauri\target\release\bundle\nsis\Voconly_0.3.6_x64-setup.exe
+    Finished 1 bundle at:
+        F:\projects\Voconly\src-tauri\target\release\bundle\nsis\Voconly_0.3.6_x64-setup.exe
+
+        Info Decrypting updater signing key, expect a prompt for password
+
+failed to decode secret key: incorrect updater private key password: 管道的另一端上无任何进程。 (os error 233)
+       Error failed to decode secret key: incorrect updater private key password: 管道的另一端上无任何进程。 (os error 233)

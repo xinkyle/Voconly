@@ -1,0 +1,120 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import UpdateDialog from '../UpdateDialog';
+import { checkForUpdates, getCurrentVersion } from '../../services/updater';
+import type { RemoteVersionInfo } from '../../types/updater';
+
+const APP_NAME = 'Voconly';
+
+// Logo Component - grayscale version for clean integration
+const LogoIcon = ({ className = 'w-7 h-7' }: { className?: string }) => (
+  <img
+    src="/logo.png"
+    alt="Voconly"
+    className={`${className} grayscale opacity-80`}
+    style={{ imageRendering: 'auto' }}
+  />
+);
+
+export default function SettingsAbout() {
+  const { t } = useTranslation();
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateVersionInfo, setUpdateVersionInfo] = useState<RemoteVersionInfo | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string>('');
+
+  // Fetch current version on mount
+  useEffect(() => {
+    getCurrentVersion()
+      .then(setCurrentVersion)
+      .catch((err) => {
+        console.error('Failed to get current version:', err);
+        setCurrentVersion('unknown');
+      });
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatus(null);
+
+    try {
+      const version = await getCurrentVersion();
+      setCurrentVersion(version);
+
+      const result = await checkForUpdates();
+
+      if (result.hasUpdate && result.versionInfo) {
+        setUpdateVersionInfo(result.versionInfo);
+        setShowUpdateDialog(true);
+      } else {
+        setUpdateStatus(t('settings.about.latestVersion'));
+      }
+    } catch (error) {
+      console.error('Check update failed:', error);
+      setUpdateStatus(t('settings.about.checkFailed'));
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* App info */}
+      <div className="flex items-center gap-4 mb-8">
+        <LogoIcon className="w-12 h-12" />
+        <div>
+          <h1 className="text-base font-semibold text-gray-900">{APP_NAME}</h1>
+          <p className="text-gray-500">{t('settings.about.subtitle')}</p>
+        </div>
+      </div>
+
+      {/* Update check */}
+      <div className="mb-8">
+        <h3 className="text-sm font-medium text-gray-500 mb-3">{t('settings.about.update')}</h3>
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+          <div>
+            <p className="font-medium text-gray-900">{t('settings.about.currentVersion', { version: currentVersion || '...' })}</p>
+            {updateStatus && (
+              <p className="text-sm text-gray-500 mt-1">{updateStatus}</p>
+            )}
+          </div>
+          <button
+            onClick={handleCheckUpdate}
+            disabled={checkingUpdate}
+            className={`px-4 py-2 bg-gray-900 text-white rounded-lg font-medium text-sm transition-colors
+              ${checkingUpdate ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-800'}`}
+          >
+            {checkingUpdate ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {t('settings.about.checking')}
+              </span>
+            ) : (
+              t('settings.about.checkUpdate')
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* License */}
+      <div className="pt-4 border-t border-gray-100">
+        <p className="text-center text-sm text-gray-400">
+          &copy; {new Date().getFullYear()} {APP_NAME}. MIT License.
+        </p>
+      </div>
+
+      {/* Update Dialog */}
+      {showUpdateDialog && updateVersionInfo && (
+        <UpdateDialog
+          isOpen={showUpdateDialog}
+          onClose={() => setShowUpdateDialog(false)}
+          versionInfo={updateVersionInfo}
+        />
+      )}
+    </div>
+  );
+}

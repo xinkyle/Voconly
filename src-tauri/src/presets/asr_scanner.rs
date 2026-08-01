@@ -1,0 +1,577 @@
+//! ASR Model Scanner
+//!
+//! Scans the model storage directory for available ASR models.
+//! Supports two backend types:
+//! - ONNX: directories containing `.onnx` or `.ort` files
+//! - TranscribeCpp: `.gguf` and `.bin` files (GGUF/GGML format for Whisper, Qwen3-ASR, etc.)
+//!
+//! 支持多目录扫描：
+//! 1. 默认的 models 目录（通过 `get_model_storage_dir()` 获取）
+//! 2. 用户自定义的目录列表（从 AppConfig 的 `custom_asr_model_dirs` 字段获取）
+
+use crate::backends::{probe_gguf_capabilities, BackendType};
+use crate::config::load_config;
+use crate::presets::{get_asr_presets, ModelPreset};
+use crate::utils::downloader::get_model_storage_dir;
+use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
+
+/// Scan available ASR models from the storage directory
+///
+/// Returns a list of ModelPreset for all discovered models.
+/// For models matching hardcoded presets, uses preset configuration.
+/// For unknown models, generates default configuration.
+///
+/// 扫描顺序：
+/// 1. 默认的 models 目录（优先级最高）
+/// 2. 用户自定义的目录列表
+///
+/// 去重逻辑：如果同名模型在多个目录中存在，优先使用默认目录的。
+pub fn scan_available_asr_models() -> Vec<ModelPreset> {
+    // 获取用户自定义目录列表
+    let custom_dirs: Vec<String> = match load_config() {
+        Ok(config) => config.custom_asr_model_dirs,
+        Err(e) => {
+            log::warn!("无法加载配置文件获取自定义模型目录: {}", e);
+            Vec::new()
+        }
+    };
+
+    // 获取默认目录
+    let default_dir = match get_model_storage_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::warn!("无法获取 ASR 模型存储目录: {}", e);
+            return Vec::new();
+        }
+    };
+
+    // 用于去重的集合（记录已扫描的模型 ID）
+    let mut seen_ids: HashSet<String> = HashSet::new();
+    let mut models: Vec<ModelPreset> = Vec::new();
+
+    // 扫描默认目录（优先级最高）
+    log::info!("扫描默认 ASR 模型目录: {:?}", default_dir);
+    let default_models = scan_single_directory(&default_dir);
+    for model in default_models {
+        seen_ids.insert(model.id.clone());
+        models.push(model);
+    }
+    log::info!("默认目录扫描到 {} 个模型", models.len());
+
+    // 扫描用户自定义目录
+    for custom_dir_path in &custom_dirs {
+        let custom_path = Path::new(custom_dir_path);
+
+        // 检查目录是否存在
+        if !custom_path.exists() {
+            log::warn!("自定义 ASR 模型目录不存在: {:?}", custom_dir_path);
+            continue;
+        }
+
+        if !custom_path.is_dir() {
+            log::warn!("自定义 ASR 模型路径不是目录: {:?}", custom_dir_path);
+            continue;
+        }
+
+        // 跳过与默认目录相同的路径
+        if custom_path == default_dir {
+            log::debug!("自定义目录与默认目录相同，跳过: {:?}", custom_dir_path);
+            continue;
+        }
+
+        log::info!("扫描自定义 ASR 模型目录: {:?}", custom_dir_path);
+        let custom_models = scan_single_directory(custom_path);
+
+        // 只添加未在默认目录中出现的模型（去重）
+        let mut added_count = 0;
+        for model in custom_models {
+            if !seen_ids.contains(&model.id) {
+                seen_ids.insert(model.id.clone());
+                models.push(model);
+                added_count += 1;
+            } else {
+                log::debug!(
+                    "模型 '{}' 已在默认目录中存在，跳过自定义目录中的同名模型",
+                    model.id
+                );
+            }
+        }
+        log::info!(
+            "自定义目录 {:?} 扫描到 {} 个新模型",
+            custom_dir_path,
+            added_count
+        );
+    }
+
+    log::info!("总共扫描到 {} 个 ASR 模型", models.len());
+    models
+}
+
+/// Scan a single directory for ASR models
+///
+/// Internal helper function that scans one directory and returns found models.
+/// Recursively scans subdirectories up to max_depth levels.
+fn scan_single_directory(storage_dir: &Path) -> Vec<ModelPreset> {
+    scan_single_directory_recursive(storage_dir, 0, 2)
+}
+
+/// Recursive helper function for scanning directories
+///
+/// # Arguments
+/// * `dir` - Directory to scan
+/// * `current_depth` - Current recursion depth (0 = top level)
+/// * `max_depth` - Maximum recursion depth (e.g., 2 = scan up to 2 levels deep)
+fn scan_single_directory_recursive(
+    dir: &Path,
+    current_depth: u32,
+    max_depth: u32,
+) -> Vec<ModelPreset> {
+    if !dir.exists() {
+        log::info!("ASR 模型目录不存在: {:?}", dir);
+        return Vec::new();
+    }
+
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            log::warn!("无法读取 ASR 模型目录 {:?}: {}", dir, e);
+            return Vec::new();
+        }
+    };
+
+    // Get hardcoded presets for matching
+    let presets = get_asr_presets();
+
+    let mut models: Vec<ModelPreset> = Vec::new();
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+
+        // Check for GGUF/GGML files (TranscribeCpp backend)
+        // GGUF: newer format (.gguf extension)
+        // GGML: legacy format (.bin extension, e.g., whisper-turbo.bin)
+        if path.is_file() {
+            let ext = path.extension().and_then(|e| e.to_str());
+            if ext == Some("gguf") || ext == Some("bin") {
+                if let Some(preset) = scan_gguf_model(&path, &presets) {
+                    models.push(preset);
+                }
+            }
+        }
+
+        // Check for directories
+        if path.is_dir() {
+            // Check for ONNX model directory (contains .onnx files)
+            if is_onnx_model_directory(&path) {
+                if let Some(preset) = scan_onnx_model(&path, &presets) {
+                    models.push(preset);
+                }
+            }
+
+            // Recursively scan subdirectories if not at max depth
+            // ONNX 模型目录不递归进入（已经是模型目录）
+            // 但普通目录需要递归查找 GGUF 文件
+            if current_depth < max_depth && !is_onnx_model_directory(&path) {
+                let sub_models =
+                    scan_single_directory_recursive(&path, current_depth + 1, max_depth);
+                models.extend(sub_models);
+            }
+        }
+    }
+
+    models
+}
+
+/// Check if a directory contains ONNX model files
+fn is_onnx_model_directory(path: &Path) -> bool {
+    if !path.is_dir() {
+        return false;
+    }
+
+    // Look for .onnx or .ort files
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let entry_path = entry.path();
+            if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
+                if ext == "onnx" || ext == "ort" {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Get model ID from path (filename or directory name without extension)
+fn get_model_id_from_path(path: &Path) -> String {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+/// Get file/directory size in MB
+fn get_size_mb(path: &Path) -> Option<u64> {
+    if path.is_file() {
+        fs::metadata(path).ok().map(|m| m.len() / (1024 * 1024))
+    } else if path.is_dir() {
+        // For directories, calculate total size
+        let mut total = 0;
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if entry.path().is_file() {
+                    if let Ok(meta) = fs::metadata(entry.path()) {
+                        total += meta.len();
+                    }
+                }
+            }
+        }
+        Some(total / (1024 * 1024))
+    } else {
+        None
+    }
+}
+
+/// Scan an ONNX model directory and create a preset
+fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
+    let id = get_model_id_from_path(path);
+
+    // Try to match against preset
+    let preset = presets
+        .iter()
+        .find(|p| p.id == id && p.backend == Some(BackendType::Onnx));
+
+    let size_mb = get_size_mb(path);
+
+    // 记录扫描到的实际路径
+    let model_path = path.to_string_lossy().to_string();
+
+    if let Some(p) = preset {
+        // Use preset configuration with actual size
+        Some(ModelPreset::asr_preset_with_path(
+            p.id.clone(),
+            p.name.clone(),
+            size_mb
+                .map(|s| format!("{}MB", s))
+                .unwrap_or_else(|| p.size.clone()),
+            BackendType::Onnx,
+            p.download_urls.clone(),
+            p.languages.clone(),
+            p.description.clone(),
+            p.supports_auto_detect,
+            p.supports_streaming,
+            p.supports_translation,
+            Some(model_path),
+        ))
+    } else {
+        // Generate default preset for unknown ONNX model
+        Some(ModelPreset::asr_preset_with_path(
+            id.clone(),
+            id.clone(),
+            size_mb
+                .map(|s| format!("{}MB", s))
+                .unwrap_or_else(|| "未知大小".to_string()),
+            BackendType::Onnx,
+            Vec::new(),
+            vec!["zh".to_string(), "en".to_string()], // Default languages
+            Some("用户自定义 ONNX 模型".to_string()),
+            None, // Unknown supports_auto_detect
+            None, // Unknown supports_streaming
+            None, // Unknown supports_translation
+            Some(model_path),
+        ))
+    }
+}
+
+/// Scan a GGUF/GGML model file and create a preset
+///
+/// GGUF (.gguf) and GGML (.bin) files are used by the TranscribeCpp backend.
+/// Supports various ASR architectures: Whisper, Qwen3-ASR, Parakeet, Voxtral, etc.
+fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    // Extract model ID from filename (remove .gguf or .bin extension)
+    let id = filename
+        .strip_suffix(".gguf")
+        .or_else(|| filename.strip_suffix(".bin"))
+        .unwrap_or(filename)
+        .to_string();
+
+    // Probe capabilities from GGUF file
+    let caps = probe_gguf_capabilities(path);
+
+    // Try to match against preset:
+    // 1. First try exact ID match (e.g., "Qwen3-ASR-1.7B-Q5_K_M" matches preset)
+    // 2. If no exact match, treat as user custom model (don't map to a different preset)
+    let preset = presets.iter().find(|p| {
+        p.backend == Some(BackendType::TranscribeCpp) && p.id == id
+    });
+
+    let size_mb = get_size_mb(path);
+
+    // 记录扫描到的实际路径
+    let model_path = path.to_string_lossy().to_string();
+
+    // Generate display name based on architecture and size
+    // 如果架构已知，显示为 "架构名 (量化信息)"
+    // 如果架构未知，直接使用文件名作为名称
+    let name = if caps.architecture.is_some() {
+        format!(
+            "{} ({})",
+            caps.display_name(),
+            id.split('-').last().unwrap_or(&id)
+        )
+    } else {
+        // Unknown architecture: use filename as display name
+        id.clone()
+    };
+
+    // Determine supported languages from capabilities
+    // 注意：对于已知架构，caps.languages 应该包含预设的语言列表
+    let languages = match &caps.languages {
+        Some(langs) if langs.is_empty() => {
+            // Multilingual model (like Whisper)
+            log::debug!("[GGUF Scanner] {} is multilingual (empty languages)", id);
+            vec![
+                "zh".to_string(),
+                "en".to_string(),
+                "ja".to_string(),
+                "ko".to_string(),
+            ]
+        }
+        Some(langs) => {
+            // 使用预设语言列表（已知架构）或 GGUF 语言列表（未知架构）
+            log::debug!("[GGUF Scanner] {} languages: {:?}", id, langs);
+            langs.clone()
+        }
+        None => {
+            // Unknown languages, assume multilingual
+            log::debug!("[GGUF Scanner] {} has no language info", id);
+            vec![
+                "zh".to_string(),
+                "en".to_string(),
+                "ja".to_string(),
+                "ko".to_string(),
+            ]
+        }
+    };
+
+    // Get capabilities from probed GGUF metadata
+    let supports_auto_detect = caps.supports_language_detect;
+    let supports_streaming = caps.supports_streaming;
+    let supports_translation = caps.supports_translation;
+
+    if let Some(p) = preset {
+        // Use preset configuration with actual file size
+        Some(ModelPreset::asr_preset_with_path(
+            p.id.clone(),
+            p.name.clone(),
+            size_mb
+                .map(|s| format!("{}MB", s))
+                .unwrap_or_else(|| p.size.clone()),
+            BackendType::TranscribeCpp,
+            p.download_urls.clone(),
+            languages,
+            p.description.clone(),
+            supports_auto_detect,
+            supports_streaming,
+            supports_translation,
+            Some(model_path),
+        ))
+    } else {
+        // Generate default preset for unknown GGUF model
+        let description = if caps.architecture.is_some() {
+            Some(format!(
+                "{}GGUF 模型，{}",
+                caps.display_name(),
+                if caps.supports_streaming.unwrap_or(false) {
+                    "支持流式转录"
+                } else {
+                    "批量转录"
+                }
+            ))
+        } else {
+            Some("用户自定义 GGUF 模型".to_string())
+        };
+
+        Some(ModelPreset::asr_preset_with_path(
+            id.clone(),
+            name,
+            size_mb
+                .map(|s| format!("{}MB", s))
+                .unwrap_or_else(|| "未知大小".to_string()),
+            BackendType::TranscribeCpp,
+            Vec::new(),
+            languages,
+            description,
+            supports_auto_detect,
+            supports_streaming,
+            supports_translation,
+            Some(model_path),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    /// Create a test ONNX model directory
+    fn create_test_onnx_dir(dir: &Path, name: &str) -> PathBuf {
+        let model_dir = dir.join(name);
+        fs::create_dir_all(&model_dir).unwrap();
+        // Create a dummy .onnx file
+        let onnx_path = model_dir.join("model.int8.onnx");
+        fs::File::create(&onnx_path).unwrap();
+        model_dir
+    }
+
+    /// Create a test GGUF file
+    fn create_test_gguf_file(dir: &Path, name: &str, size_bytes: u64) -> PathBuf {
+        let path = dir.join(name);
+        let mut file = fs::File::create(&path).unwrap();
+        if size_bytes > 0 {
+            let content = vec![0u8; size_bytes as usize];
+            use std::io::Write;
+            file.write_all(&content).unwrap();
+        }
+        path
+    }
+
+    #[test]
+    fn test_scan_empty_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+        assert!(models.is_empty());
+    }
+
+    #[test]
+    fn test_scan_known_onnx_model() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a sensevoice-small directory (matching preset)
+        create_test_onnx_dir(temp_dir.path(), "sensevoice-small");
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.id, "sensevoice-small");
+        assert_eq!(model.backend, Some(BackendType::Onnx));
+        // Should have preset languages (zh, zh-yue, en, ja, ko)
+        assert!(model.languages.contains(&"zh".to_string()));
+        assert!(model.languages.contains(&"zh-yue".to_string()));
+    }
+
+    #[test]
+    fn test_scan_unknown_onnx_model() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create an unknown ONNX model directory
+        create_test_onnx_dir(temp_dir.path(), "custom-onnx-model");
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.id, "custom-onnx-model");
+        assert_eq!(model.backend, Some(BackendType::Onnx));
+        assert!(model.description.as_ref().unwrap().contains("用户自定义"));
+    }
+
+    #[test]
+    fn test_is_onnx_model_directory() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a directory with .onnx file
+        let onnx_dir = temp_dir.path().join("onnx-model");
+        fs::create_dir_all(&onnx_dir).unwrap();
+        fs::File::create(onnx_dir.join("model.onnx")).unwrap();
+        assert!(is_onnx_model_directory(&onnx_dir));
+
+        // Create a directory with .ort file (ONNX Runtime format)
+        let ort_dir = temp_dir.path().join("ort-model");
+        fs::create_dir_all(&ort_dir).unwrap();
+        fs::File::create(ort_dir.join("encoder.ort")).unwrap();
+        assert!(is_onnx_model_directory(&ort_dir));
+
+        // Create a directory without ONNX files
+        let empty_dir = temp_dir.path().join("empty-dir");
+        fs::create_dir_all(&empty_dir).unwrap();
+        assert!(!is_onnx_model_directory(&empty_dir));
+    }
+
+    /// Helper function for tests to scan from a specific path
+    fn scan_available_asr_models_from_path(storage_dir: &Path) -> Vec<ModelPreset> {
+        scan_single_directory(storage_dir)
+    }
+
+    #[test]
+    fn test_scan_qwen3_asr_gguf_model() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a Qwen3-ASR GGUF file
+        create_test_gguf_file(
+            temp_dir.path(),
+            "qwen3-asr-0.6b-q4_0.gguf",
+            600 * 1024 * 1024,
+        );
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.backend, Some(BackendType::TranscribeCpp));
+        assert!(model.id.contains("qwen3-asr"));
+    }
+
+    #[test]
+    fn test_scan_unknown_gguf_model() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create an unknown GGUF file
+        create_test_gguf_file(temp_dir.path(), "custom-asr-model.gguf", 100 * 1024 * 1024);
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.backend, Some(BackendType::TranscribeCpp));
+        assert!(model.description.is_some());
+        assert!(model.description.as_ref().unwrap().contains("用户自定义"));
+    }
+
+    #[test]
+    fn test_scan_gguf_various_architectures() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create GGUF files for various architectures
+        let gguf_files = [
+            "parakeet-tdt-1.1b.gguf",
+            "sensevoice-small.gguf",
+            "voxtral-mini.gguf",
+            "moonshine-base.gguf",
+        ];
+
+        for filename in gguf_files {
+            create_test_gguf_file(temp_dir.path(), filename, 100 * 1024 * 1024);
+        }
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        assert_eq!(models.len(), 4);
+
+        // All should be TranscribeCpp backend
+        for model in &models {
+            assert_eq!(model.backend, Some(BackendType::TranscribeCpp));
+        }
+    }
+}

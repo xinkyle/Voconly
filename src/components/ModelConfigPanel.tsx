@@ -1,0 +1,1039 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { open } from '@tauri-apps/plugin-dialog';
+import type {
+  AsrModelWithStatus,
+  LlmModelWithStatus,
+  ModelPreset,
+  LlmModelPreset,
+} from '../services/config';
+import type { Model, ProviderWithConfig, LlmProviderInstance } from '../types';
+import {
+  getAsrModelList,
+  getLlmModelList,
+  getCustomAsrModelDirs,
+  addCustomAsrModelDir,
+  removeCustomAsrModelDir,
+} from '../services/config';
+import { getProviderList, saveProviderConfig, deleteProviderConfig, detectGpu } from '../services/llm';
+import { createLogger } from '../services/log';
+import type { DownloadProgress, DownloadCompleteEvent } from '../services/downloader';
+import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
+import ProviderConfigModal from './ProviderConfigModal';
+import { useToast } from './ui/Toast';
+
+const log = createLogger('ModelConfigPanel');
+
+// Provider logo mapping (meta.id -> icon file name)
+const PROVIDER_LOGO_MAP: Record<string, string> = {
+  ollama: 'ollama.png',
+  openai: 'openai.png',
+  deepseek: 'deepseek.png',
+  gemini: 'gemini.png',
+  glm: 'zhipu.png',          // 智谱 AI
+  minimax: 'minimax.png',
+  kimi: 'kimi.png',
+  qwen: 'qwen.png',
+  claude: 'anthropic.png',   // Anthropic Claude
+  groq: 'groq.png',
+  openrouter: 'openrouter.png',
+  cerebras: 'cerebras.png',
+  siliconflow: 'siliconflow.png',
+  yi: 'yi.png',
+  custom: 'custom.png',
+  llama_cpp: 'llamacpp.png',
+};
+
+// Get provider logo path
+const getProviderLogo = (providerId: string): string | null => {
+  const logoFile = PROVIDER_LOGO_MAP[providerId];
+  if (logoFile) {
+    return `/icons/${logoFile}`;
+  }
+  return null;
+};
+
+// ASR model logo mapping (model id prefix -> icon file name)
+const ASR_MODEL_LOGO_MAP: Record<string, string> = {
+  'whisper': 'openai.png',      // OpenAI Whisper
+  'ggml-': 'openai.png',        // GGML 格式的 Whisper 模型（如 ggml-turbo.bin）
+  'qwen': 'qwen.png',           // Alibaba Qwen/SenseVoice 系列（qwen3-asr, sensevoice 等）
+  'nemotron': 'nvidia.svg',     // NVIDIA Nemotron
+  'parakeet': 'nvidia.svg',     // NVIDIA Parakeet
+  'sensevoice': 'qwen.png',     // Alibaba SenseVoice（兼容旧版命名）
+  'moonshine': 'custom.png',    // Moonshine
+  'cohere': 'cohere-logo.svg',
+};
+
+// Get ASR model logo path based on model id
+const getAsrModelLogo = (modelId: string): string => {
+  const lowerModelId = modelId.toLowerCase();
+  for (const [prefix, logoFile] of Object.entries(ASR_MODEL_LOGO_MAP)) {
+    if (lowerModelId.startsWith(prefix.toLowerCase())) {
+      return `/icons/${logoFile}`;
+    }
+  }
+  // 默认图标
+  return '/icons/custom.png';
+};
+
+// Default ASR models with descriptions
+const DEFAULT_ASR_MODELS: (ModelPreset & { descriptionKey: string })[] = [
+  {
+    id: 'whisper-tiny',
+    name: 'Whisper Tiny',
+    size: '75MB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperTiny',
+  },
+  {
+    id: 'whisper-base',
+    name: 'Whisper Base',
+    size: '142MB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperBase',
+  },
+  {
+    id: 'whisper-small',
+    name: 'Whisper Small',
+    size: '244MB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperSmall',
+  },
+  {
+    id: 'whisper-medium',
+    name: 'Whisper Medium',
+    size: '1.5GB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperMedium',
+  },
+  {
+    id: 'whisper-large',
+    name: 'Whisper Large',
+    size: '2.9GB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperLarge',
+  },
+  {
+    id: 'whisper-turbo',
+    name: 'Whisper Turbo',
+    size: '1.6GB',
+    modelType: 'asr',
+    backend: 'Whisper',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.whisperTurbo',
+  },
+  {
+    id: 'sensevoice-small',
+    name: 'SenseVoice Small',
+    size: '229MB',
+    modelType: 'asr',
+    backend: 'Onnx',
+    languages: ['zh', 'zh-yue', 'en', 'ja', 'ko'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.sensevoiceSmall',
+  },
+  {
+    id: 'parakeet-v3',
+    name: 'Parakeet V3',
+    size: '640MB',
+    modelType: 'asr',
+    backend: 'Onnx',
+    languages: ['zh', 'en'],
+    downloadUrls: [],
+    descriptionKey: 'models.descriptions.parakeetV3',
+  },
+];
+
+// Default LLM models
+const DEFAULT_LLM_MODELS: (LlmModelPreset & { descriptionKey: string })[] = [
+  {
+    id: 'Qwen3-4B-Instruct-2507-Q4_K_M',
+    name: 'Qwen3-4B-Instruct-2507 Q4_K_M',
+    size: '~2.5GB',
+    downloadUrls: [],
+    nGpuLayers: -1,
+    nCtx: 4096,
+    recommended: true,
+    description: '',
+    descriptionKey: 'models.descriptions.qwen3b',
+  },
+  {
+    id: 'Qwen3.5-9B-Q4_K_M',
+    name: 'Qwen3.5-9B-Q4_K_M',
+    size: '~6GB',
+    downloadUrls: [],
+    nGpuLayers: -1,
+    nCtx: 4096,
+    recommended: false,
+    description: '',
+    descriptionKey: 'models.descriptions.qwen7b',
+  },
+];
+
+interface ModelConfigPanelProps {
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
+  onDownload?: (model: Model) => void;
+  onDownloadCancel?: (modelId: string) => void;
+  onAsrModelSelect?: (modelId: string) => void;
+  selectedAsrModelId?: string;
+  onConfigUpdate?: () => void; // 通知父组件重新加载配置
+}
+
+// Icons
+const DownloadIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+// ASR Model Card Component
+interface AsrModelCardProps {
+  model: AsrModelWithStatus;
+  isSelected: boolean;
+  isDownloading: boolean;
+  downloadProgress?: DownloadProgress;
+  onSelect: () => void;
+  onDownload: () => void;
+  onDownloadCancel?: () => void;
+  t: (key: string) => string;
+}
+
+function AsrModelCard({
+  model,
+  isSelected,
+  isDownloading,
+  downloadProgress,
+  onSelect,
+  onDownload,
+  onDownloadCancel,
+  t,
+}: AsrModelCardProps) {
+  const isDownloaded = model.downloaded;
+  const knownModel = DEFAULT_ASR_MODELS.find((m) => m.id === model.preset.id);
+  const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
+  const logoPath = getAsrModelLogo(model.preset.id);
+
+  return (
+    <div
+      onClick={isDownloaded ? onSelect : undefined}
+      className={`group relative rounded-xl border transition-all duration-200 overflow-hidden ${
+        isSelected
+          ? 'border-gray-900 bg-gray-50'
+          : isDownloaded
+            ? 'border-gray-200 bg-gray-50 hover:border-gray-300 cursor-pointer'
+            : 'border-gray-200 bg-white'
+      }`}
+    >
+      {/* Full-card progress background */}
+      {isDownloading && (
+        <div className="absolute inset-0 overflow-hidden rounded-xl">
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
+            style={{ width: `${downloadProgress?.percentage ?? 0}%` }}
+          />
+          <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+        </div>
+      )}
+
+      {/* Downloaded badge - top right corner for downloaded but not selected */}
+      {isDownloaded && !isSelected && (
+        <div className="absolute top-2 right-2 z-10">
+          <CheckIcon className="w-4 h-4 text-emerald-600" />
+        </div>
+      )}
+
+      <div className="relative px-3 py-2 z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
+            {/* ASR Model Logo */}
+            {logoPath && (
+              <img
+                src={logoPath}
+                alt={model.preset.name}
+                className="w-5 h-5 object-contain flex-shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              {/* Model Name */}
+              <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
+                {model.preset.name}
+              </h3>
+              {/* Description */}
+              <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
+            </div>
+          </div>
+
+          {/* Status/Action */}
+          <div className="relative flex-shrink-0 z-10">
+            {isDownloaded ? (
+              isSelected ? (
+                <CheckIcon className="w-4 h-4 text-emerald-600" />
+              ) : null
+            ) : isDownloading ? (
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
+                {onDownloadCancel && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDownloadCancel();
+                    }}
+                    className="text-xs text-red-500 hover:text-red-600 underline"
+                  >
+                    {t('models.cancel')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownload();
+                }}
+                className="flex items-center justify-center w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+              >
+                <DownloadIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Selected indicator bar */}
+      {isSelected && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-b-xl" />
+      )}
+    </div>
+  );
+}
+
+// LLM Model Card Component
+interface LlmModelCardProps {
+  model: LlmModelWithStatus;
+  isDownloading: boolean;
+  downloadProgress?: DownloadProgress;
+  onDownload: () => void;
+  onDownloadCancel?: () => void;
+  t: (key: string) => string;
+}
+
+function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDownloadCancel, t }: LlmModelCardProps) {
+  const isDownloaded = model.downloaded;
+  const knownModel = DEFAULT_LLM_MODELS.find((m) => m.id === model.preset.id);
+  const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
+
+  return (
+    <div className="group relative rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all duration-200 overflow-hidden">
+      {/* Full-card progress background */}
+      {isDownloading && (
+        <div className="absolute inset-0 overflow-hidden rounded-xl">
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
+            style={{ width: `${downloadProgress?.percentage ?? 0}%` }}
+          />
+          <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+        </div>
+      )}
+
+      <div className="relative px-3 py-2 z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 pr-6">
+            {/* Model Name */}
+            <h3 className="font-semibold text-sm text-gray-800">{model.preset.name}</h3>
+            {/* Description */}
+            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
+          </div>
+
+          {/* Status/Action */}
+          <div className="relative flex-shrink-0 z-10">
+            {isDownloaded ? (
+              <CheckIcon className="w-4 h-4 text-emerald-600" />
+            ) : isDownloading ? (
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
+                {onDownloadCancel && (
+                  <button
+                    onClick={onDownloadCancel}
+                    className="text-xs text-red-500 hover:text-red-600 underline"
+                  >
+                    {t('models.cancel')}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={onDownload}
+                className="flex items-center justify-center w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+              >
+                <DownloadIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Cloud Provider Card Component - updated to use ProviderWithConfig
+interface CloudProviderCardProps {
+  provider: ProviderWithConfig;
+  onConfigure: () => void;
+  onEdit: () => void;
+  t: (key: string) => string;
+}
+
+function CloudProviderCard({ provider, onConfigure, onEdit, t }: CloudProviderCardProps) {
+  const isConfigured = provider.instance?.enabled ?? false;
+  const logoPath = getProviderLogo(provider.meta.id);
+
+  return (
+    <div
+      onClick={onConfigure}
+      className={`group relative rounded-xl border transition-all duration-200 cursor-pointer ${
+        isConfigured
+          ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-300'
+          : 'border-gray-200 bg-white hover:border-gray-300'
+      }`}
+    >
+      <div className="px-3 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
+            {/* Provider Logo */}
+            {logoPath && (
+              <img
+                src={logoPath}
+                alt={provider.meta.label}
+                className="w-5 h-5 object-contain flex-shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              {/* Provider Name */}
+              <h3 className="font-semibold text-sm text-gray-800 truncate">
+                {provider.meta.id === 'llama_cpp' ? t('provider.llamaCppLabel') : provider.meta.label}
+              </h3>
+              {/* Description */}
+              <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.meta.description}</p>
+            </div>
+          </div>
+
+          {/* Configure/Status Button */}
+          <div className="flex-shrink-0">
+            {isConfigured ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 hover:bg-emerald-200 transition-colors"
+                >
+                  <CheckIcon className="w-3 h-3" />
+                  <span className="text-xs font-medium">{t('models.configured')}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  title={t('common.edit')}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div className="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg group-hover:bg-amber-100 transition-colors">
+                {t('models.setup')}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ModelConfigPanel({
+  downloadStates = {},
+  onDownload,
+  onDownloadCancel,
+  onAsrModelSelect,
+  selectedAsrModelId,
+  onConfigUpdate,
+}: ModelConfigPanelProps) {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+
+  // State
+  const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
+  const [llmModels, setLlmModels] = useState<LlmModelWithStatus[]>([]);
+  const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
+  const [customDirs, setCustomDirs] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [showCustomDirModal, setShowCustomDirModal] = useState(false);
+
+  // Load data
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [asrResult, llmResult, providerResult, customDirsResult] = await Promise.all([
+          getAsrModelList(),
+          getLlmModelList(),
+          getProviderList(),
+          getCustomAsrModelDirs(),
+        ]);
+        setAsrModels(asrResult);
+        setLlmModels(llmResult);
+        setProviders(providerResult);
+        setCustomDirs(customDirsResult);
+        log.info(
+          `Loaded ${asrResult.length} ASR models, ${llmResult.length} LLM models, ${providerResult.length} providers, ${customDirsResult.length} custom dirs`
+        );
+      } catch (err) {
+        log.error(`Failed to load model data: ${err}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Reload on download complete
+  useEffect(() => {
+    let mounted = true;
+    const unlisten = subscribeToDownloadComplete((event: DownloadCompleteEvent) => {
+      if (!mounted) return;
+
+      // Check if this is an LLM model download (non-ASR model)
+      const downloadedModelId = event.modelId;
+      const isLlmDownload = downloadedModelId && !downloadedModelId.startsWith('whisper') &&
+                            !downloadedModelId.startsWith('sensevoice') &&
+                            !downloadedModelId.startsWith('moonshine') &&
+                            !downloadedModelId.startsWith('parakeet');
+
+      Promise.all([getAsrModelList(), getLlmModelList(), getProviderList()])
+        .then(async ([asrResult, llmResult, providerList]) => {
+          if (!mounted) return;
+          setAsrModels(asrResult);
+          setLlmModels(llmResult);
+          setProviders(providerList);
+
+          // Auto-configure llama.cpp provider if an LLM model was downloaded and llama.cpp is not configured
+          if (isLlmDownload) {
+            const llamaProvider = providerList.find(p => p.meta.id === 'llama_cpp');
+            const downloadedModel = llmResult.find(m => m.downloaded);
+
+            if (llamaProvider && !llamaProvider.instance?.enabled && downloadedModel) {
+              log.info(`[ModelConfig] Auto-configuring llama.cpp with downloaded model: ${downloadedModel.preset.id}`);
+
+              try {
+                // Detect GPU for optimal n_gpu_layers
+                let nGpuLayers = -1; // Default: try GPU
+                try {
+                  const gpuInfo = await detectGpu();
+                  if (gpuInfo.available && gpuInfo.recommendedLayers > 0) {
+                    nGpuLayers = gpuInfo.recommendedLayers;
+                  }
+                } catch (e) {
+                  log.warn(`[ModelConfig] GPU detection failed, using default: ${e}`);
+                }
+
+                const instance: LlmProviderInstance = {
+                  metaId: 'llama_cpp',
+                  enabled: true,
+                  baseUrl: '',
+                  defaultModel: downloadedModel.preset.id,
+                  nGpuLayers: nGpuLayers,
+                };
+
+                await saveProviderConfig('llama_cpp', instance);
+                log.info(`[ModelConfig] llama.cpp auto-configured successfully`);
+
+                // Refresh provider list
+                const updatedProviders = await getProviderList();
+                if (mounted) {
+                  setProviders(updatedProviders);
+                }
+              } catch (err) {
+                log.error(`[ModelConfig] Failed to auto-configure llama.cpp: ${err}`);
+              }
+            }
+          }
+        })
+        .catch((err) => log.error(`Failed to reload models: ${err}`));
+    });
+    return () => {
+      mounted = false;
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // Handlers
+  const handleAsrModelSelect = (modelId: string) => {
+    if (onAsrModelSelect) {
+      onAsrModelSelect(modelId);
+    }
+  };
+
+  const handleAsrDownload = (model: AsrModelWithStatus) => {
+    if (onDownload) {
+      // Build a Model object from AsrModelWithStatus
+      const modelObj: Model = {
+        id: model.preset.id,
+        name: model.preset.name,
+        backend: model.preset.backend || 'Whisper',
+        size: model.preset.size,
+        downloaded: model.downloaded,
+        downloadUrls: model.preset.downloadUrls || [],
+        languages: model.preset.languages || [],
+        description: model.preset.description,
+        modelType: 'asr',
+      };
+      onDownload(modelObj);
+    }
+  };
+
+  const handleLlmDownload = (model: LlmModelWithStatus) => {
+    if (onDownload) {
+      // Build a Model object from LlmModelWithStatus
+      const modelObj: Model = {
+        id: model.preset.id,
+        name: model.preset.name,
+        backend: 'Whisper', // Placeholder, not used for LLM
+        size: model.preset.size,
+        downloaded: model.downloaded,
+        downloadUrls: model.preset.downloadUrls || [],
+        languages: [],
+        description: model.preset.description,
+        modelType: 'llm',
+      };
+      onDownload(modelObj);
+    }
+  };
+
+  const handleDownloadCancel = async (modelId: string) => {
+    try {
+      log.info(`Canceling download for model: ${modelId}`);
+      const success = await cancelModelDownload(modelId);
+      if (success) {
+        log.info(`Download cancelled successfully for ${modelId}`);
+        if (onDownloadCancel) {
+          onDownloadCancel(modelId);
+        }
+      } else {
+        log.warn(`No active download found for ${modelId}`);
+      }
+    } catch (error) {
+      log.error(`Failed to cancel download: ${error}`);
+    }
+  };
+
+  // Handle import custom ASR model directory
+  const handleImportCustomDir = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: t('modelConfig.importCustomDirTitle'),
+      });
+
+      if (selected) {
+        const result = await addCustomAsrModelDir(selected as string);
+        if (result) {
+          // Refresh model list and custom dirs
+          const [asrResult, customDirsResult] = await Promise.all([
+            getAsrModelList(),
+            getCustomAsrModelDirs(),
+          ]);
+          setAsrModels(asrResult);
+          setCustomDirs(customDirsResult);
+          // Notify parent to reload config from file
+          onConfigUpdate?.();
+          showToast({
+            type: 'success',
+            title: t('modelConfig.customDirAdded'),
+            description: selected as string,
+          });
+        }
+      }
+    } catch (err) {
+      log.error(`Failed to import custom directory: ${err}`);
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: String(err),
+      });
+    }
+  };
+
+  // Handle remove custom ASR model directory
+  const handleRemoveCustomDir = async (dirPath: string) => {
+    try {
+      const result = await removeCustomAsrModelDir(dirPath);
+      if (result) {
+        // Refresh model list and custom dirs
+        const [asrResult, customDirsResult] = await Promise.all([
+          getAsrModelList(),
+          getCustomAsrModelDirs(),
+        ]);
+        setAsrModels(asrResult);
+        setCustomDirs(customDirsResult);
+        // Notify parent to reload config from file
+        onConfigUpdate?.();
+        showToast({
+          type: 'success',
+          title: t('modelConfig.customDirRemoved'),
+          description: dirPath,
+        });
+      }
+    } catch (err) {
+      log.error(`Failed to remove custom directory: ${err}`);
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: String(err),
+      });
+    }
+  };
+
+  const handleProviderConfigure = (providerId: string) => {
+    const provider = providers.find((p) => p.meta.id === providerId);
+    if (provider) {
+      setSelectedProvider(provider);
+      setShowProviderModal(true);
+    }
+  };
+
+  // Check if any ASR model is downloaded
+  const hasDownloadedAsr = asrModels.some((m) => m.downloaded);
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-gray-500">{t('models.loading')}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[400px] space-y-6">
+      {/* Page Header - Gray info card style like SettingsLlm */}
+      <div className="p-4 bg-gray-100 border border-gray-200 rounded-xl">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-gray-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h1 className="text-base font-semibold text-gray-900">{t('modelConfig.title')}</h1>
+            <p className="text-sm text-gray-600 mt-0.5">{t('modelConfig.subtitle')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 1: ASR Models - Voice to Text */}
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.asrTitle')}</h2>
+                  {hasDownloadedAsr ? (
+                    <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-900 text-white rounded-full">
+                      <CheckIcon className="w-3 h-3" />
+                      {t('models.ready')}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-red-50 text-red-600 rounded-full border border-red-200">
+                      必须选择
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.asrSubtitle')}</p>
+              </div>
+            </div>
+            {/* Custom model directories button */}
+            <button
+              onClick={() => setShowCustomDirModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 hover:text-gray-700 transition-colors"
+              title={t('modelConfig.customDirManageHint')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {t('modelConfig.customDirManage')}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Warning for no ASR */}
+          {!hasDownloadedAsr && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">{t('modelConfig.asrRequired')}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {asrModels.map((model) => (
+              <AsrModelCard
+                key={model.preset.id}
+                model={model}
+                isSelected={selectedAsrModelId === model.preset.id}
+                isDownloading={downloadStates[model.preset.id]?.downloading ?? false}
+                downloadProgress={downloadStates[model.preset.id]?.progress}
+                onSelect={() => handleAsrModelSelect(model.preset.id)}
+                onDownload={() => handleAsrDownload(model)}
+                onDownloadCancel={() => handleDownloadCancel(model.preset.id)}
+                t={t}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section 2: Local LLM Models */}
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.llmTitle')}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.llmSubtitle')}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {llmModels.map((model) => (
+              <LlmModelCard
+                key={model.preset.id}
+                model={model}
+                isDownloading={downloadStates[model.preset.id]?.downloading ?? false}
+                downloadProgress={downloadStates[model.preset.id]?.progress}
+                onDownload={() => handleLlmDownload(model)}
+                onDownloadCancel={() => handleDownloadCancel(model.preset.id)}
+                t={t}
+              />
+            ))}
+          </div>
+
+          {llmModels.length === 0 && (
+            <div className="p-8 bg-gray-50 border border-gray-200 rounded-xl text-center">
+              <p className="text-gray-500">{t('modelConfig.noLlmModels')}</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Section 3: LLM Providers - Local & Cloud */}
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.llmProvidersTitle')}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.llmProvidersSubtitle')}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Local LLM (llama_cpp) first */}
+            {providers
+              .filter((provider) => provider.meta.id === 'llama_cpp')
+              .map((provider) => (
+                <CloudProviderCard
+                  key={provider.meta.id}
+                  provider={provider}
+                  onConfigure={() => handleProviderConfigure(provider.meta.id)}
+                  onEdit={() => handleProviderConfigure(provider.meta.id)}
+                  t={t}
+                />
+              ))}
+
+            {/* Cloud providers */}
+            {providers
+              .filter((provider) => provider.meta.id !== 'llama_cpp')
+              .map((provider) => (
+                <CloudProviderCard
+                  key={provider.meta.id}
+                  provider={provider}
+                  onConfigure={() => handleProviderConfigure(provider.meta.id)}
+                  onEdit={() => handleProviderConfigure(provider.meta.id)}
+                  t={t}
+                />
+              ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Provider Config Modal */}
+      {showProviderModal && selectedProvider && (
+        <ProviderConfigModal
+          provider={selectedProvider}
+          onClose={() => {
+            setShowProviderModal(false);
+            setSelectedProvider(null);
+          }}
+          onSave={async (providerId, instance) => {
+            // Save to backend first
+            await saveProviderConfig(providerId, instance);
+            // Refresh provider list after save
+            const list = await getProviderList();
+            setProviders(list);
+            setShowProviderModal(false);
+            setSelectedProvider(null);
+            showToast({
+              type: 'success',
+              title: t('modelConfig.providerSaved'),
+              description: selectedProvider.meta.label,
+            });
+          }}
+          onDelete={async (providerId) => {
+            // Delete from backend first
+            await deleteProviderConfig(providerId);
+            // Refresh provider list after delete
+            const list = await getProviderList();
+            setProviders(list);
+            setShowProviderModal(false);
+            setSelectedProvider(null);
+            showToast({
+              type: 'info',
+              title: t('modelConfig.providerDeleted'),
+              description: selectedProvider.meta.label,
+            });
+          }}
+        />
+      )}
+
+      {/* Custom Directory Management Modal */}
+      {showCustomDirModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">{t('modelConfig.customDirModalTitle')}</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.customDirModalDesc')}</p>
+              </div>
+              <button
+                onClick={() => setShowCustomDirModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-5 py-4">
+              {/* Add button */}
+              <button
+                onClick={handleImportCustomDir}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="font-medium">{t('modelConfig.addCustomDir')}</span>
+              </button>
+
+              {/* Directory list */}
+              <div className="mt-4">
+                {customDirs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <p className="text-sm">{t('modelConfig.noCustomDirs')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {customDirs.map((dirPath) => (
+                      <div
+                        key={dirPath}
+                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl group hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span className="flex-1 text-sm text-gray-700 truncate" title={dirPath}>{dirPath}</span>
+                        <button
+                          onClick={() => handleRemoveCustomDir(dirPath)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title={t('modelConfig.removeCustomDir')}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
+              <button
+                onClick={() => setShowCustomDirModal(false)}
+                className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

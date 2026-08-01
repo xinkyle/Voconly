@@ -1,0 +1,47 @@
+[package]
+name = "transcribe-rs"
+version = "0.3.2"
+edition = "2021"
+description = "A simple library to help you transcribe audio (patched for context isolation)"
+license = "MIT"
+repository = "https://github.com/cjpais/transcribe-rs"
+
+[features]
+default = []
+
+# Shared audio feature extraction (mel spectrogram, CTC decode, etc.)
+audio-features = ["dep:ndarray", "dep:rustfft"]
+
+# ONNX-based models (SenseVoice, GigaAM, Parakeet, Moonshine, Canary)
+onnx = ["audio-features", "dep:ort", "dep:base64", "dep:regex", "dep:once_cell"]
+
+
+# --- ORT Accelerators ---
+ort-cuda     = ["onnx", "ort/cuda"]
+ort-tensorrt = ["ort-cuda", "ort/tensorrt"]
+ort-directml = ["onnx", "ort/directml"]
+ort-rocm     = ["onnx", "ort/rocm"]
+ort-coreml   = ["onnx", "ort/coreml"]
+ort-webgpu   = ["onnx", "ort/webgpu"]
+ort-xnnpack  = ["onnx", "ort/xnnpack"]
+ort-tracing  = ["onnx", "ort/tracing"]
+ort-accel    = ["ort-cuda", "ort-tensorrt", "ort-directml", "ort-rocm", "ort-coreml", "ort-webgpu", "ort-xnnpack"]
+
+[dependencies]
+# Always required
+thiserror = "2"
+hound = "3.5.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4.28"
+env_logger = "0.10.0"
+derive_builder = { version = "0.20.2" }
+
+# ONNX runtime
+ort = { version = "=2.0.0-rc.12", optional = true }
+ndarray = { version = "0.17", optional = true }
+regex = { version = "1.11.2", optional = true }
+once_cell = { version = "1.21.3", optional = true }
+rustfft = { version = "6", optional = true }
+base64 = { version = "0.22", optional = true }
+

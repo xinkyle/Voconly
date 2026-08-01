@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 字体系统 - DM Serif Display + DM Sans */
+  --font-display: var(--font-display), 'DM Serif Display', serif;
+  --font-body: var(--font-body), 'DM Sans', system-ui, sans-serif;
+
+  /* 精简颜色系统：深色基调 + 青色调为主 */
+  --color-bg-primary: #0a0b0f;
+  --color-bg-secondary: #0d1117;
+  --color-accent: #00d4aa;        /* 主强调色 - 青绿色 */
+  --color-accent-soft: rgba(0, 212, 170, 0.1);
+  --color-accent-glow: rgba(0, 212, 170, 0.3);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-text-muted: rgba(255, 255, 255, 0.4);
+  --color-border: rgba(255, 255, 255, 0.08);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text-primary);
+}
+
+:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   字体工具类
+   ======================================== */
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* ========================================
+   玻璃态效果
+   ======================================== */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--color-border);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   按钮样式
+   ======================================== */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.75rem;
+  background: var(--color-accent);
+  color: #0a0b0f !important;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: 8px;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 0 0 rgba(0, 212, 170, 0);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 1.75rem;
+  background: transparent;
+  color: var(--color-text-primary) !important;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   文字渐变
+   ======================================== */
+
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 50%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========================================
+   强调色文字
+   ======================================== */
+
+.text-accent {
+  color: var(--color-accent);
+}
+
+/* ========================================
+   动画
+   ======================================== */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+
+/* ========================================
+   网格背景
+   ======================================== */
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}

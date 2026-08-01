@@ -1,0 +1,14 @@
+<svg
+  width="32"
+  height="32"
+  viewBox="0 0 32 32"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  {/* T字Logo */}
+  <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1"/>
+  <path
+    d="M8 8h16v4h-6v12h-4V12H8V8z"
+    fill="currentColor"
+  />
+</svg>

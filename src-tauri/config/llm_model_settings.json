@@ -1,0 +1,8 @@
+{
+  "models_disable_thinking": [
+    "Qwen3.5-9B",
+    "Qwen3.5-14B",
+    "Qwen3.5-32B"
+  ],
+  "_comment": "匹配规则：模型文件名包含上述任意字符串时，将禁用思考模式（预填空思考块）"
+}

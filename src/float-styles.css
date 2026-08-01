@@ -1,0 +1,630 @@
+/* Float panel specific styles - Pill-shaped Dark Theme */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.animate-slide-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+.animate-slide-out {
+  animation: fadeOut 0.1s ease-in forwards;
+}
+
+/* Float panel container */
+.float-panel-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end; /* 药丸固定在底部，预览区从上方展开 */
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  padding: 0; /* 去掉 padding，让 wrapper 直接填满窗口 */
+}
+
+/* 融合容器 - 包含预览区和状态区 */
+/* 高度填满窗口，由 Rust 控制窗口高度（60px 或 300px） */
+.float-panel-wrapper {
+  --pill-width-ratio: 1; /* 宽度比例变量，可通过 .compact 类调整为 0.6 */
+  --base-pill-width: min(373px, 90vw); /* 基础宽度，限制最大 373px 或视口 90% */
+
+  background: #1e1e23;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* DPI 感知尺寸：基于视口百分比，同时限制范围 */
+  width: calc(var(--base-pill-width) * var(--pill-width-ratio));
+  min-width: min(267px, 80vw); /* 最小宽度保护 */
+  max-width: min(373px, 95vw); /* 最大宽度限制，防止溢出 */
+
+  /* 高度填满窗口，由 Rust 动态控制 */
+  height: 100%;
+  max-height: 100%; /* 不超出窗口 */
+
+  /* 确保在 WebView 边界内完整显示 */
+  margin: 0 auto;
+}
+
+/* 紧凑模式 - 实时显示关闭时药丸宽度缩小为 60% */
+.float-panel-wrapper.compact {
+  --pill-width-ratio: 0.6;
+}
+
+/* 药丸模式 - 仅显示状态栏，内容竖直居中 */
+.float-panel-wrapper.pill-mode {
+  justify-content: center; /* 在竖直方向居中 */
+}
+
+/* 展开模式 - 预览区 + 状态栏，从底部开始排列 */
+/* 状态栏固定在底部，预览区从上方"生长出来"，避免窗口变大时状态栏滑动 */
+.float-panel-wrapper.expanded-mode {
+  justify-content: flex-end; /* 状态栏在底部，预览区在上方 */
+}
+
+/* 预览区域 - 融合在药丸上方 */
+/* 高度由内容决定，通过 React 条件渲染控制是否显示 */
+.preview-area {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1 1 auto; /* 自动填充剩余空间 */
+  padding: 8px 16px;
+  background: rgba(30, 30, 35, 0.6);
+  border-radius: 16px 16px 0 0;
+}
+
+.preview-text {
+  flex: 1;
+  overflow-y: auto;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  /* contentEditable div 编辑支持 */
+  background: transparent;
+  border: none;
+  width: 100%;
+  min-height: 40px; /* 最小高度，确保至少能显示一行 */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  /* 确保内容能撑开高度 */
+  display: block;
+}
+
+/* 预览窗口高度档位 */
+/* 高 - 显示更多内容，默认值，高度由窗口控制 */
+.preview-text.height-high {
+  max-height: none;
+}
+
+/* 中 - 适中显示，限制最大高度约120px（约5行） */
+.preview-text.height-medium {
+  max-height: 120px;
+}
+
+/* 低 - 仅显示约3行（约60px） */
+.preview-text.height-low {
+  max-height: 60px;
+}
+
+.preview-text::-webkit-scrollbar {
+  width: 3px;
+}
+
+.preview-text::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.preview-text::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 编辑状态时轻微背景变化提示用户 */
+.preview-text:focus {
+  background: rgba(255, 255, 255, 0.05);
+  outline: none;
+}
+
+/* placeholder 样式 */
+.preview-text::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+.preview-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* 分隔线 - 联动元素 */
+.divider-line {
+  flex-shrink: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0.15) 80%,
+    transparent 100%
+  );
+  margin: 0;
+}
+
+/* 状态区域 - 原药丸内容 */
+.status-area {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 16px 16px;
+}
+
+/* 融合状态时调整圆角和间距 */
+/* 增加上下 padding 1px，让文字在分割线和底部之间更居中 */
+.status-area.fused {
+  border-radius: 0;
+  padding: 9px 15px; /* 上下各10px，比默认8px多2px */
+}
+
+/* 独立状态区域（无预览时）- 保持原药丸样式 */
+.status-area:not(.fused) {
+  border-radius: 16px;
+  min-width: 140px;
+  width: auto;
+  /* 不设置 height: 100%，让 wrapper 的 height 控制整体高度 */
+  /* 内容通过 wrapper 的 flex 居中 */
+}
+
+/* Panel styles - Pill-shaped Dark Theme (保留用于兼容) */
+.float-panel {
+  background: #1e1e23;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 14px;
+  width: 140px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Progress background - fills from left to right */
+.progress-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border-radius: 0;
+  transition: transform 0.05s ease-out;
+  z-index: 2;
+}
+
+/* Progress background animation - fills from 0% to 100% */
+.progress-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(52, 199, 89, 0.4) 0%, rgba(48, 209, 88, 0.6) 100%);
+  border-radius: 24px;
+}
+
+@keyframes progressFill {
+  0% {
+    width: 0%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+.float-panel-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* Status row - inline with waveform */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Cancel button - small x button */
+.cancel-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 59, 48, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cancel-button:active {
+  transform: scale(0.9);
+}
+
+/* 折叠/展开按钮 */
+.collapse-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.collapse-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.collapse-toggle-button:active {
+  transform: scale(0.9);
+}
+
+/* 折叠按钮禁用状态（无预览内容时） */
+.collapse-toggle-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.collapse-toggle-button:disabled:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* 预览文字数量徽章 */
+.preview-count-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: rgba(52, 199, 89, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+/* 字数为0时的样式（更低调） */
+.preview-count-badge.empty {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+
+.status-dot.recording {
+  background: #ff3b30;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-dot.buffered {
+  background: #ff9500;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-dot.transcribing {
+  background: #34c759;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-dot.typing {
+  background: #34c759;
+}
+
+.status-dot.idle {
+  background: #8e8e93;
+}
+
+.status-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Progress info - percentage and time */
+.progress-info {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.time-remaining {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Scene name - hidden */
+.scene-name {
+  display: none;
+}
+
+/* Waveform - inline */
+.waveform-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 20px;
+  margin-left: 4px;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.6);
+  transform: scaleY(1);
+  transition: transform 0.1s ease-out;
+  will-change: transform;
+}
+
+.wave-bar.active {
+  background: rgba(255, 255, 255, 0.9);
+  animation: waveScaleAnimation 0.5s ease-in-out infinite;
+}
+
+.wave-bar:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.wave-bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.wave-bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.wave-bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.wave-bar:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+@keyframes waveScaleAnimation {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(3);
+  }
+}
+
+/* Typing progress bar */
+.typing-progress {
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-left: 8px;
+}
+
+.typing-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #34c759 0%, #30d158 100%);
+  border-radius: 2px;
+  animation: progressShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes progressShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Float panel - smooth transitions */
+.float-panel {
+  transition: opacity 0.15s ease-out;
+}
+
+/* Hide waveform when not recording */
+.waveform-container.hidden {
+  display: none;
+}
+
+/* Close button - hidden */
+.close-btn {
+  display: none;
+}
+
+/* Loading spinner - small inline spinning animation */
+@keyframes spinnerRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #34c759;
+  border-radius: 50%;
+  animation: spinnerRotate 0.8s linear infinite;
+}
+
+/* LLM Error State Styles */
+
+/* Error state wrapper - 保持原背景，仅橙色边框高亮 */
+.float-panel-wrapper.error-state {
+  border: 2px solid rgba(255, 149, 0, 0.6);
+  background: #1e1e23;
+}
+
+/* Error status area */
+.status-area.error {
+  border-radius: 16px;
+  min-width: 180px;
+}
+
+/* Error status dot - orange pulsing */
+.status-dot.error {
+  background: #ff9500;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* Confirm button - checkmark button */
+.confirm-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(52, 199, 89, 0.2);
+  color: rgba(52, 199, 89, 0.8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.confirm-button:hover {
+  background: rgba(52, 199, 89, 0.3);
+  color: rgba(52, 199, 89, 1);
+}
+
+.confirm-button:active {
+  transform: scale(0.9);
+}

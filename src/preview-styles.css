@@ -1,0 +1,91 @@
+/* Preview window specific styles */
+/* DPI 感知设计：使用相对单位 */
+.preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* 从顶部开始 */
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  padding: 0 8px 8px 8px; /* 顶部无 padding */
+}
+
+.preview-window {
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 14px;
+
+  /* DPI 感知尺寸 */
+  min-width: min(200px, 80vw);
+  max-width: min(300px, 95vw);
+  min-height: min(40px, 30vh);
+  max-height: min(80px, 60vh);
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: fadeIn 0.2s ease-out;
+
+  /* 确保在视口内 */
+  width: fit-content;
+}
+
+.preview-text {
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.4;
+  max-height: 60px;
+  overflow-y: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.preview-text::-webkit-scrollbar {
+  width: 3px;
+}
+
+.preview-text::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.preview-text::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.15s ease-in forwards;
+}
+
+/* Empty state */
+.preview-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  text-align: center;
+}

@@ -1,0 +1,103 @@
+[package]
+name = "voconly-tauri"
+version = "0.3.6"
+description = "Voconly - 本地语音转文字桌面应用"
+authors = ["Voconly"]
+edition = "2021"
+default-run = "voconly-tauri"
+
+[lib]
+name = "voconly"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+env_filter = "0.1"
+enigo = "0.3"
+arboard = "3"
+dirs = "5"
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+hound = "3.5"
+tokio = { version = "1", features = ["process", "io-util", "sync", "time"] }
+reqwest = { version = "0.12", features = ["stream", "multipart", "json"] }
+futures-util = "0.3"
+lazy_static = "1.4"
+thiserror = "1"
+once_cell = "1"
+indexmap = { version = "2", features = ["serde"] }
+ferrous-opencc = "0.2.3"
+async-trait = "0.1"
+sysinfo = "0.30"
+cpal = "0.15"
+ndarray = "0.17"
+anyhow = "1"
+ort = "2.0.0-rc.12"
+# Windows 上启用 DirectML GPU 加速 + Whisper
+zip = "2"
+# llama.cpp 绑定（optional，本地推理）
+# 使用 llama-cpp-4（活跃维护，支持 Qwen2.5）
+llama-cpp-4 = { version = "0.2", optional = true }
+
+# transcribe-cpp: GGUF ASR 模型支持（Qwen3-ASR、Whisper、Voxtral 等）
+# 统一的 GGUF 模型加载和推理，支持 GPU 加速
+transcribe-cpp = { version = "0.1.3", default-features = false }
+
+# hf-hub: HuggingFace 模型缓存和下载
+hf-hub = { version = "0.3", features = ["tokio"] }
+
+[features]
+default = ["local_llm", "vulkan"]
+local_llm = ["llama-cpp-4"]
+# GPU 加速选项（可同时启用多个）
+vulkan = ["llama-cpp-4/vulkan"]  # 跨平台 Vulkan (AMD/Intel/NVIDIA)
+cuda = ["llama-cpp-4/cuda"]      # NVIDIA CUDA (需要 CUDA SDK)
+metal = ["llama-cpp-4/metal"]    # Apple Metal (macOS only)
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+transcribe-rs = { version = "0.3.2", features = ["onnx", "ort-cuda"] }
+# 启用 Vulkan GPU 加速 (跨平台，支持 NVIDIA/AMD/Intel GPU)
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_SystemInformation", "Win32_UI_HiDpi"] }
+
+# Windows x86_64: transcribe-cpp Vulkan GPU 加速 + dynamic-backends
+# 支持 NVIDIA/AMD/Intel GPU，动态加载后端模块
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+transcribe-cpp = { version = "0.1.3", default-features = false, features = ["dynamic-backends", "vulkan"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.10.0"
+tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS 上 Metal 加速由 transcribe-rs 自动处理
+transcribe-cpp = { version = "0.1.3", default-features = false, features = ["metal"] }
+
+# Patch transcribe-rs to fix Whisper context leakage issue
+# See: patches/transcribe-rs-0.3.2/src/whisper_cpp/mod.rs
+# The patch creates a fresh WhisperState for each transcription to prevent
+# KV cache and prompt_past1 contamination between calls.
+#
+# Patch transcribe-cpp-sys to fix MSVC encoding issues.
+# Add /utf-8 flag to prevent character encoding errors on Windows MSVC.
+[patch.crates-io]
+transcribe-rs = { path = "../patches/transcribe-rs-0.3.2" }
+transcribe-cpp-sys = { path = "../patches/transcribe-cpp-sys-0.1.3" }
+
+# Linux: transcribe-cpp Vulkan GPU 加速 + dynamic-backends
+[target.'cfg(target_os = "linux")'.dependencies]
+transcribe-cpp = { version = "0.1.3", default-features = false, features = ["dynamic-backends", "vulkan"] }

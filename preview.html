@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voconly Preview</title>
+    <!-- 使用空的 data URL 避免 favicon 404 -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/src/preview-base.css" />
+    <script>
+      // 直接在 HTML 中添加日志，确认页面加载
+      console.log('===== PREVIEW.HTML LOADED =====');
+      console.log('Window location: ' + window.location.href);
+      console.log('Document ready state: ' + document.readyState);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/preview-main.tsx"></script>
+  </body>
+</html>

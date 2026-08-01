@@ -1,0 +1,19 @@
+{#- Qwen3 非思考模式 Chat Template - 强制禁用思考过程 #}
+{%- if messages[0]['role'] == 'system' %}
+    {{- '<|im_start|>system\n' + messages[0]['content'] + '<|im_end|>\n' }}
+    {%- set messages = messages[1:] %}
+{%- endif %}
+{%- for message in messages %}
+    {%- if message['role'] == 'user' %}
+        {{- '<|im_start|>user\n' + message['content'] + '<|im_end|>\n' }}
+    {%- elif message['role'] == 'assistant' %}
+        {{- '<|im_start|>assistant\n' + message['content'] + '<|im_end|>\n' }}
+    {%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\n
+
+\n\n
+
+\n\n' }}
+{%- endif %}
