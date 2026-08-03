@@ -1,77 +1,198 @@
 # Voconly
 
-本地语音转文字桌面应用，基于 Tauri + React + Whisper
+**一个本地优先（Local-first）的 AI 语音输入助手。**
 
-## 环境要求
+**让声音成为你的第二键盘。**
+
+说出来，AI 帮你整理，想法直接变成可用内容。
+
+*由老幸.AI 开源 | 15年创业者，正在探索 AI 时代的个人创造*
+
+---
+
+## 为什么做 Voconly？
+
+我们每天花大量时间输入文字：写邮件、写方案、回消息、整理想法。但键盘并不是最自然的人机交互方式。
+
+很多时候，大脑已经有了完整的想法，但输入速度限制了表达。
+
+语言才是人类最自然的表达方式。AI 时代，语音不应该只是文字输入的替代，而应该成为人与 AI 协作的新入口。
+
+**Voconly 的目标：让每个人都拥有一个随时可以交流、理解并整理你想法的 AI 输入助手，并且核心能力无需依赖云端服务。**
+
+---
+
+## 核心特点
+
+### 场景化配置
+
+为不同使用场景配置专属组合：
+
+- 自定义场景名称
+- 绑定快捷键，一键触发录音
+- 选择 ASR 模型（Whisper / SenseVoice / Parakeet / Qwen-Asr）
+- 可选 LLM 后处理（轻度润色、翻译、专业润色、会议秘书、支持自定义提示词）
+
+### 实时转写
+
+- 实时转写：边说边显示文字
+- 支持流式模型（Nemotron）和非流式模型自动优化体验。
+
+### 本地 ASR，隐私安全
+
+- 本地语音识别引擎，数据不上传
+- 支持多种模型：Whisper、SenseVoice、Parakeet、Qwen-Asr
+- 零网络延迟，随时可用
+
+### 灵活的 LLM 支持
+
+- 本地模型：通过 Llama.cpp 运行
+- 云端 API：支持多种 Provider
+- 内置处理模式：轻度润色、翻译、专业润色、会议秘书
+- 自定义预设：按需配置处理逻辑
+
+### 快速触发
+
+- 全局热键唤起
+- 一次按键完成录音 → 转写 → LLM 处理
+- 结果自动输出到光标位置
+
+---
+
+## LLM 处理模式
+
+| 模式 | 说明 |
+|------|------|
+| 轻度润色 | 修正错字、标点，保持原意 |
+| 翻译 | 中文→英文，跨语言表达 |
+| 专业润色 | 口语转书面，正式表达 |
+| 会议秘书 | 整理会议要点，结构化输出 |
+| 自定义预设 | 按需配置处理逻辑 |
+
+---
+
+## 使用场景
+
+| 场景 | 典型用途 |
+|------|----------|
+| 内容创作 | 文章灵感、视频脚本、创作想法 |
+| 职场工作 | 邮件撰写、工作总结、会议记录 |
+| 开发者 | 需求描述、技术想法、Issue 编写 |
+| 日常记录 | 灵感笔记、学习心得、生活记录 |
+
+---
+
+## 我的故事
+
+Voconly 并不是一个单纯的技术实验。
+
+它来自一次个人重新开始。
+
+我创业超过 15 年，经历过企业快速增长，也经历过团队扩张、压力和重新调整。
+
+过去很长时间，我都是一个创业者和管理者。
+
+但 AI 的出现，让我重新找回了创造者的状态。
+
+2024 年开始深入探索 AI。
+
+从不会使用 AI 编程，到通过 AI 独立完成产品。
+
+我逐渐发现：
+
+> AI 最大的价值，不是替代程序员，而是让更多普通人重新拥有创造能力。
+
+Voconly 就是这个过程中的一个实践。
+
+我希望通过这个项目验证：
+
+一个人 + AI，是否可以创造过去需要一个团队才能完成的事情。
+
+---
+
+## 安装使用
+
+### 下载
+
+前往 [Releases](https://github.com/xinkyle/Voconly/releases) 页面下载最新版本。
+
+### 环境要求
 
 - Windows 10/11
-- [Rust](https://rustup.rs/) 1.70+
-- [Node.js](https://nodejs.org/) 18+
-- [pnpm](https://pnpm.io/) 8+
-- (可选) [Vulkan SDK](https://vulkan.lunarg.com/) - 用于 GPU 加速
+- 推荐具备 GPU 以获得更好性能
 
-## 快速开始
-
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/xinkyle/Voconly.git
-cd Voconly
-```
-
-### 2. 运行安装脚本
+### 从源码构建
 
 ```powershell
+# 1. 安装依赖
 .\setup.ps1
-```
 
-该脚本会自动：
-- 检查并安装 Rust、Node.js、pnpm（如果缺失）
-- 检测 GPU 并配置 Vulkan SDK
-- 下载预编译的 Whisper 库
-- 安装 npm 依赖
+# 2. 开发模式运行
+pnpm tauri dev
 
-### 3. 开发模式
-
-```powershell
-.\start-dev.ps1
-```
-
-### 4. 构建发布版本
-
-```powershell
+# 3. 或构建发布版本
 pnpm tauri build
 ```
 
-## 路径超长问题？
+---
 
-Windows 默认有 260 字符路径限制。如果遇到路径超长错误：
+## Roadmap
 
-### 方案 1：将项目放在短路径下（推荐）
+已完成：
+- 本地语音识别（Whisper / SenseVoice / Parakeet /Qwen-Asr）
+- LLM 后处理（轻度润色、翻译、专业润色、会议秘书、自定义）
+- 场景化配置（快捷键 + 模型 + LLM）
+- 桌面端应用（Windows）
 
-```powershell
-# 避免路径过长
-C:\dev\Voconly          # ✅ 好
-D:\work\Voconly         # ✅ 好
-C:\Users\用户名\Documents\项目\Voconly  # ❌ 可能超长
-```
+计划中：
+- macOS / Linux 支持
+- 更多的功能也期待大家的反馈。
 
-### 方案 2：启用 Windows 长路径支持
+如果你有想法，欢迎提交 [Issue](https://github.com/xinkyle/Voconly/issues)。
 
-```powershell
-# 管理员权限运行
-Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
-    -Name "LongPathsEnabled" -Value 1
+---
 
-# 重启电脑使更改生效
-```
+## 技术栈
 
-详见：[Microsoft 文档](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation)
+- Desktop Framework: Tauri 2.0
+- Frontend: React + TypeScript
+- Speech Recognition: Whisper.cpp（本地）
+- AI Processing: 本地 LLM + 云端 API
+- Language: Rust + TypeScript
 
-## 故障排查
+---
 
-详见 [docs](docs/) 目录。
+## 为什么开源？
 
-## 正在开发中...
+AI 时代最大的机会，不只是拥有 AI 工具，而是每个人都能够利用 AI 创造属于自己的工具。
 
-此项目正在积极开发中，功能可能随时变化。
+Voconly 是这个探索的开始。我希望验证：一个人 + AI，能创造什么。
+
+如果对你有帮助，欢迎 Star 支持。
+
+---
+
+## 参与贡献
+
+欢迎提交 Bug、提出建议、优化代码。一起探索 AI 时代新的生产方式。
+
+---
+
+## License
+
+MIT License
+
+Copyright (c) 2026 幸勇
+
+---
+
+## 关于作者
+
+**幸勇（老幸.AI）**
+
+15 年创业经历，长期关注 AI、大数据和个人创造力。正在探索 AI 时代，一个人如何重新获得创造能力。
+
+欢迎关注我的公众号、小红书等平台，账号：**老幸.AI**
+
+- GitHub: [xinkyle](https://github.com/xinkyle)
+- Email: laoxingai@139.com
