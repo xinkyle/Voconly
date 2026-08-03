@@ -807,7 +807,7 @@ mod tests {
             }],
             scenes: vec![Scene {
                 id: "1".to_string(),
-                name: "快速录入".to_string(),
+                name: "轻度润色".to_string(),
                 shortcut: "1".to_string(),
                 model_id: "sensevoice-small".to_string(),
                 enabled: true,

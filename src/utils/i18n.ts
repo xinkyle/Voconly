@@ -7,8 +7,8 @@
  * Used to detect and translate default names
  */
 const DEFAULT_SCENE_NAMES_ZH: Record<string, string> = {
-  '快速录入': 'scene.defaultNames.quickInput',
-  '准确录入': 'scene.defaultNames.accurateInput',
+  '轻度润色': 'scene.defaultNames.quickInput',
+  '专业润色': 'scene.defaultNames.accurateInput',
   '翻译': 'scene.defaultNames.translate',
 };
 

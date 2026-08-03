@@ -385,7 +385,7 @@ impl Default for AppConfig {
             scenes: vec![
                 Scene {
                     id: "1".to_string(),
-                    name: "快速录入".to_string(),
+                    name: "轻度润色".to_string(),
                     shortcut: "[".to_string(),
                     model_id: "".to_string(), // 空字符串，提示用户先下载模型
                     enabled: true,
@@ -395,7 +395,7 @@ impl Default for AppConfig {
                 },
                 Scene {
                     id: "2".to_string(),
-                    name: "准确录入".to_string(),
+                    name: "专业润色".to_string(),
                     shortcut: "]".to_string(),
                     model_id: "".to_string(), // 空字符串，提示用户先下载模型
                     enabled: true,

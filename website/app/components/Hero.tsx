@@ -6,7 +6,7 @@ import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
 export default function Hero() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   return (
     <section className="relative min-h-screen overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
@@ -113,7 +113,7 @@ export default function Hero() {
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <img
-                  src="/app-screenshot.png"
+                  src={lang === 'zh' ? '/app-screenshot_cn.png' : '/app-screenshot_en.png'}
                   alt="Voconly"
                   className="w-full h-auto"
                 />

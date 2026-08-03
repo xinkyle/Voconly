@@ -5,7 +5,7 @@
   },
   "nav": {
     "home": "主页",
-    "memory": "记忆",
+    "memory": "历史",
     "models": "模型",
     "dictionary": "词典",
     "settings": "设置"
@@ -151,13 +151,13 @@
     "accurateDesc": "适合重要文档，识别准确率高",
     "defaultDesc": "通用场景，平衡速度与准确度",
     "longTextDesc": "适合长文本输入，保持上下文连贯",
-    "shortTextDesc": "适合短句快速录入，即时响应",
+    "shortTextDesc": "适合短句轻度润色，即时响应",
     "meetingDesc": "适合会议记录，支持多人对话",
     "notesDesc": "适合随手记录，快速备忘",
     "genericDesc": "语音输入场景配置",
     "defaultNames": {
-      "quickInput": "快速录入",
-      "accurateInput": "准确录入",
+      "quickInput": "轻度润色",
+      "accurateInput": "专业润色",
       "translate": "翻译"
     }
   },
@@ -375,7 +375,7 @@
     "editScene": "编辑场景",
     "addScene": "添加场景",
     "sceneName": "场景名称",
-    "sceneNamePlaceholder": "例如：快速录入",
+    "sceneNamePlaceholder": "例如：轻度润色",
     "sceneNameRequired": "请输入场景名称",
     "shortcut": "快捷键",
     "shortcutPlaceholder": "例如：1, 2, F1, F2",
