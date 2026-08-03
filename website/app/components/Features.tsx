@@ -111,7 +111,7 @@ export default function Features() {
             href="#download"
             className="inline-flex items-center gap-2 text-[var(--color-accent)] hover:text-white transition-colors group font-body"
           >
-            <span>免费下载，每天 50 分钟</span>
+            <span>免费下载，每天无限使用</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
         </motion.div>

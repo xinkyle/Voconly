@@ -16,6 +16,7 @@ export interface Translation {
     shortcutHint: string;
     platformInfo: string;
     badge: string;
+    freeOpenSource: string;
     trustBadges: {
       offline: string;
       multiLang: string;
@@ -141,6 +142,7 @@ export const zh: Translation = {
     shortcutHint: '或按下',
     platformInfo: '支持 Windows / Mac / Linux',
     badge: '1,000+ 用户每天省下 30 分钟打字时间',
+    freeOpenSource: '免费开源',
     trustBadges: {
       offline: '断网也能用',
       multiLang: '说中文/英文都行',
@@ -275,6 +277,7 @@ export const en: Translation = {
     shortcutHint: 'or press',
     platformInfo: 'Available for Windows / Mac / Linux',
     badge: '1,000+ users save 30 minutes of typing every day',
+    freeOpenSource: 'Free & Open Source',
     trustBadges: {
       offline: 'Local Run',
       multiLang: 'Multi-Language',
@@ -408,6 +411,7 @@ export type TranslationKey =
   | 'hero.shortcutHint'
   | 'hero.platformInfo'
   | 'hero.badge'
+  | 'hero.freeOpenSource'
   | 'hero.trustBadges.offline'
   | 'hero.trustBadges.multiLang'
   | 'hero.trustBadges.crossPlatform'

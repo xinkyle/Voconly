@@ -37,6 +37,8 @@ export default function Hero() {
           >
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-white/70">
               <Sparkles className="w-4 h-4 text-[var(--color-accent)]" />
+              <span className="font-bold text-[var(--color-accent)]">{t('hero.freeOpenSource')}</span>
+              <span className="text-white/40">·</span>
               {t('hero.badge')}
             </span>
           </motion.div>
