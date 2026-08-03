@@ -287,6 +287,15 @@ pub fn find_llm_preset_by_id(id: &str) -> Option<ModelPreset> {
     get_llm_presets().iter().find(|p| p.id == id).cloned()
 }
 
+/// Check if a model ID refers to a LLM model
+/// Uses preset definitions as the authoritative source for model type classification
+/// Returns true only if the model is defined in LLM presets, false otherwise
+pub fn is_llm_model(model_id: &str) -> bool {
+    // Only models in LLM presets are treated as LLM models
+    let llm_presets = get_llm_presets();
+    llm_presets.iter().any(|p| p.id == model_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,6 +3,7 @@
 
 use crate::config::{load_config, AppServices};
 use crate::paths::{llm_models_dir, models_dir};
+use crate::presets::is_llm_model;
 use futures_util::StreamExt;
 use log;
 use serde::{Deserialize, Serialize};
@@ -436,28 +437,6 @@ pub fn model_exists(model_id: &str, backend: &str) -> bool {
     }
 }
 
-/// Check if a model ID refers to a GGUF/LLM model
-/// Note: qwen3-asr-* are ASR models, not LLM models
-pub fn is_llm_model(model_id: &str) -> bool {
-    // Explicit list of ASR model IDs that should NOT be treated as LLM
-    const ASR_MODEL_IDS: &[&str] = &[
-        "qwen3-asr-0.6",
-        "qwen3-asr-1.7b",
-        "qwen3-asr-1.7",
-        // Add more ASR model IDs here as needed
-    ];
-
-    if ASR_MODEL_IDS.contains(&model_id) {
-        return false;
-    }
-
-    model_id.ends_with(".gguf")
-        || model_id.contains("qwen3")
-        || model_id.contains("hy-mt")
-        || model_id.contains("llama")
-        || model_id.contains("mistral")
-}
-
 /// Get the storage directory for LLM models
 pub fn get_llm_model_storage_dir() -> Result<PathBuf, String> {
     llm_models_dir()
@@ -633,26 +612,25 @@ async fn download_single_attempt(
         url
     );
 
-    // Get model path
-    // Infer backend from model_id or URL extension
-    let backend = if is_llm_model(model_id) || url.contains(".gguf") {
-        "gguf"
-    } else if url.contains(".onnx")
-        || model_id.contains("sensevoice")
-        || model_id.contains("parakeet")
-        || model_id.contains("moonshine")
-    {
-        "onnx"
-    } else if model_id.contains("qwen3-asr") && !model_id.ends_with(".gguf") {
-        // Historical: Non-GGUF Qwen3-ASR uses directory structure (zip download)
-        "python"
-    } else {
-        "transcribe_cpp"
-    };
+    // Determine storage path based on model type
+    // LLM models go to llm_models directory, ASR models go to models directory
+    let is_llm = is_llm_model(model_id);
 
-    let model_path = if backend == "gguf" {
+    let model_path = if is_llm {
+        // LLM model → llm_models directory
         get_llm_model_path(model_id)?
     } else {
+        // ASR model → models directory
+        // Only two backends now: ONNX (sensevoice/parakeet) and TranscribeCpp (all GGUF)
+        let backend = if url.contains(".onnx")
+            || model_id.contains("sensevoice")
+            || model_id.contains("parakeet")
+        {
+            "onnx"
+        } else {
+            // All GGUF and other formats use TranscribeCpp backend
+            "transcribe_cpp"
+        };
         get_model_path(model_id, backend)?
     };
 
@@ -849,6 +827,14 @@ pub async fn download_model_with_source(
         prefer_china
     );
 
+    // Debug: 检查 is_llm_model 的返回值
+    let is_llm = is_llm_model(&model_id);
+    log::info!(
+        "[DEBUG] is_llm_model('{}') = {}",
+        model_id,
+        is_llm
+    );
+
     // Check if model already exists
     let backend = if sources
         .iter()
@@ -867,8 +853,16 @@ pub async fn download_model_with_source(
 
     if model_exists(&model_id, backend) {
         let path = get_model_path(&model_id, backend)?;
+        // Debug: 检查 is_llm_model 的返回值
+        let is_llm = is_llm_model(&model_id);
+        log::info!(
+            "[DEBUG] is_llm_model('{}') = {}, backend = '{}'",
+            model_id,
+            is_llm,
+            backend
+        );
         // 如果是 ASR 模型，使缓存失效以确保前端获取最新状态
-        if !is_llm_model(&model_id) {
+        if !is_llm {
             if let Ok(cache) = services.asr_models_cache.lock() {
                 cache.invalidate();
                 log::info!("[ASR] Cache invalidated for existing model: {}", model_id);

@@ -2,6 +2,7 @@
 //! 硬编码支持的 GGUF 模型（用于下载源信息）
 //! 动态扫描目录获取已存在的模型
 
+use crate::presets::is_llm_model;
 use crate::utils::downloader::{get_llm_model_storage_dir, DownloadSourceInfo};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -57,12 +58,33 @@ pub fn scan_available_llm_models() -> Vec<LlmModelPreset> {
 
     let models: Vec<LlmModelPreset> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
+        .filter_map(|e| {
+            // Check file extension
+            let path = e.path();
+            let is_gguf = path
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .map(|ext| ext == "gguf")
-                .unwrap_or(false)
+                .unwrap_or(false);
+
+            if !is_gguf {
+                return None;
+            }
+
+            // Get filename and ID
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+
+            let id = filename.strip_suffix(".gguf").unwrap_or(filename);
+
+            // Check if this is a real LLM model (exclude ASR models)
+            if is_llm_model(id) {
+                Some(e)
+            } else {
+                None
+            }
         })
         .map(|e| {
             let path = e.path();
