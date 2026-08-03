@@ -808,17 +808,10 @@ async fn set_float_panel_height(
 /// Open the model folder in file explorer
 #[tauri::command]
 async fn open_model_folder(model_id: String) -> Result<(), String> {
-    // Determine backend type from model_id
-    let backend = if model_id.contains(".onnx")
-        || model_id.contains("sensevoice")
-        || model_id.contains("parakeet")
-        || model_id.contains("moonshine")
-    {
-        "onnx"
-    } else if model_id.contains(".gguf") || model_id.contains("qwen3-asr") {
-        "transcribe_cpp"
-    } else {
-        "transcribe_cpp"
+    // Use unified detection from preset table
+    let backend = match crate::presets::get_model_backend(&model_id) {
+        crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
+        crate::backends::BackendType::Onnx => "onnx",
     };
 
     // Get model path

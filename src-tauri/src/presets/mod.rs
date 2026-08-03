@@ -287,6 +287,29 @@ pub fn find_llm_preset_by_id(id: &str) -> Option<ModelPreset> {
     get_llm_presets().iter().find(|p| p.id == id).cloned()
 }
 
+/// Extract base model ID by removing quantization suffix
+/// Examples:
+/// - "parakeet-unified-en-0.6b-Q5_K_M" → "parakeet-unified-en-0.6b"
+/// - "parakeet-unified-en-0.6b-F16" → "parakeet-unified-en-0.6b"
+/// - "qwen3-asr-1.7b-q4_0" → "qwen3-asr-1.7b"
+fn get_base_model_id(model_id: &str) -> &str {
+    // Remove file extension first if present
+    let name = model_id
+        .strip_suffix(".gguf")
+        .or_else(|| model_id.strip_suffix(".bin"))
+        .or_else(|| model_id.strip_suffix(".onnx"))
+        .unwrap_or(model_id);
+
+    // Find quantization marker from right side
+    // Quantization markers: -Q, _Q, -F, _F, -IQ, _IQ
+    for marker in ["-Q", "_Q", "-F", "_F", "-IQ", "_IQ"] {
+        if let Some(pos) = name.rfind(marker) {
+            return &name[..pos];
+        }
+    }
+    name
+}
+
 /// Check if a model ID refers to a LLM model
 /// Uses preset definitions as the authoritative source for model type classification
 /// Returns true only if the model is defined in LLM presets, false otherwise
@@ -294,6 +317,69 @@ pub fn is_llm_model(model_id: &str) -> bool {
     // Only models in LLM presets are treated as LLM models
     let llm_presets = get_llm_presets();
     llm_presets.iter().any(|p| p.id == model_id)
+}
+
+/// Get the backend type for a model (unified entry point)
+///
+/// Detection order:
+/// 1. Exact match in ASR presets
+/// 2. Base name match in ASR presets (removing quantization suffix)
+/// 3. LLM models default to TranscribeCpp (GGUF format)
+/// 4. Unknown models: detect from file extension (.onnx → Onnx, others → TranscribeCpp)
+pub fn get_model_backend(model_id: &str) -> BackendType {
+    // Check ASR presets - exact match
+    if let Some(preset) = find_asr_preset_by_id(model_id) {
+        if let Some(backend) = preset.backend {
+            return backend;
+        }
+    }
+
+    // Check ASR presets - base name match (for different quantization variants)
+    let base_id = get_base_model_id(model_id);
+    if base_id != model_id {
+        // Try to find a preset with matching base name
+        for preset in get_asr_presets() {
+            let preset_base = get_base_model_id(&preset.id);
+            if preset_base == base_id {
+                if let Some(backend) = preset.backend {
+                    log::debug!(
+                        "[get_model_backend] Matched '{}' to preset '{}' via base name '{}'",
+                        model_id, preset.id, base_id
+                    );
+                    return backend;
+                }
+            }
+        }
+    }
+
+    // LLM models use TranscribeCpp backend (GGUF format)
+    if is_llm_model(model_id) {
+        return BackendType::TranscribeCpp;
+    }
+
+    // Unknown model: detect from file extension
+    if model_id.contains(".onnx") {
+        BackendType::Onnx
+    } else {
+        BackendType::TranscribeCpp
+    }
+}
+
+/// Check if a model is an ASR model (exact match)
+pub fn is_asr_model(model_id: &str) -> bool {
+    get_asr_presets().iter().any(|p| p.id == model_id)
+}
+
+/// Check if a model is GGUF format (exact match first)
+pub fn is_gguf_model(model_id: &str) -> bool {
+    let backend = get_model_backend(model_id);
+    backend == BackendType::TranscribeCpp
+}
+
+/// Check if a model is ONNX format (exact match first)
+pub fn is_onnx_model(model_id: &str) -> bool {
+    let backend = get_model_backend(model_id);
+    backend == BackendType::Onnx
 }
 
 #[cfg(test)]
@@ -503,5 +589,60 @@ mod tests {
         let llm_preset = find_llm_preset_by_id("Qwen3-4B-Instruct-2507-Q4_K_M");
         assert!(llm_preset.is_some());
         assert!(llm_preset.unwrap().is_llm());
+    }
+
+    #[test]
+    fn test_base_model_id_extraction() {
+        // Test quantization suffix stripping
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-Q5_K_M"),
+            "parakeet-unified-en-0.6b"
+        );
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-F16"),
+            "parakeet-unified-en-0.6b"
+        );
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-Q6_K"),
+            "parakeet-unified-en-0.6b"
+        );
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-Q8_0"),
+            "parakeet-unified-en-0.6b"
+        );
+        // With file extension
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-F16.gguf"),
+            "parakeet-unified-en-0.6b"
+        );
+        // Model without quantization suffix
+        assert_eq!(
+            get_base_model_id("sensevoice-small"),
+            "sensevoice-small"
+        );
+        // qwen with lowercase
+        assert_eq!(
+            get_base_model_id("qwen3-asr-1.7b-q4_0"),
+            "qwen3-asr-1.7b"
+        );
+    }
+
+    #[test]
+    fn test_get_model_backend_base_name_match() {
+        // Should match parakeet-unified-en-0.6b-F16 to parakeet-unified-en-0.6b-Q5_K_M preset
+        let backend = get_model_backend("parakeet-unified-en-0.6b-F16");
+        assert_eq!(backend, BackendType::TranscribeCpp);
+
+        // Should match parakeet-unified-en-0.6b-F16.gguf to preset
+        let backend = get_model_backend("parakeet-unified-en-0.6b-F16.gguf");
+        assert_eq!(backend, BackendType::TranscribeCpp);
+    }
+
+    #[test]
+    fn test_is_gguf_model_with_base_name_match() {
+        // parakeet-unified-en-0.6b-F16 should be detected as GGUF
+        // because its base name matches parakeet-unified-en-0.6b-Q5_K_M preset
+        assert!(is_gguf_model("parakeet-unified-en-0.6b-F16"));
+        assert!(is_gguf_model("parakeet-unified-en-0.6b-F16.gguf"));
     }
 }
