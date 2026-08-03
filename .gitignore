@@ -6,7 +6,9 @@
 .tauri/signing.key
 
 # Local-only scripts (not for GitHub)
-build-release-local.bat
+build-release-local.ps1
+sign-release.ps1
+upload-release.ps1
 
 # Dependencies
 node_modules/
