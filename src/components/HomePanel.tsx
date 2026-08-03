@@ -751,7 +751,7 @@ function SceneCard({
           onClick={() => onModelSelect(scene.modelId)}
         >
           <div
-            className="bg-white rounded-xl p-5 w-[740px] max-h-[80vh] overflow-hidden shadow-2xl animate-fade-in"
+            className="bg-white rounded-xl p-5 w-[900px] max-h-[80vh] overflow-hidden shadow-2xl animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">

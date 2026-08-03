@@ -318,19 +318,9 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     // 记录扫描到的实际路径
     let model_path = path.to_string_lossy().to_string();
 
-    // Generate display name based on architecture and size
-    // 如果架构已知，显示为 "架构名 (量化信息)"
-    // 如果架构未知，直接使用文件名作为名称
-    let name = if caps.architecture.is_some() {
-        format!(
-            "{} ({})",
-            caps.display_name(),
-            id.split('-').last().unwrap_or(&id)
-        )
-    } else {
-        // Unknown architecture: use filename as display name
-        id.clone()
-    };
+    // 使用完整 ID 作为显示名称，保留所有信息便于区分
+    // 例如：parakeet-unified-en-0.6b-F16, qwen3-asr-1.7b-q4_0
+    let name = id.clone();
 
     // Determine supported languages from capabilities
     // 注意：对于已知架构，caps.languages 应该包含预设的语言列表
