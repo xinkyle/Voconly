@@ -404,7 +404,7 @@ impl Default for AppConfig {
                     auto_type: true,
                 },
             ],
-            auto_start: Some(false),
+            auto_start: Some(true), // 默认开启开机自启
             default_microphone: None,
             check_updates: Some(true),
             show_shortcut_hint: Some(true),
