@@ -69,12 +69,14 @@ if (-not (Test-Path $NsisPath)) {
 }
 Write-Host "[OK] NSIS: $NsisPath" -ForegroundColor Green
 
-if (-not (Test-Path $MsiPath)) {
-    Write-Host "[ERROR] MSI not found: $MsiPath" -ForegroundColor Red
-    Write-Host "[HINT] Run build-release.bat first" -ForegroundColor Yellow
-    exit 1
+# MSI is optional (only NSIS is required)
+if (Test-Path $MsiPath) {
+    Write-Host "[OK] MSI: $MsiPath" -ForegroundColor Green
+    $HasMsi = $true
+} else {
+    Write-Host "[INFO] MSI not found (optional): $MsiPath" -ForegroundColor Gray
+    $HasMsi = $false
 }
-Write-Host "[OK] MSI: $MsiPath" -ForegroundColor Green
 
 # Check signature file
 if (-not (Test-Path $NsisSigPath)) {
@@ -108,7 +110,11 @@ $LatestContent = @"
 [System.IO.File]::WriteAllText("latest.json", $LatestContent, [System.Text.UTF8Encoding]::new($false))
 Write-Host "[OK] latest.json generated (version: $Version)" -ForegroundColor Green
 
-$FilesToUpload = @("latest.json", $NsisPath, $MsiPath)
+# Build upload list (always include latest.json and NSIS, MSI is optional)
+$FilesToUpload = @("latest.json", $NsisPath)
+if ($HasMsi) {
+    $FilesToUpload += $MsiPath
+}
 
 # Step 5: Delete old release if exists
 Write-Host ""
