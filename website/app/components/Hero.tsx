@@ -113,8 +113,8 @@ export default function Hero() {
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <img
-                  src={lang === 'zh' ? '/app-screenshot_cn.png' : '/app-screenshot_en.png'}
-                  alt="Voconly"
+                  src={lang === 'zh' ? '/demo_cn.gif' : '/demo_en.gif'}
+                  alt="Voconly Demo"
                   className="w-full h-auto"
                 />
               </motion.div>

@@ -166,7 +166,7 @@ export const zh: Translation = {
     },
     realtime: {
       title: '说完就出字',
-      description: '本地识别速度快，边说边看文字上屏。支持中文、英文、甚至中英夹杂。',
+      description: '本地识别速度快，边说边看文字上屏。支持中文、英文及中英文混合输入。',
     },
     privacy: {
       title: '你的声音留在本地',
@@ -301,7 +301,7 @@ export const en: Translation = {
     },
     realtime: {
       title: 'Real-time Transcription',
-      description: 'Instant text output after recording ends. Supports streaming display - see recognition results as you speak.',
+      description: 'Fast local recognition, see text as you speak. Supports Chinese, English, and Chinese-English mixed input.',
     },
     privacy: {
       title: 'Zero Privacy Risk',
