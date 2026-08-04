@@ -609,7 +609,20 @@ fn probe_from_filename(path: &Path) -> GgufCapabilities {
     }
 
     // Parakeet 模型命名格式：parakeet-{version}.gguf
+    // 注意：parakeet-unified-en 是英语专用模型，需要特殊处理
+    if filename.contains("parakeet-unified-en") {
+        // 英语专用 Parakeet 模型
+        return GgufCapabilities {
+            verdict: Compatibility::Compatible,
+            architecture: Some("parakeet".to_string()),
+            supports_streaming: Some(true),
+            supports_translation: Some(false),
+            supports_language_detect: Some(false),
+            languages: Some(vec!["en".to_string()]),
+        };
+    }
     if filename.contains("parakeet") {
+        // 其他 Parakeet 模型（如 parakeet-tdt），支持多种欧洲语言
         return GgufCapabilities::parakeet();
     }
 
@@ -807,6 +820,31 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
+        // 多语言模型，应该有多个语言
+        assert!(caps
+            .languages
+            .as_ref()
+            .map_or(false, |langs| langs.len() > 1));
+    }
+
+    #[test]
+    fn test_probe_parakeet_unified_en_filename() {
+        // parakeet-unified-en 是英语专用模型
+        let path = PathBuf::from("parakeet-unified-en-0.6b-F16.gguf");
+        let caps = probe_from_filename(&path);
+        assert_eq!(caps.architecture, Some("parakeet".to_string()));
+        assert_eq!(caps.supports_streaming, Some(true));
+        // 只支持英语
+        assert_eq!(caps.languages, Some(vec!["en".to_string()]));
+    }
+
+    #[test]
+    fn test_probe_parakeet_unified_en_lowercase() {
+        // 测试小写文件名
+        let path = PathBuf::from("parakeet-unified-en-0.6b-q5_k_m.gguf");
+        let caps = probe_from_filename(&path);
+        assert_eq!(caps.architecture, Some("parakeet".to_string()));
+        assert_eq!(caps.languages, Some(vec!["en".to_string()]));
     }
 
     #[test]

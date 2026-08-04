@@ -11,7 +11,7 @@
 
 use crate::backends::{probe_gguf_capabilities, BackendType};
 use crate::config::load_config;
-use crate::presets::{get_asr_presets, ModelPreset};
+use crate::presets::{get_asr_presets, get_base_model_id, ModelPreset};
 use crate::utils::downloader::get_model_storage_dir;
 use std::collections::HashSet;
 use std::fs;
@@ -239,10 +239,24 @@ fn get_size_mb(path: &Path) -> Option<u64> {
 fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
     let id = get_model_id_from_path(path);
 
-    // Try to match against preset
-    let preset = presets
+    // Try to match against preset:
+    // 1. First try exact ID match (case-insensitive)
+    // 2. If no exact match, try base name match (for quantization variants)
+    let (preset, matched_by_base_name) = presets
         .iter()
-        .find(|p| p.id == id && p.backend == Some(BackendType::Onnx));
+        .find(|p| p.id.to_lowercase() == id.to_lowercase() && p.backend == Some(BackendType::Onnx))
+        .map(|p| (Some(p), false))
+        .unwrap_or_else(|| {
+            // Try base name match (case-insensitive)
+            let base_id = get_base_model_id(&id);
+            presets
+                .iter()
+                .find(|p| {
+                    p.backend == Some(BackendType::Onnx) && get_base_model_id(&p.id) == base_id
+                })
+                .map(|p| (Some(p), true))
+                .unwrap_or((None, false))
+        });
 
     let size_mb = get_size_mb(path);
 
@@ -250,10 +264,16 @@ fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     let model_path = path.to_string_lossy().to_string();
 
     if let Some(p) = preset {
-        // Use preset configuration with actual size
+        // 使用实际文件的 ID，继承预设的语言列表
+        let display_name = if matched_by_base_name {
+            id.clone()
+        } else {
+            p.name.clone()
+        };
+
         Some(ModelPreset::asr_preset_with_path(
-            p.id.clone(),
-            p.name.clone(),
+            id.clone(), // 使用文件 ID，避免去重冲突
+            display_name,
             size_mb
                 .map(|s| format!("{}MB", s))
                 .unwrap_or_else(|| p.size.clone()),
@@ -307,11 +327,24 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     let caps = probe_gguf_capabilities(path);
 
     // Try to match against preset:
-    // 1. First try exact ID match (e.g., "Qwen3-ASR-1.7B-Q5_K_M" matches preset)
-    // 2. If no exact match, treat as user custom model (don't map to a different preset)
-    let preset = presets.iter().find(|p| {
-        p.backend == Some(BackendType::TranscribeCpp) && p.id == id
-    });
+    // 1. First try exact ID match (case-insensitive)
+    // 2. If no exact match, try base name match (e.g., "parakeet-unified-en-0.6b-F16" matches "parakeet-unified-en-0.6b-Q5_K_M")
+    let (preset, matched_by_base_name) = presets
+        .iter()
+        .find(|p| p.backend == Some(BackendType::TranscribeCpp) && p.id.to_lowercase() == id.to_lowercase())
+        .map(|p| (Some(p), false))
+        .unwrap_or_else(|| {
+            // Try base name match (case-insensitive)
+            let base_id = get_base_model_id(&id);
+            presets
+                .iter()
+                .find(|p| {
+                    p.backend == Some(BackendType::TranscribeCpp)
+                        && get_base_model_id(&p.id) == base_id
+                })
+                .map(|p| (Some(p), true))
+                .unwrap_or((None, false))
+        });
 
     let size_mb = get_size_mb(path);
 
@@ -322,33 +355,45 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     // 例如：parakeet-unified-en-0.6b-F16, qwen3-asr-1.7b-q4_0
     let name = id.clone();
 
-    // Determine supported languages from capabilities
-    // 注意：对于已知架构，caps.languages 应该包含预设的语言列表
-    let languages = match &caps.languages {
-        Some(langs) if langs.is_empty() => {
-            // Multilingual model (like Whisper)
-            log::debug!("[GGUF Scanner] {} is multilingual (empty languages)", id);
-            vec![
-                "zh".to_string(),
-                "en".to_string(),
-                "ja".to_string(),
-                "ko".to_string(),
-            ]
-        }
-        Some(langs) => {
-            // 使用预设语言列表（已知架构）或 GGUF 语言列表（未知架构）
-            log::debug!("[GGUF Scanner] {} languages: {:?}", id, langs);
-            langs.clone()
-        }
-        None => {
-            // Unknown languages, assume multilingual
-            log::debug!("[GGUF Scanner] {} has no language info", id);
-            vec![
-                "zh".to_string(),
-                "en".to_string(),
-                "ja".to_string(),
-                "ko".to_string(),
-            ]
+    // Determine supported languages:
+    // - For exact preset match: use preset languages
+    // - For base name match: use preset languages (inherit from matching preset)
+    // - For unknown models: use GGUF probed languages or defaults
+    let languages = if let Some(p) = preset {
+        // 继承预设的语言列表
+        log::debug!(
+            "[GGUF Scanner] {} 匹配预设 {}，使用预设语言: {:?}",
+            id,
+            p.id,
+            p.languages
+        );
+        p.languages.clone()
+    } else {
+        // 未知模型，使用 GGUF 探测的语言
+        match &caps.languages {
+            Some(langs) if langs.is_empty() => {
+                // Multilingual model (like Whisper)
+                log::debug!("[GGUF Scanner] {} is multilingual (empty languages)", id);
+                vec![
+                    "zh".to_string(),
+                    "en".to_string(),
+                    "ja".to_string(),
+                    "ko".to_string(),
+                ]
+            }
+            Some(langs) => {
+                log::debug!("[GGUF Scanner] {} languages: {:?}", id, langs);
+                langs.clone()
+            }
+            None => {
+                log::debug!("[GGUF Scanner] {} has no language info", id);
+                vec![
+                    "zh".to_string(),
+                    "en".to_string(),
+                    "ja".to_string(),
+                    "ko".to_string(),
+                ]
+            }
         }
     };
 
@@ -358,10 +403,19 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     let supports_translation = caps.supports_translation;
 
     if let Some(p) = preset {
-        // Use preset configuration with actual file size
+        // 使用实际文件的 ID（保留量化信息），继承预设的语言列表
+        // 这样不同量化版本会显示为独立条目，但语言列表正确
+        let display_name = if matched_by_base_name {
+            // 基础名称匹配时，使用文件名作为显示名称
+            name.clone()
+        } else {
+            // 精准匹配时，使用预设名称
+            p.name.clone()
+        };
+
         Some(ModelPreset::asr_preset_with_path(
-            p.id.clone(),
-            p.name.clone(),
+            id.clone(), // 始终使用文件 ID，避免去重冲突
+            display_name,
             size_mb
                 .map(|s| format!("{}MB", s))
                 .unwrap_or_else(|| p.size.clone()),

@@ -287,12 +287,13 @@ pub fn find_llm_preset_by_id(id: &str) -> Option<ModelPreset> {
     get_llm_presets().iter().find(|p| p.id == id).cloned()
 }
 
-/// Extract base model ID by removing quantization suffix
+/// Extract base model ID by removing quantization suffix (lowercase for case-insensitive matching)
 /// Examples:
 /// - "parakeet-unified-en-0.6b-Q5_K_M" → "parakeet-unified-en-0.6b"
 /// - "parakeet-unified-en-0.6b-F16" → "parakeet-unified-en-0.6b"
 /// - "qwen3-asr-1.7b-q4_0" → "qwen3-asr-1.7b"
-fn get_base_model_id(model_id: &str) -> &str {
+/// - "Qwen3-ASR-1.7B-Q5_K_M" → "qwen3-asr-1.7b" (lowercase)
+pub fn get_base_model_id(model_id: &str) -> String {
     // Remove file extension first if present
     let name = model_id
         .strip_suffix(".gguf")
@@ -300,14 +301,15 @@ fn get_base_model_id(model_id: &str) -> &str {
         .or_else(|| model_id.strip_suffix(".onnx"))
         .unwrap_or(model_id);
 
-    // Find quantization marker from right side
-    // Quantization markers: -Q, _Q, -F, _F, -IQ, _IQ
-    for marker in ["-Q", "_Q", "-F", "_F", "-IQ", "_IQ"] {
-        if let Some(pos) = name.rfind(marker) {
-            return &name[..pos];
+    // Find quantization marker from right side (case-insensitive)
+    // Quantization markers: -Q, _Q, -F, _F, -IQ, _IQ (and lowercase variants)
+    let name_lower = name.to_lowercase();
+    for marker in ["-q", "_q", "-f", "_f", "-iq", "_iq"] {
+        if let Some(pos) = name_lower.rfind(marker) {
+            return name[..pos].to_lowercase(); // Return lowercase for case-insensitive matching
         }
     }
-    name
+    name.to_lowercase() // Return lowercase for case-insensitive matching
 }
 
 /// Check if a model ID refers to a LLM model
@@ -322,32 +324,32 @@ pub fn is_llm_model(model_id: &str) -> bool {
 /// Get the backend type for a model (unified entry point)
 ///
 /// Detection order:
-/// 1. Exact match in ASR presets
-/// 2. Base name match in ASR presets (removing quantization suffix)
+/// 1. Exact match in ASR presets (case-insensitive)
+/// 2. Base name match in ASR presets (removing quantization suffix, case-insensitive)
 /// 3. LLM models default to TranscribeCpp (GGUF format)
 /// 4. Unknown models: detect from file extension (.onnx → Onnx, others → TranscribeCpp)
 pub fn get_model_backend(model_id: &str) -> BackendType {
-    // Check ASR presets - exact match
-    if let Some(preset) = find_asr_preset_by_id(model_id) {
-        if let Some(backend) = preset.backend {
-            return backend;
+    // Check ASR presets - exact match (case-insensitive)
+    let model_id_lower = model_id.to_lowercase();
+    for preset in get_asr_presets() {
+        if preset.id.to_lowercase() == model_id_lower {
+            if let Some(backend) = preset.backend {
+                return backend;
+            }
         }
     }
 
-    // Check ASR presets - base name match (for different quantization variants)
+    // Check ASR presets - base name match (for different quantization variants, case-insensitive)
     let base_id = get_base_model_id(model_id);
-    if base_id != model_id {
-        // Try to find a preset with matching base name
-        for preset in get_asr_presets() {
-            let preset_base = get_base_model_id(&preset.id);
-            if preset_base == base_id {
-                if let Some(backend) = preset.backend {
-                    log::debug!(
-                        "[get_model_backend] Matched '{}' to preset '{}' via base name '{}'",
-                        model_id, preset.id, base_id
-                    );
-                    return backend;
-                }
+    for preset in get_asr_presets() {
+        let preset_base = get_base_model_id(&preset.id);
+        if preset_base == base_id {
+            if let Some(backend) = preset.backend {
+                log::debug!(
+                    "[get_model_backend] Matched '{}' to preset '{}' via base name '{}'",
+                    model_id, preset.id, base_id
+                );
+                return backend;
             }
         }
     }
@@ -593,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_base_model_id_extraction() {
-        // Test quantization suffix stripping
+        // Test quantization suffix stripping (uppercase)
         assert_eq!(
             get_base_model_id("parakeet-unified-en-0.6b-Q5_K_M"),
             "parakeet-unified-en-0.6b"
@@ -610,9 +612,22 @@ mod tests {
             get_base_model_id("parakeet-unified-en-0.6b-Q8_0"),
             "parakeet-unified-en-0.6b"
         );
+        // Test lowercase quantization suffix
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-q5_k_m"),
+            "parakeet-unified-en-0.6b"
+        );
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-f16"),
+            "parakeet-unified-en-0.6b"
+        );
         // With file extension
         assert_eq!(
             get_base_model_id("parakeet-unified-en-0.6b-F16.gguf"),
+            "parakeet-unified-en-0.6b"
+        );
+        assert_eq!(
+            get_base_model_id("parakeet-unified-en-0.6b-f16.gguf"),
             "parakeet-unified-en-0.6b"
         );
         // Model without quantization suffix
@@ -623,6 +638,11 @@ mod tests {
         // qwen with lowercase
         assert_eq!(
             get_base_model_id("qwen3-asr-1.7b-q4_0"),
+            "qwen3-asr-1.7b"
+        );
+        // qwen with uppercase (now returns lowercase for case-insensitive matching)
+        assert_eq!(
+            get_base_model_id("Qwen3-ASR-1.7B-Q4_0"),
             "qwen3-asr-1.7b"
         );
     }
