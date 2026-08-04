@@ -8,6 +8,15 @@
 //! 1. **Primary**: Parse GGUF header metadata (general.architecture, stt.capability.*)
 //! 2. **Fallback**: Infer from filename pattern matching
 //!
+//! # Language Information Source
+//!
+//! **重要**：语言信息从预设文件（asr.rs）读取，这里只返回架构能力。
+//! - 对于已知架构，`languages` 字段返回 `None`
+//! - `asr_scanner.rs` 负责从预设读取语言列表
+//! - 仅对未知模型，才使用 GGUF Header 的 `general.languages` 元数据
+//!
+//! 这样确保预设文件是语言列表的唯一来源，避免数据不一致。
+//!
 //! # Supported Architectures
 //!
 //! GGUF ASR models support various architectures including:
@@ -138,22 +147,12 @@ impl Default for GgufCapabilities {
 }
 
 impl GgufCapabilities {
-    /// Whisper 语言列表（99种语言，空列表表示多语言支持）
-    /// 参考 Handy model.rs 的预设值
-    const WHISPER_LANGUAGES: &[&str] = &[
-        "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv",
-        "it", "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no",
-        "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr",
-        "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw",
-        "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu",
-        "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl",
-        "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su", "yue",
-    ];
-
     /// Create capabilities for Whisper architecture
     ///
     /// Whisper supports translation to English and is multilingual.
     /// It also supports automatic language detection.
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn whisper() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -161,7 +160,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(true),
             supports_language_detect: Some(true),
-            languages: Some(vec![]), // Empty = multilingual (支持99种语言)
+            languages: None, // 语言列表从预设读取
         }
     }
 
@@ -169,6 +168,8 @@ impl GgufCapabilities {
     ///
     /// Qwen3-ASR does NOT support streaming transcription (offline only).
     /// Supports Chinese, English, Japanese, Korean with auto language detection.
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn qwen3_asr() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -176,26 +177,16 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: Some(vec![
-                "zh".to_string(),
-                "en".to_string(),
-                "ja".to_string(),
-                "ko".to_string(),
-            ]),
+            languages: None, // 语言列表从预设读取
         }
     }
-
-    /// Parakeet V3 语言列表（25种欧洲语言）
-    /// 参考 Handy model.rs 的预设值
-    const PARAKEET_LANGUAGES: &[&str] = &[
-        "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt",
-        "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
-    ];
 
     /// Create capabilities for Parakeet architecture
     ///
     /// NVIDIA Parakeet supports streaming, optimized for European languages.
     /// 支持25种欧洲语言。
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn parakeet() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -203,18 +194,15 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: Some(
-                Self::PARAKEET_LANGUAGES
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            ),
+            languages: None, // 语言列表从预设读取
         }
     }
 
     /// Create capabilities for Voxtral architecture
     ///
     /// Mistral Voxtral supports streaming transcription.
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn voxtral() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -222,18 +210,16 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: Some(vec!["en".to_string(), "zh".to_string()]),
+            languages: None, // 语言列表从预设读取
         }
     }
-
-    /// SenseVoice 语言列表（5种语言）
-    /// 参考 Handy model.rs 的预设值
-    const SENSEVOICE_LANGUAGES: &[&str] = &["zh", "en", "yue", "ja", "ko"];
 
     /// Create capabilities for SenseVoice architecture
     ///
     /// Alibaba SenseVoice supports Chinese, Cantonese, and major Asian languages.
     /// 支持5种语言：中文、英文、粤语、日文、韩文
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn sensevoice() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -241,29 +227,17 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: Some(
-                Self::SENSEVOICE_LANGUAGES
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            ),
+            languages: None, // 语言列表从预设读取
         }
     }
-
-    /// Canary 180M Flash 语言列表（4种语言）
-    const CANARY_180M_LANGUAGES: &[&str] = &["en", "de", "es", "fr"];
-
-    /// Canary 1B v2 语言列表（25种欧洲语言，与 Parakeet V3 相同）
-    const CANARY_1B_LANGUAGES: &[&str] = &[
-        "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt",
-        "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
-    ];
 
     /// Create capabilities for Canary architecture
     ///
     /// NVIDIA Canary supports streaming and translation.
     /// 默认使用 Canary 1B v2 的25种欧洲语言列表。
     /// 注意：Canary 180M Flash 只支持4种语言，需要根据具体模型区分。
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn canary() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -271,19 +245,15 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(true),
             supports_language_detect: Some(true),
-            // 默认使用更大的语言列表，具体模型可能需要调整
-            languages: Some(
-                Self::CANARY_1B_LANGUAGES
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            ),
+            languages: None, // 语言列表从预设读取
         }
     }
 
     /// Create capabilities for Moonshine architecture
     ///
     /// Moonshine is optimized for English transcription.
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn moonshine() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -291,7 +261,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: Some(vec!["en".to_string()]),
+            languages: None, // 语言列表从预设读取
         }
     }
 
@@ -299,6 +269,8 @@ impl GgufCapabilities {
     ///
     /// NVIDIA GigaAM supports streaming, optimized for Russian.
     /// 仅支持俄语
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn gigaam() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -306,20 +278,16 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: Some(vec!["ru".to_string()]),
+            languages: None, // 语言列表从预设读取
         }
     }
-
-    /// Cohere 语言列表（14种语言）
-    /// 参考 Handy model.rs 的预设值
-    const COHERE_LANGUAGES: &[&str] = &[
-        "en", "fr", "de", "it", "es", "pt", "el", "nl", "pl", "zh", "ja", "ko", "vi", "ar",
-    ];
 
     /// Create capabilities for Cohere architecture
     ///
     /// Cohere audio models do NOT support streaming transcription (offline only).
     /// 支持14种语言
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn cohere() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -327,12 +295,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: Some(
-                Self::COHERE_LANGUAGES
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            ),
+            languages: None, // 语言列表从预设读取
         }
     }
 
@@ -340,6 +303,8 @@ impl GgufCapabilities {
     ///
     /// NVIDIA Nemotron ASR models support English only.
     /// Streaming capability depends on transcribe-cpp runtime detection.
+    ///
+    /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn nemotron() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -347,7 +312,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false), // Conservative, depends on runtime detection
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: Some(vec!["en".to_string()]), // Only supports English
+            languages: None, // 语言列表从预设读取
         }
     }
 
@@ -609,20 +574,8 @@ fn probe_from_filename(path: &Path) -> GgufCapabilities {
     }
 
     // Parakeet 模型命名格式：parakeet-{version}.gguf
-    // 注意：parakeet-unified-en 是英语专用模型，需要特殊处理
-    if filename.contains("parakeet-unified-en") {
-        // 英语专用 Parakeet 模型
-        return GgufCapabilities {
-            verdict: Compatibility::Compatible,
-            architecture: Some("parakeet".to_string()),
-            supports_streaming: Some(true),
-            supports_translation: Some(false),
-            supports_language_detect: Some(false),
-            languages: Some(vec!["en".to_string()]),
-        };
-    }
+    // 所有 Parakeet 模型统一使用 parakeet() 能力，语言列表从预设读取
     if filename.contains("parakeet") {
-        // 其他 Parakeet 模型（如 parakeet-tdt），支持多种欧洲语言
         return GgufCapabilities::parakeet();
     }
 
@@ -722,10 +675,8 @@ mod tests {
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(true));
         assert_eq!(caps.supports_language_detect, Some(true));
-        assert!(caps.languages.as_ref().unwrap().is_empty()); // Multilingual
-        assert_eq!(caps.supports_language("zh"), Some(true));
-        assert_eq!(caps.supports_language("en"), Some(true));
-        assert_eq!(caps.supports_language("ja"), Some(true));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -735,11 +686,8 @@ mod tests {
         assert_eq!(caps.architecture, Some("qwen3_asr".to_string()));
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(false));
-        assert_eq!(caps.supports_language("zh"), Some(true));
-        assert_eq!(caps.supports_language("en"), Some(true));
-        assert_eq!(caps.supports_language("ja"), Some(true));
-        assert_eq!(caps.supports_language("ko"), Some(true));
-        assert_eq!(caps.supports_language("de"), Some(false));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -749,10 +697,8 @@ mod tests {
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
         assert_eq!(caps.supports_translation, Some(false));
-        assert_eq!(caps.supports_language("en"), Some(true));
-        assert_eq!(caps.supports_language("de"), Some(true));
-        assert_eq!(caps.supports_language("fr"), Some(true));
-        assert_eq!(caps.supports_language("zh"), Some(false));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -762,10 +708,8 @@ mod tests {
         assert_eq!(caps.architecture, Some("sensevoice".to_string()));
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(false));
-        assert_eq!(caps.supports_language("zh"), Some(true));
-        assert_eq!(caps.supports_language("yue"), Some(true)); // 粤语
-        assert_eq!(caps.supports_language("ja"), Some(true));
-        assert_eq!(caps.supports_language("de"), Some(false));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -820,11 +764,8 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
-        // 多语言模型，应该有多个语言
-        assert!(caps
-            .languages
-            .as_ref()
-            .map_or(false, |langs| langs.len() > 1));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -834,8 +775,8 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
-        // 只支持英语
-        assert_eq!(caps.languages, Some(vec!["en".to_string()]));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]
@@ -844,7 +785,8 @@ mod tests {
         let path = PathBuf::from("parakeet-unified-en-0.6b-q5_k_m.gguf");
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
-        assert_eq!(caps.languages, Some(vec!["en".to_string()]));
+        // 语言列表从预设读取，这里返回 None
+        assert_eq!(caps.languages, None);
     }
 
     #[test]

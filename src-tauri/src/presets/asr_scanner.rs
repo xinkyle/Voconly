@@ -8,6 +8,14 @@
 //! 支持多目录扫描：
 //! 1. 默认的 models 目录（通过 `get_model_storage_dir()` 获取）
 //! 2. 用户自定义的目录列表（从 AppConfig 的 `custom_asr_model_dirs` 字段获取）
+//!
+//! # Language Information Source
+//!
+//! **预设是语言列表的唯一来源**：
+//! - 对于匹配预设的模型：使用预设的语言列表（`preset.languages`）
+//! - 对于未知模型：使用 GGUF Header 探测的语言，或默认值
+//!
+//! GGUF capabilities 的 `languages` 字段返回 `None`，由本模块负责从预设读取。
 
 use crate::backends::{probe_gguf_capabilities, BackendType};
 use crate::config::load_config;
