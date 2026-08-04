@@ -1,4 +1,4 @@
-//#![windows_subsystem = "windows"]  // 隐藏 CMD 控制台窗口
+#![windows_subsystem = "windows"]  // 隐藏 CMD 控制台窗口
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
