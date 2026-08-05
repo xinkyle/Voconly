@@ -118,7 +118,11 @@ impl CatalogModel {
                                 urls.iter()
                                     .map(|u| DownloadSourceInfo {
                                         name: u.name.clone(),
-                                        url: format!("{}{}", u.url, f.filename),
+                                        url: if u.url.ends_with('/') {
+                                        format!("{}{}", u.url.trim_end_matches('/'), f.filename)
+                                    } else {
+                                        format!("{}/{}", u.url, f.filename)
+                                    },
                                         is_china_accessible: u.is_china_accessible,
                                         priority: u.priority,
                                     })
