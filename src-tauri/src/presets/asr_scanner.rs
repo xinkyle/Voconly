@@ -9,13 +9,15 @@
 //! 1. 默认的 models 目录（通过 `get_model_storage_dir()` 获取）
 //! 2. 用户自定义的目录列表（从 AppConfig 的 `custom_asr_model_dirs` 字段获取）
 //!
-//! # Language Information Source
+//! # Language Information Source (重构后)
 //!
-//! **预设是语言列表的唯一来源**：
-//! - 对于匹配预设的模型：使用预设的语言列表（`preset.languages`）
-//! - 对于未知模型：使用 GGUF Header 探测的语言，或默认值
+//! **GGUF Header 是能力的唯一真实来源**：
+//! - 所有模型统一从 GGUF Header 读取能力（包括语言列表）
+//! - 预设文件仅用于 Catalog UI 展示（下载信息、展示名称、描述）
+//! - GGUF 缺失能力时，使用预设文件的值作为 fallback
+//! - 预设也不存在时，使用默认值 ['zh', 'en']
 //!
-//! GGUF capabilities 的 `languages` 字段返回 `None`，由本模块负责从预设读取。
+//! 这样实现零配置自动发现，未知模型也能正常使用。
 
 use crate::backends::{probe_gguf_capabilities, BackendType};
 use crate::config::load_config;
@@ -318,6 +320,9 @@ fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
 ///
 /// GGUF (.gguf) and GGML (.bin) files are used by the TranscribeCpp backend.
 /// Supports various ASR architectures: Whisper, Qwen3-ASR, Parakeet, Voxtral, etc.
+///
+/// **核心变更**：统一使用 GGUF Header 的能力（包括语言列表）。
+/// 预设文件仅用于获取展示信息（名称、描述、下载链接）。
 fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
     let filename = path
         .file_name()
@@ -363,52 +368,37 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     // 例如：parakeet-unified-en-0.6b-F16, qwen3-asr-1.7b-q4_0
     let name = id.clone();
 
-    // Determine supported languages:
-    // - For exact preset match: use preset languages
-    // - For base name match: use preset languages (inherit from matching preset)
-    // - For unknown models: use GGUF probed languages or defaults
-    let languages = if let Some(p) = preset {
-        // 继承预设的语言列表
-        log::debug!(
-            "[GGUF Scanner] {} 匹配预设 {}，使用预设语言: {:?}",
-            id,
-            p.id,
-            p.languages
+    // ✅ 核心变更：统一使用 GGUF Header 的能力，添加 fallback 逻辑
+    let languages = caps.languages.clone().or_else(|| {
+        // Fallback 1: GGUF 缺失语言信息，尝试使用预设
+        log::warn!(
+            "[Scanner] GGUF 缺少语言信息，尝试使用预设 fallback: {}",
+            id
         );
-        p.languages.clone()
-    } else {
-        // 未知模型，使用 GGUF 探测的语言
-        match &caps.languages {
-            Some(langs) if langs.is_empty() => {
-                // Multilingual model (like Whisper)
-                log::debug!("[GGUF Scanner] {} is multilingual (empty languages)", id);
-                vec![
-                    "zh".to_string(),
-                    "en".to_string(),
-                    "ja".to_string(),
-                    "ko".to_string(),
-                ]
-            }
-            Some(langs) => {
-                log::debug!("[GGUF Scanner] {} languages: {:?}", id, langs);
-                langs.clone()
-            }
-            None => {
-                log::debug!("[GGUF Scanner] {} has no language info", id);
-                vec![
-                    "zh".to_string(),
-                    "en".to_string(),
-                    "ja".to_string(),
-                    "ko".to_string(),
-                ]
-            }
-        }
-    };
+        preset.and_then(|p| Some(p.languages.clone()))
+    }).unwrap_or_else(|| {
+        // Fallback 2: 预设也缺少语言信息，使用默认值
+        log::warn!(
+            "[Scanner] 预设也缺少语言信息，使用默认值: {}",
+            id
+        );
+        vec!["zh".to_string(), "en".to_string()]
+    });
 
-    // Get capabilities from probed GGUF metadata
+    // ✅ 核心变更：能力字段从 GGUF Header 读取，不是预设
     let supports_auto_detect = caps.supports_language_detect;
     let supports_streaming = caps.supports_streaming;
     let supports_translation = caps.supports_translation;
+
+    // 记录能力信息
+    log::info!(
+        "[Scanner] 模型 {} 能力: languages={:?}, streaming={:?}, detect={:?}, translate={:?}",
+        id,
+        languages,
+        supports_streaming,
+        supports_auto_detect,
+        supports_translation
+    );
 
     if let Some(p) = preset {
         // 使用实际文件的 ID（保留量化信息），继承预设的语言列表

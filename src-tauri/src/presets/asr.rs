@@ -1,7 +1,27 @@
 //! ASR Model Presets
 //!
 //! Hardcoded presets for ASR (Automatic Speech Recognition) models.
-//! These presets define the available models and their download sources.
+//!
+//! ⚠️ 职责说明（重构后）:
+//! - 本文件的预设仅用于 Catalog UI 展示（下载前）
+//! - 提供下载链接、展示名称、描述等信息
+//! - 运行时能力（languages, supports_streaming 等）从 GGUF Header 读取
+//! - 预设文件中的能力字段已废弃，仅用于 fallback 场景
+//!
+//! 架构原则：
+//! - GGUF Header 是能力的唯一真实来源
+//! - 预设文件仅用于 Catalog 展示（下载信息、展示名称）
+//! - 运行时验证作为最终兜底
+//!
+//! 支持的模型包括：
+//! - Qwen3-ASR (GGUF, Chinese SOTA)
+//! - Cohere Transcribe (GGUF, HF Open ASR #1)
+//! - Nemotron 3.5 ASR (GGUF, streaming, low latency)
+//! - Parakeet TDT v3 (GGUF, European languages)
+//! - Parakeet Unified EN (GGUF, English optimized)
+//! - Whisper Large v3 Turbo (GGUF, 100+ languages)
+//! - SenseVoice Small (ONNX, Chinese/Cantonese optimized)
+//! - Parakeet V3 (ONNX, European languages)
 
 use super::{DownloadSourceInfo, ModelPreset};
 use crate::backends::BackendType;

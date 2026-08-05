@@ -9,7 +9,7 @@ use crate::backends::{
 use crate::config::{AppConfig, DownloadSource, Model};
 use crate::presets::{scan_available_asr_models, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
-use log::info;
+use log::{info, warn};
 use sysinfo::System;
 
 /// Backend enum for supporting both trait object and streaming operations
@@ -537,6 +537,30 @@ impl ModelManager {
                 })?;
 
                 info!("[ModelManager] TranscribeCpp 后端创建成功");
+
+                // ✅ 新增：首次运行时验证能力
+                let caps = backend.get_capabilities();
+                info!(
+                    "[ModelManager] 运行时验证 - 模型 {} 的能力: languages={:?}, streaming={:?}, detect={:?}, translate={:?}",
+                    model_id,
+                    caps.languages,
+                    caps.supports_streaming,
+                    caps.supports_language_detect,
+                    caps.supports_translation
+                );
+
+                // 验证能力与扫描时是否一致
+                if !model_config.languages.is_empty() {
+                    if let Some(ref runtime_langs) = caps.languages {
+                        if model_config.languages != *runtime_langs {
+                            warn!(
+                                "[ModelManager] 语言列表不一致: model_id={}, 扫描时={:?}, 运行时={:?}",
+                                model_id, model_config.languages, runtime_langs
+                            );
+                        }
+                    }
+                }
+
                 BackendEnum::TranscribeCpp(backend)
             }
         };

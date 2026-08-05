@@ -10,12 +10,11 @@
 //!
 //! # Language Information Source
 //!
-//! **重要**：语言信息从预设文件（asr.rs）读取，这里只返回架构能力。
-//! - 对于已知架构，`languages` 字段返回 `None`
-//! - `asr_scanner.rs` 负责从预设读取语言列表
-//! - 仅对未知模型，才使用 GGUF Header 的 `general.languages` 元数据
-//!
-//! 这样确保预设文件是语言列表的唯一来源，避免数据不一致。
+//! **重要变更**：语言信息优先从 GGUF Header 读取，实现零配置自动发现。
+//! - GGUF Header 中的 `general.languages` 是能力的唯一真实来源
+//! - 预设文件仅用于 Catalog 展示（下载信息、展示名称）
+//! - 如果 GGUF 缺失语言列表，使用预设文件的值作为 fallback
+//! - 如果预设也不存在，使用默认值 ['zh', 'en']
 //!
 //! # Supported Architectures
 //!
@@ -153,7 +152,8 @@ impl GgufCapabilities {
     /// It also supports automatic language detection.
     /// 注意：Whisper 不支持流式转录（offline only）。
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
+    /// 默认语言列表：中英文（实际支持更多语言）。
     pub fn whisper() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -161,7 +161,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(true),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("whisper"),
         }
     }
 
@@ -170,7 +170,7 @@ impl GgufCapabilities {
     /// Qwen3-ASR does NOT support streaming transcription (offline only).
     /// Supports Chinese, English, Japanese, Korean with auto language detection.
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn qwen3_asr() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -178,7 +178,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("qwen3_asr"),
         }
     }
 
@@ -189,15 +189,15 @@ impl GgufCapabilities {
     /// 注意：streaming 能力取决于具体模型，Parakeet Unified EN 支持流式，Parakeet TDT 不支持。
     /// 这里统一设置为支持流式，Parakeet TDT 的非流式设置由预设文件处理。
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn parakeet() -> Self {
         Self {
             verdict: Compatibility::Compatible,
             architecture: Some("parakeet".to_string()),
-            supports_streaming: Some(false),
+            supports_streaming: Some(true),
             supports_translation: Some(false),
-            supports_language_detect: Some(false),
-            languages: None, // 语言列表从预设读取
+            supports_language_detect: Some(true),
+            languages: get_default_languages("parakeet"),
         }
     }
 
@@ -205,7 +205,7 @@ impl GgufCapabilities {
     ///
     /// Mistral Voxtral supports streaming transcription.
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn voxtral() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -213,7 +213,7 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("voxtral"),
         }
     }
 
@@ -222,7 +222,7 @@ impl GgufCapabilities {
     /// Alibaba SenseVoice supports Chinese, Cantonese, and major Asian languages.
     /// 支持5种语言：中文、英文、粤语、日文、韩文
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn sensevoice() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -230,7 +230,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("sensevoice"),
         }
     }
 
@@ -240,7 +240,7 @@ impl GgufCapabilities {
     /// 默认使用 Canary 1B v2 的25种欧洲语言列表。
     /// 注意：Canary 180M Flash 只支持4种语言，需要根据具体模型区分。
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn canary() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -248,7 +248,7 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(true),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("canary"),
         }
     }
 
@@ -256,7 +256,7 @@ impl GgufCapabilities {
     ///
     /// Moonshine is optimized for English transcription.
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn moonshine() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -264,7 +264,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("moonshine"),
         }
     }
 
@@ -273,7 +273,7 @@ impl GgufCapabilities {
     /// NVIDIA GigaAM supports streaming, optimized for Russian.
     /// 仅支持俄语
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn gigaam() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -281,7 +281,7 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("gigaam"),
         }
     }
 
@@ -290,7 +290,7 @@ impl GgufCapabilities {
     /// Cohere audio models do NOT support streaming transcription (offline only).
     /// 支持14种语言
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn cohere() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -298,7 +298,7 @@ impl GgufCapabilities {
             supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("cohere"),
         }
     }
 
@@ -307,7 +307,7 @@ impl GgufCapabilities {
     /// NVIDIA Nemotron ASR models support streaming and auto language detection.
     /// Nemotron Streaming 系列支持流式处理。
     ///
-    /// 注意：语言信息从预设文件读取，这里返回 None。
+    /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
     pub fn nemotron() -> Self {
         Self {
             verdict: Compatibility::Compatible,
@@ -315,7 +315,7 @@ impl GgufCapabilities {
             supports_streaming: Some(true),
             supports_translation: Some(false),
             supports_language_detect: Some(true),
-            languages: None, // 语言列表从预设读取
+            languages: get_default_languages("nemotron"),
         }
     }
 
@@ -335,27 +335,34 @@ impl GgufCapabilities {
 
     /// Build capabilities from parsed GGUF metadata.
     ///
-    /// 对于已知架构，使用预设的能力值（包括语言列表），不信任 GGUF 读取的值。
-    /// 只有未知架构才使用 GGUF 自己的值。
+    /// 对于所有架构（包括已知架构），优先使用 GGUF Header 的能力信息。
+    /// 实现零配置自动发现，GGUF Header 是能力的唯一真实来源。
     ///
     /// 注意：GGUF 中的架构名可能是大小写混合（如 "Cohere"），
     /// 需要转换为小写后再匹配 KNOWN_ARCHES。
     ///
-    /// Streaming for the parakeet family is *inferred* by transcribe-cpp's
-    /// native loader from encoder hparams rather than a flat bool.
-    /// When the explicit `stt.capability.streaming` key is absent, we check
-    /// if the architecture is known to support streaming (parakeet, voxtral, etc.)
-    /// and use the preset value instead of returning None.
+    /// 如果 GGUF Header 缺失某些能力字段，使用架构默认值作为 fallback。
     pub fn from_metadata(meta: &GgufMetadata) -> Self {
         let architecture = meta.get_str(KEY_ARCH).map(str::to_string);
 
-        // 对于已知架构，使用预设能力
-        // 注意：GGUF 中的架构名可能是大小写混合（如 "Cohere"），需要转换为小写后匹配
+        // 对于已知架构，仍然从 GGUF Header 读取能力，但使用默认值作为 fallback
         if let Some(ref arch) = architecture {
             let arch_lower = arch.to_lowercase();
             if KNOWN_ARCHES.contains(&arch_lower.as_str()) {
-                // 使用预设能力，包括语言列表
-                return get_architecture_capabilities(&arch_lower);
+                // ✅ 新逻辑：从 GGUF Header 读取所有能力
+                // 如果 GGUF 缺失某些字段，使用架构默认值作为 fallback
+                return GgufCapabilities {
+                    verdict: Compatibility::Compatible,
+                    architecture: Some(arch_lower.clone()),
+                    supports_streaming: meta.get_bool(KEY_CAP_STREAMING)
+                        .or_else(|| get_default_streaming(&arch_lower)),
+                    supports_translation: meta.get_bool(KEY_CAP_TRANSLATE)
+                        .or_else(|| get_default_translation(&arch_lower)),
+                    supports_language_detect: meta.get_bool(KEY_CAP_LANG_DETECT)
+                        .or_else(|| get_default_lang_detect(&arch_lower)),
+                    languages: meta.get_string_array(KEY_LANGUAGES)
+                        .or_else(|| get_default_languages(&arch_lower)),
+                };
             }
         }
 
@@ -634,10 +641,70 @@ fn probe_from_filename(path: &Path) -> GgufCapabilities {
     GgufCapabilities::unknown()
 }
 
+// ============================================================================
+// 架构默认能力辅助函数
+// ============================================================================
+
+/// Get default streaming capability for an architecture
+///
+/// Used as fallback when GGUF header doesn't contain streaming capability.
+fn get_default_streaming(arch: &str) -> Option<bool> {
+    match arch {
+        "parakeet" | "voxtral" | "voxtral_realtime" | "canary" | "canary_qwen" | "gigaam" | "nemotron" => Some(true),
+        "whisper" | "qwen3_asr" | "sensevoice" | "moonshine" | "moonshine_streaming" | "cohere" | "cohere_asr" => Some(false),
+        _ => None,
+    }
+}
+
+/// Get default translation capability for an architecture
+///
+/// Used as fallback when GGUF header doesn't contain translation capability.
+fn get_default_translation(arch: &str) -> Option<bool> {
+    match arch {
+        "whisper" | "canary" | "canary_qwen" => Some(true),
+        "parakeet" | "qwen3_asr" | "voxtral" | "voxtral_realtime" | "sensevoice" | "moonshine" | "moonshine_streaming" | "gigaam" | "cohere" | "cohere_asr" | "nemotron" => Some(false),
+        _ => None,
+    }
+}
+
+/// Get default language detection capability for an architecture
+///
+/// Used as fallback when GGUF header doesn't contain language detection capability.
+fn get_default_lang_detect(arch: &str) -> Option<bool> {
+    match arch {
+        "whisper" | "qwen3_asr" | "voxtral" | "voxtral_realtime" | "sensevoice" | "canary" | "canary_qwen" | "cohere" | "cohere_asr" | "nemotron" => Some(true),
+        "parakeet" | "moonshine" | "moonshine_streaming" | "gigaam" => Some(false),
+        _ => None,
+    }
+}
+
+/// Get default language list for an architecture
+///
+/// Used as fallback when GGUF header doesn't contain language list.
+/// Returns None if the architecture is unknown or has no known default languages.
+fn get_default_languages(arch: &str) -> Option<Vec<String>> {
+    match arch {
+        "whisper" => Some(vec!["zh".to_string(), "en".to_string()]), // Whisper 支持多语言，默认返回中英文
+        "qwen3_asr" => Some(vec!["zh".to_string(), "en".to_string(), "ja".to_string(), "ko".to_string()]),
+        "parakeet" => Some(vec!["en".to_string()]), // Parakeet 默认欧洲语言
+        "voxtral" | "voxtral_realtime" => Some(vec!["en".to_string(), "zh".to_string()]), // Voxtral 支持多语言
+        "sensevoice" => Some(vec!["zh".to_string(), "en".to_string(), "yue".to_string(), "ja".to_string(), "ko".to_string()]),
+        "canary" | "canary_qwen" => Some(vec!["en".to_string()]), // Canary 默认欧洲语言
+        "moonshine" | "moonshine_streaming" => Some(vec!["en".to_string()]),
+        "gigaam" => Some(vec!["ru".to_string()]),
+        "cohere" | "cohere_asr" => Some(vec!["en".to_string()]), // Cohere 支持多语言
+        "nemotron" => Some(vec!["en".to_string()]), // Nemotron 支持多语言
+        _ => None,
+    }
+}
+
 /// Get architecture-specific capabilities
 ///
 /// Returns the predefined capabilities for a known architecture.
 /// Returns unknown capabilities for unsupported architectures.
+///
+/// 注意：此函数仅用于文件名推断的 fallback 场景，不用于 GGUF Header 解析。
+/// GGUF Header 解析使用 `from_metadata()` 函数。
 pub fn get_architecture_capabilities(arch: &str) -> GgufCapabilities {
     match arch {
         "whisper" => GgufCapabilities::whisper(),
@@ -680,8 +747,11 @@ mod tests {
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(true));
         assert_eq!(caps.supports_language_detect, Some(true));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值（中英文）
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"zh".to_string()));
+        assert!(langs.contains(&"en".to_string()));
     }
 
     #[test]
@@ -691,8 +761,13 @@ mod tests {
         assert_eq!(caps.architecture, Some("qwen3_asr".to_string()));
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(false));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"zh".to_string()));
+        assert!(langs.contains(&"en".to_string()));
+        assert!(langs.contains(&"ja".to_string()));
+        assert!(langs.contains(&"ko".to_string()));
     }
 
     #[test]
@@ -703,8 +778,10 @@ mod tests {
         assert_eq!(caps.supports_streaming, Some(true));
         assert_eq!(caps.supports_translation, Some(false));
         assert_eq!(caps.supports_language_detect, Some(true));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"en".to_string()));
     }
 
     #[test]
@@ -714,8 +791,14 @@ mod tests {
         assert_eq!(caps.architecture, Some("sensevoice".to_string()));
         assert_eq!(caps.supports_streaming, Some(false));
         assert_eq!(caps.supports_translation, Some(false));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"zh".to_string()));
+        assert!(langs.contains(&"en".to_string()));
+        assert!(langs.contains(&"yue".to_string()));
+        assert!(langs.contains(&"ja".to_string()));
+        assert!(langs.contains(&"ko".to_string()));
     }
 
     #[test]
@@ -771,8 +854,10 @@ mod tests {
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
         assert_eq!(caps.supports_language_detect, Some(true));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"en".to_string()));
     }
 
     #[test]
@@ -783,8 +868,10 @@ mod tests {
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
         assert_eq!(caps.supports_language_detect, Some(true));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"en".to_string()));
     }
 
     #[test]
@@ -794,8 +881,10 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_language_detect, Some(true));
-        // 语言列表从预设读取，这里返回 None
-        assert_eq!(caps.languages, None);
+        // 语言列表使用默认值
+        assert!(caps.languages.is_some());
+        let langs = caps.languages.unwrap();
+        assert!(langs.contains(&"en".to_string()));
     }
 
     #[test]
@@ -901,5 +990,107 @@ mod tests {
         assert_eq!(caps.supports_translation, None);
         assert_eq!(caps.supports_language_detect, None);
         assert_eq!(caps.languages, None);
+    }
+
+    // ========== 新增：测试 GGUF Header 优先级和 fallback 机制 ==========
+
+    #[test]
+    fn test_default_streaming_function() {
+        // 测试支持流式的架构
+        assert_eq!(get_default_streaming("parakeet"), Some(true));
+        assert_eq!(get_default_streaming("voxtral"), Some(true));
+        assert_eq!(get_default_streaming("canary"), Some(true));
+        assert_eq!(get_default_streaming("gigaam"), Some(true));
+        assert_eq!(get_default_streaming("nemotron"), Some(true));
+
+        // 测试不支持流式的架构
+        assert_eq!(get_default_streaming("whisper"), Some(false));
+        assert_eq!(get_default_streaming("qwen3_asr"), Some(false));
+        assert_eq!(get_default_streaming("sensevoice"), Some(false));
+        assert_eq!(get_default_streaming("moonshine"), Some(false));
+        assert_eq!(get_default_streaming("cohere"), Some(false));
+
+        // 测试未知架构
+        assert_eq!(get_default_streaming("unknown_arch"), None);
+    }
+
+    #[test]
+    fn test_default_translation_function() {
+        // 测试支持翻译的架构
+        assert_eq!(get_default_translation("whisper"), Some(true));
+        assert_eq!(get_default_translation("canary"), Some(true));
+
+        // 测试不支持翻译的架构
+        assert_eq!(get_default_translation("qwen3_asr"), Some(false));
+        assert_eq!(get_default_translation("parakeet"), Some(false));
+        assert_eq!(get_default_translation("voxtral"), Some(false));
+        assert_eq!(get_default_translation("sensevoice"), Some(false));
+        assert_eq!(get_default_translation("moonshine"), Some(false));
+        assert_eq!(get_default_translation("gigaam"), Some(false));
+        assert_eq!(get_default_translation("cohere"), Some(false));
+        assert_eq!(get_default_translation("nemotron"), Some(false));
+
+        // 测试未知架构
+        assert_eq!(get_default_translation("unknown_arch"), None);
+    }
+
+    #[test]
+    fn test_default_lang_detect_function() {
+        // 测试支持语言检测的架构
+        assert_eq!(get_default_lang_detect("whisper"), Some(true));
+        assert_eq!(get_default_lang_detect("qwen3_asr"), Some(true));
+        assert_eq!(get_default_lang_detect("voxtral"), Some(true));
+        assert_eq!(get_default_lang_detect("sensevoice"), Some(true));
+        assert_eq!(get_default_lang_detect("canary"), Some(true));
+        assert_eq!(get_default_lang_detect("cohere"), Some(true));
+        assert_eq!(get_default_lang_detect("nemotron"), Some(true));
+
+        // 测试不支持语言检测的架构
+        assert_eq!(get_default_lang_detect("parakeet"), Some(false));
+        assert_eq!(get_default_lang_detect("moonshine"), Some(false));
+        assert_eq!(get_default_lang_detect("gigaam"), Some(false));
+
+        // 测试未知架构
+        assert_eq!(get_default_lang_detect("unknown_arch"), None);
+    }
+
+    #[test]
+    fn test_default_languages_function() {
+        // 测试已知架构的默认语言列表
+        let whisper_langs = get_default_languages("whisper").unwrap();
+        assert!(whisper_langs.contains(&"zh".to_string()));
+        assert!(whisper_langs.contains(&"en".to_string()));
+
+        let qwen_langs = get_default_languages("qwen3_asr").unwrap();
+        assert!(qwen_langs.contains(&"zh".to_string()));
+        assert!(qwen_langs.contains(&"en".to_string()));
+        assert!(qwen_langs.contains(&"ja".to_string()));
+        assert!(qwen_langs.contains(&"ko".to_string()));
+
+        let sensevoice_langs = get_default_languages("sensevoice").unwrap();
+        assert!(sensevoice_langs.contains(&"zh".to_string()));
+        assert!(sensevoice_langs.contains(&"en".to_string()));
+        assert!(sensevoice_langs.contains(&"yue".to_string()));
+        assert!(sensevoice_langs.contains(&"ja".to_string()));
+        assert!(sensevoice_langs.contains(&"ko".to_string()));
+
+        // 测试未知架构
+        assert_eq!(get_default_languages("unknown_arch"), None);
+    }
+
+    #[test]
+    fn test_architecture_functions_return_default_languages() {
+        // 测试架构函数返回默认语言列表（不再是 None）
+        let caps = GgufCapabilities::whisper();
+        assert!(caps.languages.is_some());
+
+        let caps = GgufCapabilities::qwen3_asr();
+        assert!(caps.languages.is_some());
+
+        let caps = GgufCapabilities::parakeet();
+        assert!(caps.languages.is_some());
+
+        let caps = GgufCapabilities::sensevoice();
+        assert!(caps.languages.is_some());
     }
 }
