@@ -316,4 +316,31 @@ mod tests {
         assert!(model.files.is_none());
         assert_eq!(model.default_quant, None);
     }
+
+    #[test]
+    fn presets_generated_correctly() {
+        let presets: Vec<_> = CATALOG
+            .iter()
+            .filter(|m| m.backend.as_deref() != Some("LLM"))
+            .flat_map(|m| m.to_presets())
+            .collect();
+
+        assert!(!presets.is_empty(), "should generate presets");
+
+        // 验证 sensevoice-small 有分数
+        let sensevoice = presets.iter().find(|p| p.id == "sensevoice-small");
+        assert!(sensevoice.is_some());
+        let sensevoice = sensevoice.unwrap();
+        assert!(sensevoice.accuracy_score.is_some());
+        assert!(sensevoice.speed_score.is_some());
+    }
+
+    #[test]
+    fn all_models_have_required_fields() {
+        for model in CATALOG.iter() {
+            assert!(!model.id.is_empty(), "model should have id");
+            assert!(!model.name.is_empty(), "model should have name");
+            assert!(!model.languages.is_empty(), "model should have languages");
+        }
+    }
 }

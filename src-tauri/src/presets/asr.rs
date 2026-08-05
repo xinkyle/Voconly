@@ -23,9 +23,9 @@
 //! - SenseVoice Small (ONNX, Chinese/Cantonese optimized)
 //! - Parakeet V3 (ONNX, European languages)
 
-use super::{DownloadSourceInfo, ModelPreset};
+use super::ModelPreset;
 use crate::backends::BackendType;
-use crate::catalog::{get_accuracy_score, get_speed_score, CATALOG};
+use crate::catalog::CATALOG;
 
 /// Get all ASR model presets (从 catalog.json 动态生成)
 pub fn get_asr_presets() -> Vec<ModelPreset> {
