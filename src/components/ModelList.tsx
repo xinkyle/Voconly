@@ -7,6 +7,7 @@ import { invoke } from '../utils/tauri';
 import { getAsrModelList, getLlmModelList } from '../services/config';
 import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
 import { createLogger } from '../services/log';
+import { AudioLines } from 'lucide-react';
 
 // 创建日志记录器
 const log = createLogger('ModelList');
@@ -50,6 +51,8 @@ interface ModelWithStatus extends Model {
   descriptionKey?: string;
   isUserModel?: boolean;  // 是否为用户自定义模型（无下载源）
   modelType?: 'asr' | 'llm';  // 模型类型：ASR 或 LLM
+  accuracyScore?: number;  // 准确度评分 0-1
+  speedScore?: number;  // 速度评分 0-1
 }
 
 // Filter component
@@ -85,6 +88,19 @@ const CustomBadge = ({ t }: { t: (key: string) => string }) => (
   <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-600 rounded-full border border-amber-200">
     {t('models.custom')}
   </span>
+);
+
+// Score bar component for model quality metrics
+const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
+  <div className="flex items-center gap-2">
+    <span className="text-xs text-gray-500 w-16 text-right">{label}</span>
+    <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-blue-500' : 'bg-green-500'}`}
+        style={{ width: `${score * 100}%` }}
+      />
+    </div>
+  </div>
 );
 
 export default function ModelList({ downloadStates = {}, onDownload, onDownloadCancel, autoDownloadModelId }: ModelListProps) {
@@ -175,6 +191,9 @@ export default function ModelList({ downloadStates = {}, onDownload, onDownloadC
       downloadProgress: downloadState?.progress,
       isUserModel,
       modelType: 'asr' as const,
+      supportsStreaming: model.preset.supportsStreaming,
+      accuracyScore: model.preset.accuracyScore,
+      speedScore: model.preset.speedScore,
     };
   });
 
@@ -371,6 +390,26 @@ export default function ModelList({ downloadStates = {}, onDownload, onDownloadC
               <div className="mt-1 text-sm text-gray-500">
                 {model.descriptionKey ? t(model.descriptionKey) : model.description || ''}
               </div>
+
+              {/* Accuracy and speed scores for ASR models */}
+              {model.modelType === 'asr' && (model.accuracyScore || model.speedScore) && (
+                <div className="mt-2 flex items-center gap-4">
+                  {model.accuracyScore && (
+                    <ScoreBar label={t('models.accuracy')} score={model.accuracyScore} color="blue" />
+                  )}
+                  {model.speedScore && (
+                    <ScoreBar label={t('models.speed')} score={model.speedScore} color="green" />
+                  )}
+                </div>
+              )}
+
+              {/* Streaming support badge */}
+              {model.modelType === 'asr' && model.supportsStreaming && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                  <AudioLines className="w-3.5 h-3.5" />
+                  <span>{t('models.streaming')}</span>
+                </div>
+              )}
 
               {/* Progress info */}
               {model.downloading && model.downloadProgress && (

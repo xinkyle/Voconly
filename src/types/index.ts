@@ -39,6 +39,9 @@ export interface Model {
   modelType?: 'asr' | 'llm';  // 模型类型：ASR 或 LLM
   supportsAutoDetect?: boolean;  // 是否支持自动语言检测
   defaultLanguage?: string;  // 用户配置的默认语言
+  supportsStreaming?: boolean;  // 是否支持流式转录
+  accuracyScore?: number;  // 准确度评分 0-1
+  speedScore?: number;  // 速度评分 0-1
 }
 
 // 场景定义

@@ -1,0 +1,117 @@
+{
+  "catalog_version": 1,
+  "models": [
+    {
+      "id": "Qwen3-ASR-1.7B-Q5_K_M",
+      "name": "Qwen3-ASR-1.7B Q5_K_M",
+      "architecture": "qwen3",
+      "languages": ["zh", "zh-yue", "en", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl", "sv", "da", "fi", "pl", "cs", "fil", "fa", "el", "hu", "mk", "ro"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 63,
+      "accuracy_score": 87,
+      "description": "中文/英文混合识别，支持30种语言+22种中文方言，中文WER 5.2%"
+    },
+    {
+      "id": "cohere-transcribe-03-2026-Q5_K_M",
+      "name": "Cohere Transcribe 03-2026 Q5_K_M",
+      "architecture": "cohere_asr",
+      "languages": ["zh", "en", "ja", "ko", "de", "fr", "es", "it", "pt", "el", "nl", "pl", "vi", "ar"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 63,
+      "accuracy_score": 92,
+      "description": "HuggingFace Open ASR排行榜#1，WER 5.42%，14种语言支持"
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M",
+      "name": "Nemotron 3.5 ASR Streaming 0.6B Q5_K_M",
+      "architecture": "parakeet",
+      "languages": ["ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hi", "hr", "hu", "it", "ja", "ko", "lt", "lv", "nb", "nl", "nn", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "th", "tr", "uk", "vi", "zh"],
+      "capabilities": {
+        "streaming": true,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 84,
+      "accuracy_score": 82,
+      "description": "流式处理，80ms超低延迟，39种语言，纯CPU可运行"
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3-Q5_K_M",
+      "name": "Parakeet TDT 0.6B v3 Q5_K_M",
+      "architecture": "parakeet",
+      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 79,
+      "accuracy_score": 88,
+      "description": "TDT架构，约48倍Whisper吞吐量，25种欧洲语言，自动语言检测"
+    },
+    {
+      "id": "parakeet-unified-en-0.6b-Q5_K_M",
+      "name": "Parakeet Unified EN 0.6B Q5_K_M",
+      "architecture": "parakeet",
+      "languages": ["en"],
+      "capabilities": {
+        "streaming": true,
+        "translate": false,
+        "lang_detect": false
+      },
+      "speed_score": 79,
+      "accuracy_score": 90,
+      "description": "英语专项优化，统一离线/流式推理，最低160ms延迟"
+    },
+    {
+      "id": "whisper-large-v3-turbo-Q5_K_M",
+      "name": "Whisper Large v3 Turbo Q5_K_M",
+      "architecture": "whisper",
+      "languages": ["af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "ky", "la", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "so", "sq", "sr", "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr", "tt", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"],
+      "capabilities": {
+        "streaming": false,
+        "translate": true,
+        "lang_detect": true
+      },
+      "speed_score": 42,
+      "accuracy_score": 87,
+      "description": "99种语言覆盖，相比Large v3约8倍速度提升，支持翻译"
+    },
+    {
+      "id": "sensevoice-small",
+      "name": "SenseVoice Small",
+      "architecture": "sensevoice",
+      "languages": ["zh", "zh-yue", "en", "ja", "ko"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 85,
+      "accuracy_score": 90,
+      "description": "中文/粤语识别优于 Whisper，支持情绪识别"
+    },
+    {
+      "id": "parakeet-v3",
+      "name": "Parakeet V3",
+      "architecture": "parakeet",
+      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
+      "capabilities": {
+        "streaming": true,
+        "translate": false,
+        "lang_detect": false
+      },
+      "speed_score": 88,
+      "accuracy_score": 87,
+      "description": "NVIDIA 高速语音识别，平均 WER 6.05%，支持25种欧洲语言"
+    }
+  ]
+}

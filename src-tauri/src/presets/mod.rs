@@ -101,6 +101,14 @@ pub struct ModelPreset {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub supports_translation: Option<bool>,
 
+    // Model quality metrics (user-friendly)
+    /// Accuracy score (0.0-1.0, higher is better)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accuracy_score: Option<f32>,
+    /// Speed score (0.0-1.0, higher is faster)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed_score: Option<f32>,
+
     // LLM-specific fields (None for ASR models)
     /// GPU layer count for llama.cpp (-1 = all layers, 0 = CPU only)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -135,6 +143,8 @@ impl ModelPreset {
         supports_auto_detect: Option<bool>,
         supports_streaming: Option<bool>,
         supports_translation: Option<bool>,
+        accuracy_score: Option<f32>,
+        speed_score: Option<f32>,
     ) -> Self {
         Self {
             id,
@@ -148,6 +158,8 @@ impl ModelPreset {
             supports_auto_detect,
             supports_streaming,
             supports_translation,
+            accuracy_score,
+            speed_score,
             n_gpu_layers: None,
             n_ctx: None,
             recommended: None,
@@ -167,6 +179,8 @@ impl ModelPreset {
         supports_auto_detect: Option<bool>,
         supports_streaming: Option<bool>,
         supports_translation: Option<bool>,
+        accuracy_score: Option<f32>,
+        speed_score: Option<f32>,
         path: Option<String>,
     ) -> Self {
         Self {
@@ -181,6 +195,8 @@ impl ModelPreset {
             supports_auto_detect,
             supports_streaming,
             supports_translation,
+            accuracy_score,
+            speed_score,
             n_gpu_layers: None,
             n_ctx: None,
             recommended: None,
@@ -211,6 +227,8 @@ impl ModelPreset {
             supports_auto_detect: None,
             supports_streaming: None,
             supports_translation: None,
+            accuracy_score: None,
+            speed_score: None,
             n_gpu_layers: Some(n_gpu_layers),
             n_ctx: Some(n_ctx),
             recommended: Some(recommended),
@@ -241,6 +259,8 @@ impl ModelPreset {
             supports_auto_detect: None,
             supports_streaming: None,
             supports_translation: None,
+            accuracy_score: None,
+            speed_score: None,
             n_gpu_layers: Some(n_gpu_layers),
             n_ctx: Some(n_ctx),
             recommended: Some(recommended),
@@ -408,6 +428,8 @@ mod tests {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming
             Some(false), // supports_translation
+            Some(0.90),  // accuracy_score
+            Some(0.85),  // speed_score
         );
 
         assert!(preset.is_asr());
@@ -468,6 +490,8 @@ mod tests {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming
             Some(false), // supports_translation
+            Some(0.90),  // accuracy_score
+            Some(0.85),  // speed_score
         );
 
         // Serialize to JSON

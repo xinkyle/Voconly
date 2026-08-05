@@ -90,6 +90,9 @@
     "scanError": "Failed to scan models",
     "noModels": "No models found",
     "custom": "Custom",
+    "accuracy": "Accuracy",
+    "speed": "Speed",
+    "streaming": "Real-time",
     "descriptions": {
       "whisperTiny": "Best for quick testing, extremely fast but lower accuracy",
       "whisperBase": "Best for daily use, balanced speed and accuracy",

@@ -294,6 +294,8 @@ fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             p.supports_auto_detect,
             p.supports_streaming,
             p.supports_translation,
+            p.accuracy_score, // 继承预设的评分
+            p.speed_score,    // 继承预设的评分
             Some(model_path),
         ))
     } else {
@@ -311,6 +313,8 @@ fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             None, // Unknown supports_auto_detect
             None, // Unknown supports_streaming
             None, // Unknown supports_translation
+            None, // Unknown accuracy_score
+            None, // Unknown speed_score
             Some(model_path),
         ))
     }
@@ -424,6 +428,8 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
+            p.accuracy_score, // 继承预设的评分
+            p.speed_score,    // 继承预设的评分
             Some(model_path),
         ))
     } else {
@@ -455,6 +461,8 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
+            None, // Unknown accuracy_score for custom model
+            None, // Unknown speed_score for custom model
             Some(model_path),
         ))
     }

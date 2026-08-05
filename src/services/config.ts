@@ -21,6 +21,9 @@ interface RustModel {
   languages: string[];
   description?: string;
   supportsAutoDetect?: boolean;
+  supportsStreaming?: boolean;  // 是否支持流式转录
+  accuracyScore?: number;  // 准确度评分 0-1
+  speedScore?: number;  // 速度评分 0-1
   defaultLanguage?: string;
 }
 
@@ -145,6 +148,9 @@ function convertModelFromRust(rust: RustModel): Model {
     languages: rust.languages || [],
     description: rust.description,
     supportsAutoDetect: rust.supportsAutoDetect,
+    supportsStreaming: rust.supportsStreaming,
+    accuracyScore: rust.accuracyScore,
+    speedScore: rust.speedScore,
     defaultLanguage: rust.defaultLanguage,
   };
 }
@@ -177,6 +183,9 @@ function convertModelToRust(model: Model): RustModel {
     languages: model.languages,
     description: model.description,
     supportsAutoDetect: model.supportsAutoDetect,
+    supportsStreaming: model.supportsStreaming,
+    accuracyScore: model.accuracyScore,
+    speedScore: model.speedScore,
     defaultLanguage: model.defaultLanguage,
   };
 }
@@ -396,6 +405,9 @@ export interface ModelPreset {
   backend?: BackendType;
   languages: string[];
   supportsAutoDetect?: boolean;
+  supportsStreaming?: boolean;  // 是否支持流式转录
+  accuracyScore?: number;  // 准确度评分 0-1
+  speedScore?: number;  // 速度评分 0-1
   pythonConfig?: PythonModelConfig;
   // LLM-specific fields (not used for ASR)
   nGpuLayers?: number;

@@ -2,6 +2,7 @@
 // Provides Rust commands for the Tauri frontend
 
 pub mod backends;
+pub mod catalog;
 pub mod config;
 pub mod dictionary;
 pub mod file_ops;

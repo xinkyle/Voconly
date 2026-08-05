@@ -24,6 +24,19 @@ import { useToast } from './ui/Toast';
 
 const log = createLogger('ModelConfigPanel');
 
+// Score bar component for model quality metrics
+const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
+  <div className="flex items-center gap-1.5">
+    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0">{label}</span>
+    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
+      <div
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        style={{ width: `${(score || 0) * 100}%` }}
+      />
+    </div>
+  </div>
+);
+
 // Provider logo mapping (meta.id -> icon file name)
 const PROVIDER_LOGO_MAP: Record<string, string> = {
   ollama: 'ollama.png',
@@ -283,6 +296,13 @@ function AsrModelCard({
               </h3>
               {/* Description */}
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
+              {/* Accuracy and Speed Scores */}
+              {model.preset.accuracyScore !== undefined && model.preset.speedScore !== undefined && (
+                <div className="flex items-center gap-3 mt-2">
+                  <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
+                  <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
+                </div>
+              )}
             </div>
           </div>
 

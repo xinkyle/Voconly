@@ -32,6 +32,7 @@ use audio::AudioCapture;
 // Re-declare modules in binary crate
 mod audio;
 mod backends;
+mod catalog;
 mod commands;
 mod config;
 mod crash_report;

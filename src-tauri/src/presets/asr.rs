@@ -25,6 +25,7 @@
 
 use super::{DownloadSourceInfo, ModelPreset};
 use crate::backends::BackendType;
+use crate::catalog::{get_accuracy_score, get_speed_score};
 
 /// Get all ASR model presets
 ///
@@ -67,6 +68,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming (offline only)
             Some(false), // supports_translation
+            get_accuracy_score("Qwen3-ASR-1.7B-Q5_K_M"),
+            get_speed_score("Qwen3-ASR-1.7B-Q5_K_M"),
         ),
 
         // Cohere Transcribe 03-2026 - HF Open ASR Leaderboard #1
@@ -94,6 +97,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming
             Some(false), // supports_translation
+            get_accuracy_score("cohere-transcribe-03-2026-Q5_K_M"),
+            get_speed_score("cohere-transcribe-03-2026-Q5_K_M"),
         ),
 
         // Nemotron 3.5 ASR Streaming 0.6B - Low latency, CPU friendly
@@ -121,6 +126,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect
             Some(true),  // supports_streaming
             Some(false), // supports_translation
+            get_accuracy_score("nemotron-3.5-asr-streaming-0.6b-Q5_K_M"),
+            get_speed_score("nemotron-3.5-asr-streaming-0.6b-Q5_K_M"),
         ),
 
         // Parakeet TDT 0.6B v3 - High throughput European languages
@@ -148,6 +155,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming (offline only)
             Some(false), // supports_translation
+            get_accuracy_score("parakeet-tdt-0.6b-v3-Q5_K_M"),
+            get_speed_score("parakeet-tdt-0.6b-v3-Q5_K_M"),
         ),
 
         // Parakeet Unified EN 0.6B - English specialized
@@ -175,6 +184,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(false), // supports_auto_detect (single language model)
             Some(true),  // supports_streaming
             Some(false), // supports_translation
+            get_accuracy_score("parakeet-unified-en-0.6b-Q5_K_M"),
+            get_speed_score("parakeet-unified-en-0.6b-Q5_K_M"),
         ),
 
         // Whisper Large v3 Turbo - 100+ languages, 8x faster than Large v3
@@ -202,6 +213,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming (offline only)
             Some(true),  // supports_translation
+            get_accuracy_score("whisper-large-v3-turbo-Q5_K_M"),
+            get_speed_score("whisper-large-v3-turbo-Q5_K_M"),
         ),
 
         // ========== ONNX Models (Onnx Backend) ==========
@@ -232,6 +245,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(true),  // supports_auto_detect: SenseVoice supports automatic language detection
             Some(false), // supports_streaming: ONNX version does not support streaming
             Some(false), // supports_translation: SenseVoice does not support translation to English
+            get_accuracy_score("sensevoice-small"),
+            get_speed_score("sensevoice-small"),
         ),
 
         // Parakeet V3 - NVIDIA high-speed ASR for European languages
@@ -260,6 +275,8 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             Some(false), // supports_auto_detect: Parakeet does NOT support automatic language detection
             Some(true),  // supports_streaming: Parakeet ONNX version supports streaming
             Some(false), // supports_translation: Parakeet does not support translation to English
+            get_accuracy_score("parakeet-v3"),
+            get_speed_score("parakeet-v3"),
         ),
     ]
 }
