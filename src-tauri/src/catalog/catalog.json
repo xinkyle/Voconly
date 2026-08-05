@@ -5,6 +5,22 @@
       "id": "Qwen3-ASR-1.7B-Q5_K_M",
       "name": "Qwen3-ASR-1.7B Q5_K_M",
       "architecture": "qwen3",
+      "backend": "TranscribeCpp",
+      "size": "~1.5GB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/Qwen3-ASR-1.7B-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/Qwen3-ASR-1.7B-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["zh", "zh-yue", "en", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl", "sv", "da", "fi", "pl", "cs", "fil", "fa", "el", "hu", "mk", "ro"],
       "capabilities": {
         "streaming": false,
@@ -19,6 +35,22 @@
       "id": "cohere-transcribe-03-2026-Q5_K_M",
       "name": "Cohere Transcribe 03-2026 Q5_K_M",
       "architecture": "cohere_asr",
+      "backend": "TranscribeCpp",
+      "size": "~1.7GB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/cohere-transcribe-03-2026-gguf/resolve/main/cohere-transcribe-03-2026-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/cohere-transcribe-03-2026-gguf/resolve/main/cohere-transcribe-03-2026-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["zh", "en", "ja", "ko", "de", "fr", "es", "it", "pt", "el", "nl", "pl", "vi", "ar"],
       "capabilities": {
         "streaming": false,
@@ -33,6 +65,22 @@
       "id": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M",
       "name": "Nemotron 3.5 ASR Streaming 0.6B Q5_K_M",
       "architecture": "parakeet",
+      "backend": "TranscribeCpp",
+      "size": "~534MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hi", "hr", "hu", "it", "ja", "ko", "lt", "lv", "nb", "nl", "nn", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "th", "tr", "uk", "vi", "zh"],
       "capabilities": {
         "streaming": true,
@@ -47,6 +95,22 @@
       "id": "parakeet-tdt-0.6b-v3-Q5_K_M",
       "name": "Parakeet TDT 0.6B v3 Q5_K_M",
       "architecture": "parakeet",
+      "backend": "TranscribeCpp",
+      "size": "~524MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
       "capabilities": {
         "streaming": false,
@@ -61,6 +125,22 @@
       "id": "parakeet-unified-en-0.6b-Q5_K_M",
       "name": "Parakeet Unified EN 0.6B Q5_K_M",
       "architecture": "parakeet",
+      "backend": "TranscribeCpp",
+      "size": "~516MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/parakeet-unified-en-0.6b-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/parakeet-unified-en-0.6b-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["en"],
       "capabilities": {
         "streaming": true,
@@ -75,6 +155,22 @@
       "id": "whisper-large-v3-turbo-Q5_K_M",
       "name": "Whisper Large v3 Turbo Q5_K_M",
       "architecture": "whisper",
+      "backend": "TranscribeCpp",
+      "size": "~591MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/whisper-large-v3-turbo-gguf/resolve/main/whisper-large-v3-turbo-Q5_K_M.gguf",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/whisper-large-v3-turbo-gguf/resolve/main/whisper-large-v3-turbo-Q5_K_M.gguf",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ],
       "languages": ["af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "ky", "la", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "so", "sq", "sr", "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr", "tt", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"],
       "capabilities": {
         "streaming": false,
@@ -89,6 +185,22 @@
       "id": "sensevoice-small",
       "name": "SenseVoice Small",
       "architecture": "sensevoice",
+      "backend": "Onnx",
+      "size": "229MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
+          "is_china_accessible": false,
+          "priority": 2
+        }
+      ],
       "languages": ["zh", "zh-yue", "en", "ja", "ko"],
       "capabilities": {
         "streaming": false,
@@ -103,6 +215,22 @@
       "id": "parakeet-v3",
       "name": "Parakeet V3",
       "architecture": "parakeet",
+      "backend": "Onnx",
+      "size": "640MB",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/parakeet-v3/resolve/main/parakeet-v3.zip",
+          "is_china_accessible": true,
+          "priority": 1
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/parakeet-v3/resolve/main/parakeet-v3.zip",
+          "is_china_accessible": false,
+          "priority": 2
+        }
+      ],
       "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
       "capabilities": {
         "streaming": true,
