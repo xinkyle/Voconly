@@ -3,6 +3,8 @@
 //! Provides model metadata including benchmark scores from `catalog.json`.
 //! Scores are stored as 0-100 and converted to 0.0-1.0 for UI display.
 
+use crate::backends::BackendType;
+use crate::presets::{DownloadSourceInfo, ModelPreset};
 use crate::utils::get_base_model_id;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -56,6 +58,87 @@ pub struct CatalogFile {
     pub filename: String,
     pub quant: String,
     pub size_bytes: u64,
+}
+
+impl CatalogModel {
+    /// Parse backend type from catalog model
+    fn parse_backend(&self) -> BackendType {
+        match self.backend.as_deref() {
+            Some("Onnx") => BackendType::Onnx,
+            Some("TranscribeCpp") | None => BackendType::TranscribeCpp,
+            _ => BackendType::TranscribeCpp,
+        }
+    }
+
+    /// Create a single ModelPreset from CatalogModel
+    pub fn to_preset(&self) -> ModelPreset {
+        ModelPreset::asr_preset(
+            self.id.clone(),
+            self.name.clone(),
+            self.size.clone().unwrap_or_else(|| "未知大小".to_string()),
+            self.parse_backend(),
+            self.download_urls
+                .as_ref()
+                .map(|urls| {
+                    urls.iter()
+                        .map(|u| DownloadSourceInfo {
+                            name: u.name.clone(),
+                            url: u.url.clone(),
+                            is_china_accessible: u.is_china_accessible,
+                            priority: u.priority,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            self.languages.clone(),
+            self.description.clone(),
+            Some(self.capabilities.lang_detect),
+            Some(self.capabilities.streaming),
+            Some(self.capabilities.translate),
+            self.accuracy_score.map(|a| a as f32 / 100.0),
+            self.speed_score.map(|s| s as f32 / 100.0),
+        )
+    }
+
+    /// Get all quantization variant presets (for GGUF models)
+    pub fn to_presets(&self) -> Vec<ModelPreset> {
+        if let Some(files) = &self.files {
+            files
+                .iter()
+                .map(|f| {
+                    let id = format!("{}-{}", self.id, f.quant);
+                    ModelPreset::asr_preset(
+                        id,
+                        format!("{} {}", self.name, f.quant),
+                        format!("{}MB", f.size_bytes / 1024 / 1024),
+                        BackendType::TranscribeCpp,
+                        self.download_urls
+                            .as_ref()
+                            .map(|urls| {
+                                urls.iter()
+                                    .map(|u| DownloadSourceInfo {
+                                        name: u.name.clone(),
+                                        url: format!("{}{}", u.url, f.filename),
+                                        is_china_accessible: u.is_china_accessible,
+                                        priority: u.priority,
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                        self.languages.clone(),
+                        self.description.clone(),
+                        Some(self.capabilities.lang_detect),
+                        Some(self.capabilities.streaming),
+                        Some(self.capabilities.translate),
+                        self.accuracy_score.map(|a| a as f32 / 100.0),
+                        self.speed_score.map(|s| s as f32 / 100.0),
+                    )
+                })
+                .collect()
+        } else {
+            vec![self.to_preset()]
+        }
+    }
 }
 
 /// Global catalog instance (loaded once at startup)
