@@ -33,7 +33,6 @@ interface RustScene {
   shortcut: string;
   modelId: string;
   loadStrategy: RustLoadStrategy;
-  language: string;
   autoType: boolean;
   enabled: boolean;
 }
@@ -156,7 +155,6 @@ function convertSceneFromRust(rust: RustScene): Scene {
     name: rust.name,
     shortcut: rust.shortcut,
     modelId: rust.modelId,
-    language: rust.language || 'zh',
     autoType: rust.autoType ?? true,
     enabled: rust.enabled,
   };
@@ -190,7 +188,6 @@ function convertSceneToRust(scene: Scene): RustScene {
     shortcut: scene.shortcut,
     modelId: scene.modelId,
     loadStrategy: { type: 'Always' },
-    language: scene.language || 'zh',
     autoType: scene.autoType ?? true,
     enabled: scene.enabled,
   };

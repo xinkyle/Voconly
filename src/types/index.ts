@@ -47,7 +47,6 @@ export interface Scene {
   name: string;
   shortcut: string;
   modelId: string;
-  language?: string;
   autoType?: boolean;
   enabled: boolean;
 }

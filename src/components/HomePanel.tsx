@@ -412,7 +412,38 @@ function SceneCard({
   onLanguageChange,
   onModelLanguageChange,
 }: SceneCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // 智能语言推荐逻辑（公共函数）：
+  // 1. 用户已设置过的语言偏好（优先级最高）
+  // 2. 如果模型支持自动检测，优先推荐 auto
+  // 3. 如果界面语言在模型支持列表中，使用界面语言
+  // 4. 否则使用第一个支持的语言
+  const getRecommendedLanguage = (
+    modelId: string,
+    languages: string[],
+    supportsAutoDetect: boolean
+  ): string => {
+    // 1. 用户已设置过的语言偏好
+    if (modelLanguagePrefs[modelId]) {
+      return modelLanguagePrefs[modelId];
+    }
+
+    // 2. 如果模型支持自动检测，优先推荐 auto
+    if (supportsAutoDetect) {
+      return 'auto';
+    }
+
+    // 3. 获取系统/界面语言，如果支持则使用
+    const i18nLanguage = i18n.language || 'zh'; // 默认中文
+    const langCode = i18nLanguage.split('-')[0]; // 'zh-CN' -> 'zh', 'en-US' -> 'en'
+    if (languages.includes(langCode)) {
+      return langCode;
+    }
+
+    // 4. 否则使用第一个支持的语言
+    return languages[0] || 'zh';
+  };
 
   // Build model list from ASR models (same logic as ModelConfigPanel.tsx)
   const modelList = asrModels.map(model => {
@@ -425,9 +456,9 @@ function SceneCard({
     const modelFromProps = models.find(m => m.id === model.preset.id);
     const languages = model.preset.languages || modelFromProps?.languages || [];
     const supportsAutoDetect = model.preset.supportsAutoDetect ?? modelFromProps?.supportsAutoDetect ?? (languages.length > 10);
-    // 从用户偏好获取默认语言，如果没有则使用 auto 或第一个支持的语言
-    const defaultLanguage = modelLanguagePrefs[model.preset.id]
-      || (supportsAutoDetect ? 'auto' : languages[0]);
+
+    const defaultLanguage = getRecommendedLanguage(model.preset.id, languages, supportsAutoDetect);
+
     return {
       id: model.preset.id,
       name: model.preset.name,
@@ -721,12 +752,8 @@ function SceneCard({
               ? ['auto', ...modelLanguages]
               : modelLanguages;
 
-            // 计算默认语言：
-            // 1. 从用户偏好获取
-            // 2. 如果没有偏好且支持 auto，默认 'auto'
-            // 3. 如果不支持 auto，默认第一个支持的语言
-            const currentLanguage = modelLanguagePrefs[scene.modelId]
-              || (supportsAutoDetect ? 'auto' : modelLanguages[0]);
+            // 使用统一的智能语言推荐逻辑
+            const currentLanguage = getRecommendedLanguage(scene.modelId, modelLanguages, supportsAutoDetect);
 
             return (
               <div className="flex items-center gap-2">

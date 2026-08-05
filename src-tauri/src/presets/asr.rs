@@ -45,7 +45,7 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             vec!["zh".to_string(), "zh-yue".to_string(), "en".to_string(), "ar".to_string(), "de".to_string(), "fr".to_string(), "es".to_string(), "pt".to_string(), "id".to_string(), "it".to_string(), "ko".to_string(), "ru".to_string(), "th".to_string(), "vi".to_string(), "ja".to_string(), "tr".to_string(), "hi".to_string(), "ms".to_string(), "nl".to_string(), "sv".to_string(), "da".to_string(), "fi".to_string(), "pl".to_string(), "cs".to_string(), "fil".to_string(), "fa".to_string(), "el".to_string(), "hu".to_string(), "mk".to_string(), "ro".to_string()],
             Some("中文/英文混合识别，支持30种语言+22种中文方言，中文WER 5.2%".to_string()),
             Some(true),  // supports_auto_detect
-            Some(true),  // supports_streaming
+            Some(false), // supports_streaming (offline only)
             Some(false), // supports_translation
         ),
 
@@ -126,7 +126,7 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             vec!["en".to_string(), "fr".to_string(), "es".to_string(), "de".to_string(), "it".to_string(), "pt".to_string(), "nl".to_string(), "bg".to_string(), "hr".to_string(), "cs".to_string(), "da".to_string(), "et".to_string(), "fi".to_string(), "el".to_string(), "hu".to_string(), "lv".to_string(), "lt".to_string(), "mt".to_string(), "pl".to_string(), "ro".to_string(), "sk".to_string(), "sl".to_string(), "sv".to_string(), "ru".to_string(), "uk".to_string()],
             Some("TDT架构，约48倍Whisper吞吐量，25种欧洲语言，自动语言检测".to_string()),
             Some(true),  // supports_auto_detect
-            Some(true),  // supports_streaming
+            Some(false), // supports_streaming (offline only)
             Some(false), // supports_translation
         ),
 
@@ -180,7 +180,7 @@ pub fn get_asr_presets() -> Vec<ModelPreset> {
             vec!["af".to_string(), "am".to_string(), "ar".to_string(), "as".to_string(), "az".to_string(), "ba".to_string(), "be".to_string(), "bg".to_string(), "bn".to_string(), "bo".to_string(), "br".to_string(), "bs".to_string(), "ca".to_string(), "cs".to_string(), "cy".to_string(), "da".to_string(), "de".to_string(), "el".to_string(), "en".to_string(), "es".to_string(), "et".to_string(), "eu".to_string(), "fa".to_string(), "fi".to_string(), "fo".to_string(), "fr".to_string(), "gl".to_string(), "gu".to_string(), "ha".to_string(), "he".to_string(), "hi".to_string(), "hr".to_string(), "ht".to_string(), "hu".to_string(), "hy".to_string(), "id".to_string(), "is".to_string(), "it".to_string(), "ja".to_string(), "jv".to_string(), "ka".to_string(), "kk".to_string(), "km".to_string(), "kn".to_string(), "ko".to_string(), "ky".to_string(), "la".to_string(), "lo".to_string(), "lt".to_string(), "lv".to_string(), "mg".to_string(), "mk".to_string(), "ml".to_string(), "mn".to_string(), "mr".to_string(), "ms".to_string(), "mt".to_string(), "my".to_string(), "ne".to_string(), "nl".to_string(), "nn".to_string(), "no".to_string(), "oc".to_string(), "or".to_string(), "pa".to_string(), "pl".to_string(), "ps".to_string(), "pt".to_string(), "ro".to_string(), "ru".to_string(), "sa".to_string(), "sd".to_string(), "si".to_string(), "sk".to_string(), "sl".to_string(), "so".to_string(), "sq".to_string(), "sr".to_string(), "su".to_string(), "sv".to_string(), "sw".to_string(), "ta".to_string(), "te".to_string(), "tg".to_string(), "th".to_string(), "tk".to_string(), "tl".to_string(), "tr".to_string(), "tt".to_string(), "uk".to_string(), "ur".to_string(), "uz".to_string(), "vi".to_string(), "wo".to_string(), "xh".to_string(), "yi".to_string(), "yo".to_string(), "zh".to_string(), "zu".to_string()],
             Some("99种语言覆盖，相比Large v3约8倍速度提升，支持翻译".to_string()),
             Some(true),  // supports_auto_detect
-            Some(true),  // supports_streaming
+            Some(false), // supports_streaming (offline only)
             Some(true),  // supports_translation
         ),
 
@@ -299,7 +299,7 @@ mod tests {
         assert!(qwen3.is_some());
         let qwen3 = qwen3.unwrap();
         assert!(qwen3.languages.contains(&"zh".to_string()));
-        assert!(qwen3.supports_streaming == Some(true));
+        assert!(qwen3.supports_streaming == Some(false)); // Qwen3-ASR 不支持流式
 
         // Whisper Turbo should support translation
         let whisper = gguf_presets

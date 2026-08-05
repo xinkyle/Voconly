@@ -249,9 +249,6 @@ pub struct Scene {
     /// 模型加载策略
     #[serde(default)]
     pub load_strategy: LoadStrategy,
-    /// 识别语言
-    #[serde(default = "default_language")]
-    pub language: String,
     /// 自动输入识别结果
     #[serde(default = "default_true")]
     pub auto_type: bool,
@@ -356,11 +353,6 @@ pub struct AppConfig {
     pub custom_asr_model_dirs: Vec<String>,
 }
 
-/// 默认语言
-fn default_language() -> String {
-    "zh".to_string()
-}
-
 /// 默认自动语言
 fn default_auto_language() -> String {
     "auto".to_string()
@@ -390,7 +382,6 @@ impl Default for AppConfig {
                     model_id: "".to_string(), // 空字符串，提示用户先下载模型
                     enabled: true,
                     load_strategy: LoadStrategy::Always,
-                    language: "zh".to_string(),
                     auto_type: true,
                 },
                 Scene {
@@ -400,7 +391,6 @@ impl Default for AppConfig {
                     model_id: "".to_string(), // 空字符串，提示用户先下载模型
                     enabled: true,
                     load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
-                    language: "zh".to_string(),
                     auto_type: true,
                 },
             ],

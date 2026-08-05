@@ -151,6 +151,7 @@ impl GgufCapabilities {
     ///
     /// Whisper supports translation to English and is multilingual.
     /// It also supports automatic language detection.
+    /// 注意：Whisper 不支持流式转录（offline only）。
     ///
     /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn whisper() -> Self {
@@ -184,14 +185,16 @@ impl GgufCapabilities {
     /// Create capabilities for Parakeet architecture
     ///
     /// NVIDIA Parakeet supports streaming, optimized for European languages.
-    /// 支持25种欧洲语言。
+    /// 支持25种欧洲语言，支持自动语言检测。
+    /// 注意：streaming 能力取决于具体模型，Parakeet Unified EN 支持流式，Parakeet TDT 不支持。
+    /// 这里统一设置为支持流式，Parakeet TDT 的非流式设置由预设文件处理。
     ///
     /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn parakeet() -> Self {
         Self {
             verdict: Compatibility::Compatible,
             architecture: Some("parakeet".to_string()),
-            supports_streaming: Some(true),
+            supports_streaming: Some(false),
             supports_translation: Some(false),
             supports_language_detect: Some(false),
             languages: None, // 语言列表从预设读取
@@ -301,17 +304,17 @@ impl GgufCapabilities {
 
     /// Create capabilities for Nemotron architecture
     ///
-    /// NVIDIA Nemotron ASR models support English only.
-    /// Streaming capability depends on transcribe-cpp runtime detection.
+    /// NVIDIA Nemotron ASR models support streaming and auto language detection.
+    /// Nemotron Streaming 系列支持流式处理。
     ///
     /// 注意：语言信息从预设文件读取，这里返回 None。
     pub fn nemotron() -> Self {
         Self {
             verdict: Compatibility::Compatible,
             architecture: Some("nemotron".to_string()),
-            supports_streaming: Some(false), // Conservative, depends on runtime detection
+            supports_streaming: Some(true),
             supports_translation: Some(false),
-            supports_language_detect: Some(false),
+            supports_language_detect: Some(true),
             languages: None, // 语言列表从预设读取
         }
     }
@@ -367,14 +370,16 @@ impl GgufCapabilities {
 
         // If streaming capability is not in metadata, infer from architecture
         // This handles parakeet, voxtral, etc. where streaming is inferred from encoder hparams
+        // 注意：只有特定模型支持流式，这里按架构统一处理
         if supports_streaming.is_none() {
             if let Some(ref arch) = architecture {
                 supports_streaming = match arch.as_str() {
                     // Architectures known to support streaming
-                    "parakeet" | "voxtral" | "voxtral_realtime" | "canary" | "gigaam" => Some(true),
+                    "parakeet" | "voxtral" | "voxtral_realtime" | "canary" | "gigaam"
+                    | "nemotron" => Some(true),
                     // Architectures known to NOT support streaming
                     "whisper" | "qwen3_asr" | "sensevoice" | "moonshine" | "cohere"
-                    | "cohere_asr" | "nemotron" => Some(false),
+                    | "cohere_asr" => Some(false),
                     // Unknown architectures - keep None
                     _ => None,
                 };
@@ -697,6 +702,7 @@ mod tests {
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
         assert_eq!(caps.supports_translation, Some(false));
+        assert_eq!(caps.supports_language_detect, Some(true));
         // 语言列表从预设读取，这里返回 None
         assert_eq!(caps.languages, None);
     }
@@ -764,6 +770,7 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
+        assert_eq!(caps.supports_language_detect, Some(true));
         // 语言列表从预设读取，这里返回 None
         assert_eq!(caps.languages, None);
     }
@@ -775,6 +782,7 @@ mod tests {
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
         assert_eq!(caps.supports_streaming, Some(true));
+        assert_eq!(caps.supports_language_detect, Some(true));
         // 语言列表从预设读取，这里返回 None
         assert_eq!(caps.languages, None);
     }
@@ -785,6 +793,7 @@ mod tests {
         let path = PathBuf::from("parakeet-unified-en-0.6b-q5_k_m.gguf");
         let caps = probe_from_filename(&path);
         assert_eq!(caps.architecture, Some("parakeet".to_string()));
+        assert_eq!(caps.supports_language_detect, Some(true));
         // 语言列表从预设读取，这里返回 None
         assert_eq!(caps.languages, None);
     }
