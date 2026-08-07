@@ -344,8 +344,28 @@ fn build_model_list_from_presets(
     }
 
     // 添加未下载的预设（downloaded=false）
+    //
+    // 优化逻辑：如果模型已下载，不显示未下载的版本
+    // 这样可以避免同一模型显示多个条目（如 Q8 已下载，Q5 未下载）
     for preset in presets {
-        // 检查是否已经在已存在列表中
+        // 检查是否已经有已下载的版本（基础 ID 匹配）
+        let base_preset_id = crate::presets::get_base_model_id(&preset.id);
+        let already_downloaded = result.iter().any(|m| {
+            let base_model_id = crate::presets::get_base_model_id(&m.preset.id);
+            base_model_id == base_preset_id && m.downloaded
+        });
+
+        // 如果已经有已下载的版本，跳过未下载的版本
+        if already_downloaded {
+            log::debug!(
+                "[ASR] Skipping undownloaded preset '{}' (base_id='{}') - already downloaded",
+                preset.id,
+                base_preset_id
+            );
+            continue;
+        }
+
+        // 检查是否已经在结果列表中（精确 ID 匹配）
         if !result.iter().any(|m| m.preset.id == preset.id) {
             result.push(AsrModelWithStatus {
                 preset,

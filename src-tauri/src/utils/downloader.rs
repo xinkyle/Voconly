@@ -3,7 +3,7 @@
 
 use crate::config::{load_config, AppServices};
 use crate::paths::{llm_models_dir, models_dir};
-use crate::presets::{get_model_backend, is_gguf_model, is_llm_model, is_onnx_model};
+use crate::presets::{get_asr_presets, get_model_backend, is_gguf_model, is_llm_model, is_onnx_model, scan_available_asr_models};
 use futures_util::StreamExt;
 use log;
 use serde::{Deserialize, Serialize};
@@ -199,6 +199,48 @@ pub fn get_model_storage_dir() -> Result<PathBuf, String> {
     models_dir()
 }
 
+/// 统一辅助函数：获取模型路径（优先使用 ModelPreset）
+///
+/// 查找顺序：
+/// 1. 扫描结果（已存在的模型，包含自定义目录）
+/// 2. Catalog 预设（未下载的模型，使用 default_quant）
+/// 3. Fallback：旧逻辑（兼容）
+pub fn get_model_path_from_preset(model_id: &str) -> Result<PathBuf, String> {
+    // Step 1: 先从扫描结果查找（已存在的模型）
+    let scanned = scan_available_asr_models();
+    if let Some(preset) = scanned.iter().find(|p| p.id == model_id) {
+        // 最高优先级：扫描器设置的完整路径（包括自定义目录）
+        if let Some(ref path_str) = preset.path {
+            log::debug!("[get_model_path_from_preset] 使用扫描结果的 path: {}", path_str);
+            return Ok(PathBuf::from(path_str));
+        }
+        // 次优先级：文件名（在默认目录查找）
+        if let Some(ref filename) = preset.filename {
+            let storage_dir = get_model_storage_dir()?;
+            let path = storage_dir.join(filename);
+            log::debug!("[get_model_path_from_preset] 使用扫描结果的 filename: {}", path.display());
+            return Ok(path);
+        }
+    }
+
+    // Step 2: 从 catalog 预设查找（未下载的模型）
+    let presets = get_asr_presets();
+    if let Some(preset) = presets.iter().find(|p| p.id == model_id) {
+        // 使用 catalog 的 default_quant 对应的 filename
+        if let Some(ref filename) = preset.filename {
+            let storage_dir = get_model_storage_dir()?;
+            let path = storage_dir.join(filename);
+            log::debug!("[get_model_path_from_preset] 使用 catalog 预设的 filename: {}", path.display());
+            return Ok(path);
+        }
+    }
+
+    // Step 3: Fallback：使用旧逻辑（兼容）
+    let backend = get_model_backend_str(model_id);
+    log::debug!("[get_model_path_from_preset] Fallback 到 get_model_path: model_id={}, backend={}", model_id, backend);
+    get_model_path(model_id, &backend)
+}
+
 /// Get model file path by model ID and backend type
 /// For ONNX models (SenseVoice/Parakeet/Moonshine), returns directory path
 /// For Whisper models, returns file path
@@ -366,39 +408,62 @@ fn find_in_custom_dirs(file_name: &str, is_file: bool) -> Option<PathBuf> {
 /// For ONNX models, checks if directory exists with model files
 /// For GGUF models (TranscribeCpp backend), checks if file exists
 pub fn model_exists(model_id: &str, backend: &str) -> bool {
-    if let Ok(path) = get_model_path(model_id, backend) {
-        // Use unified detection functions
-        let is_gguf = is_gguf_model(model_id) || backend == "transcribe_cpp" || backend == "transcribecpp" || backend == "transcribe-cpp";
-        let is_onnx = is_onnx_model(model_id) || backend == "onnx";
+    check_model_available(model_id, Some(backend))
+}
 
-        if is_gguf {
-            // GGUF 文件直接检查存在性
-            return path.exists() && path.is_file();
+/// Unified model availability check
+///
+/// Uses the scanner as the single source of truth, following design principles:
+/// - GGUF models: uses scan_available_asr_models() (already selects highest precision version)
+/// - ONNX models: checks if directory exists (not using scanner, as scanner may miss newly downloaded)
+/// - LLM models: directly checks file
+///
+/// # Performance optimization
+/// - ASR scanner has internal caching mechanism (scan_available_asr_models)
+/// - Avoids duplicate filesystem access
+pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
+    // LLM models: directly check file
+    if is_llm_model(model_id) {
+        return llm_model_exists(model_id);
+    }
+
+    // Determine backend type
+    let backend_type = backend
+        .map(|b| b.to_string())
+        .unwrap_or_else(|| get_model_backend_str(model_id));
+
+    // ONNX models: check directory existence (not using scanner, as scanner may miss newly downloaded)
+    if backend_type == "onnx" {
+        if let Ok(path) = get_model_path(model_id, &backend_type) {
+            return path.is_dir() && has_onnx_model_files(&path, model_id);
         }
+        return false;
+    }
 
-        if is_onnx {
-            // For ONNX models, check directory exists with appropriate model files
-            if !path.is_dir() {
-                return false;
-            }
+    // GGUF models: use scanner (already selected highest precision version, supports multi-quantization)
+    let scanned = scan_available_asr_models();
+    scanned.iter().any(|p| p.id == model_id)
+}
 
-            // Check for model files based on model type
-            if model_id.contains("moonshine") {
-                // Moonshine models have different file structures
-                // Base: encoder_model.onnx, Tiny streaming: encoder.ort
-                path.join("encoder_model.onnx").exists() || path.join("encoder.ort").exists()
-            } else if model_id.contains("parakeet") {
-                // Parakeet: encoder-model.int8.onnx
-                path.join("encoder-model.int8.onnx").exists()
-            } else {
-                // SenseVoice: model.int8.onnx
-                path.join("model.int8.onnx").exists()
-            }
-        } else {
-            path.exists()
-        }
+/// Helper: Get backend type as string
+fn get_model_backend_str(model_id: &str) -> String {
+    match get_model_backend(model_id) {
+        crate::backends::BackendType::TranscribeCpp => "transcribe_cpp".to_string(),
+        crate::backends::BackendType::Onnx => "onnx".to_string(),
+    }
+}
+
+/// Helper: Check if ONNX model directory contains necessary model files
+fn has_onnx_model_files(path: &Path, model_id: &str) -> bool {
+    if model_id.contains("moonshine") {
+        // Moonshine: encoder_model.onnx or encoder.ort
+        path.join("encoder_model.onnx").exists() || path.join("encoder.ort").exists()
+    } else if model_id.contains("parakeet") {
+        // Parakeet: encoder-model.int8.onnx
+        path.join("encoder-model.int8.onnx").exists()
     } else {
-        false
+        // SenseVoice: model.int8.onnx
+        path.join("model.int8.onnx").exists()
     }
 }
 
@@ -585,13 +650,8 @@ async fn download_single_attempt(
         // LLM model → llm_models directory
         get_llm_model_path(model_id)?
     } else {
-        // ASR model → models directory
-        // Use unified detection from preset table
-        let backend = match get_model_backend(model_id) {
-            crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
-            crate::backends::BackendType::Onnx => "onnx",
-        };
-        get_model_path(model_id, backend)?
+        // ASR model: 使用统一辅助函数获取正确的保存路径
+        get_model_path_from_preset(model_id)?
     };
 
     // Create parent directories if needed
@@ -802,8 +862,8 @@ pub async fn download_model_with_source(
         crate::backends::BackendType::Onnx => "onnx",
     };
 
-    if model_exists(&model_id, backend) {
-        let path = get_model_path(&model_id, backend)?;
+    if check_model_available(&model_id, Some(backend)) {
+        let path = get_model_path_from_preset(&model_id)?;
         // Debug: 检查 is_llm_model 的返回值
         let is_llm = is_llm_model(&model_id);
         log::info!(
@@ -995,8 +1055,8 @@ pub async fn download_model_from_url(
         }
     });
 
-    if model_exists(&model_id, &backend_type) {
-        let path = get_model_path(&model_id, &backend_type)?;
+    if check_model_available(&model_id, Some(&backend_type)) {
+        let path = get_model_path_from_preset(&model_id)?;
         return Ok(DownloadResult {
             success: true,
             model_id,
@@ -1080,7 +1140,7 @@ pub fn get_model_storage_path_cmd(
         }
     });
 
-    let path = get_model_path(&model_id, &backend_type)?;
+    let path = get_model_path_from_preset(&model_id)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -1088,18 +1148,7 @@ pub fn get_model_storage_path_cmd(
 /// Automatically detects backend type based on preset definitions (exact match first)
 #[tauri::command]
 pub fn check_model_exists_cmd(model_id: String, backend: Option<String>) -> bool {
-    // Use provided backend if available
-    if let Some(b) = backend {
-        return model_exists(&model_id, &b);
-    }
-
-    // Use unified detection from preset table
-    let backend_type = match get_model_backend(&model_id) {
-        crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
-        crate::backends::BackendType::Onnx => "onnx",
-    };
-
-    model_exists(&model_id, backend_type)
+    check_model_available(&model_id, backend.as_deref())
 }
 
 /// Cancel an ongoing model download

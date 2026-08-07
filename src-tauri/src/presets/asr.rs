@@ -28,11 +28,14 @@ use crate::backends::BackendType;
 use crate::catalog::CATALOG;
 
 /// Get all ASR model presets (从 catalog.json 动态生成)
+///
+/// 每个模型只返回一个 preset（使用 default_quant），
+/// 不再支持多个量化版本的独立展示。
 pub fn get_asr_presets() -> Vec<ModelPreset> {
     CATALOG
         .iter()
         .filter(|m| m.backend.as_deref() != Some("LLM"))
-        .flat_map(|m| m.to_presets())
+        .map(|m| m.to_preset())
         .collect()
 }
 
@@ -85,21 +88,29 @@ mod tests {
         assert_eq!(gguf_presets.len(), 6);
 
         // Qwen3-ASR should support Chinese
+        // Note: ID no longer includes quantization suffix
         let qwen3 = gguf_presets
             .iter()
-            .find(|p| p.id == "Qwen3-ASR-1.7B-Q5_K_M");
+            .find(|p| p.id == "Qwen3-ASR-1.7B");
         assert!(qwen3.is_some());
         let qwen3 = qwen3.unwrap();
         assert!(qwen3.languages.contains(&"zh".to_string()));
         assert!(qwen3.supports_streaming == Some(false)); // Qwen3-ASR 不支持流式
+        // Should have filename and quant fields
+        assert!(qwen3.filename.is_some());
+        assert!(qwen3.quant.is_some());
 
         // Whisper Turbo should support translation
+        // Note: ID no longer includes quantization suffix
         let whisper = gguf_presets
             .iter()
-            .find(|p| p.id == "whisper-large-v3-turbo-Q5_K_M");
+            .find(|p| p.id == "whisper-large-v3-turbo");
         assert!(whisper.is_some());
         let whisper = whisper.unwrap();
         assert!(whisper.supports_translation == Some(true));
+        // Should have filename and quant fields
+        assert!(whisper.filename.is_some());
+        assert!(whisper.quant.is_some());
     }
 
     #[test]

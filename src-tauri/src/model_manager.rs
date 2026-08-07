@@ -168,6 +168,9 @@ fn calc_dir_size(path: &Path) -> u64 {
 ///
 /// 此函数计算模型路径并验证文件是否存在。
 /// 仅返回实际存在于磁盘上的模型配置。
+///
+/// **优先使用 preset.filename 字段**（GGUF 模型），
+/// 如果没有 filename，再使用 get_model_path 查找。
 fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
     // 仅 ASR 模型可转换为 Model (ModelManager 只处理 ASR)
     if !preset.is_asr() {
@@ -180,11 +183,26 @@ fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
 
     log::debug!("[preset_to_model] 开始查找模型: id={}, backend={}", preset.id, backend_str);
 
-    // 使用 get_model_path 获取模型路径（支持自定义目录）
-    let model_path_result = get_model_path(&preset.id, &backend_str);
-    log::debug!("[preset_to_model] get_model_path 返回: {:?}", model_path_result);
-
-    let model_path = model_path_result.ok()?;
+    // 优先使用 preset.path（扫描器设置的完整路径，包括自定义目录）
+    // 其次使用 preset.filename（GGUF 文件名，在默认目录查找）
+    // 最后 fallback 到 get_model_path
+    let model_path = if let Some(ref path_str) = preset.path {
+        // 扫描器已设置完整路径（自定义目录中的模型）- 最高优先级
+        let path = std::path::PathBuf::from(path_str);
+        log::debug!("[preset_to_model] 使用 preset.path: {}", path.display());
+        path
+    } else if let Some(ref filename) = preset.filename {
+        // GGUF 模型：使用 filename 字段（在默认目录查找）
+        let storage_dir = get_model_storage_dir().ok()?;
+        let path = storage_dir.join(filename);
+        log::debug!("[preset_to_model] 使用 preset.filename: {}", path.display());
+        path
+    } else {
+        // 默认：使用 get_model_path 查找
+        let model_path_result = get_model_path(&preset.id, &backend_str);
+        log::debug!("[preset_to_model] get_model_path 返回: {:?}", model_path_result);
+        model_path_result.ok()?
+    };
 
     // 验证文件/目录存在
     let exists = match backend {
@@ -828,6 +846,8 @@ mod tests {
                 languages: vec!["zh".to_string(), "en".to_string()],
                 description: Some("Test model".to_string()),
                 gguf_config: None,
+                supports_auto_detect: true,
+                default_language: "auto".to_string(),
             }],
             scenes: vec![Scene {
                 id: "1".to_string(),
@@ -836,7 +856,6 @@ mod tests {
                 model_id: "sensevoice-small".to_string(),
                 enabled: true,
                 load_strategy: LoadStrategy::Always,
-                language: "zh".to_string(),
                 auto_type: true,
             }],
             auto_start: Some(false),
@@ -865,7 +884,7 @@ mod tests {
         let mut manager = ModelManager::new(config);
 
         // 加载模型
-        let result = manager.load_model("sensevoice-small");
+        let result = manager.load_model("sensevoice-small", false);
         assert!(result.is_ok(), "Failed to load model: {:?}", result.err());
 
         // 验证模型已加载
@@ -901,7 +920,7 @@ mod tests {
 
         // 加载模型
         let loaded_model = manager
-            .load_model("sensevoice-small")
+            .load_model("sensevoice-small", false)
             .expect("Failed to load model");
 
         // 创建简单的静音测试音频（1秒，16kHz采样率）
@@ -991,6 +1010,8 @@ mod tests {
                 languages: vec!["zh".to_string()],
                 description: None,
                 gguf_config: None,
+                supports_auto_detect: true,
+                default_language: "auto".to_string(),
             }],
             scenes: vec![Scene {
                 id: "1".to_string(),
@@ -999,7 +1020,6 @@ mod tests {
                 model_id: "sensevoice-small".to_string(),
                 enabled: true,
                 load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
-                language: "zh".to_string(),
                 auto_type: true,
             }],
             auto_start: Some(false),
@@ -1071,7 +1091,7 @@ mod tests {
 
         // 第一次加载
         let _ = manager
-            .load_model("sensevoice-small")
+            .load_model("sensevoice-small", false)
             .expect("Failed to load model");
         let initial_count = manager.loaded_count();
         assert_eq!(initial_count, 1, "Should have 1 model loaded");
@@ -1171,6 +1191,8 @@ mod tests {
                 languages: vec!["zh".to_string()],
                 description: None,
                 gguf_config: None,
+                supports_auto_detect: true,
+                default_language: "auto".to_string(),
             }],
             scenes: vec![],
             ..Default::default()

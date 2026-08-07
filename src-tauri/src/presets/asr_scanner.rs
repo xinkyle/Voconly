@@ -9,6 +9,13 @@
 //! 1. 默认的 models 目录（通过 `get_model_storage_dir()` 获取）
 //! 2. 用户自定义的目录列表（从 AppConfig 的 `custom_asr_model_dirs` 字段获取）
 //!
+//! # 多量化版本处理（重构后）
+//!
+//! 当目录中存在同一模型的多个量化版本时：
+//! - 按基础 ID 分组
+//! - 选择最高精度版本
+//! - 不识别的文件名直接跳过
+//!
 //! # Language Information Source (重构后)
 //!
 //! **GGUF Header 是能力的唯一真实来源**：
@@ -23,7 +30,8 @@ use crate::backends::{probe_gguf_capabilities, BackendType};
 use crate::config::load_config;
 use crate::presets::{get_asr_presets, get_base_model_id, ModelPreset};
 use crate::utils::downloader::get_model_storage_dir;
-use std::collections::HashSet;
+use crate::utils::{extract_quant_from_filename, quant_priority};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -123,8 +131,43 @@ pub fn scan_available_asr_models() -> Vec<ModelPreset> {
 ///
 /// Internal helper function that scans one directory and returns found models.
 /// Recursively scans subdirectories up to max_depth levels.
+///
+/// **多量化版本处理**：按基础 ID 分组，选择最高精度版本
 fn scan_single_directory(storage_dir: &Path) -> Vec<ModelPreset> {
-    scan_single_directory_recursive(storage_dir, 0, 2)
+    // 第一阶段：扫描所有模型
+    let all_models = scan_single_directory_recursive(storage_dir, 0, 2);
+
+    // 第二阶段：按基础 ID 分组，选择最高精度版本
+    let mut grouped: HashMap<String, ModelPreset> = HashMap::new();
+
+    for model in all_models {
+        let base_id = get_base_model_id(&model.id);
+
+        // 如果已存在，比较量化版本优先级
+        if let Some(existing) = grouped.get_mut(&base_id) {
+            // 只有 GGUF 模型才比较量化版本
+            let should_replace = match (&model.quant, &existing.quant) {
+                (Some(model_quant), Some(existing_quant)) => {
+                    quant_priority(model_quant) > quant_priority(existing_quant)
+                }
+                _ => false,
+            };
+
+            if should_replace {
+                log::debug!(
+                    "[Scanner] 替换为更高精度版本: {} ({} > {})",
+                    base_id,
+                    model.quant.as_ref().unwrap(),
+                    existing.quant.as_ref().unwrap()
+                );
+                *existing = model; // 替换为更高精度版本
+            }
+        } else {
+            grouped.insert(base_id, model);
+        }
+    }
+
+    grouped.into_values().collect()
 }
 
 /// Recursive helper function for scanning directories
@@ -325,42 +368,37 @@ fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
 /// GGUF (.gguf) and GGML (.bin) files are used by the TranscribeCpp backend.
 /// Supports various ASR architectures: Whisper, Qwen3-ASR, Parakeet, Voxtral, etc.
 ///
-/// **核心变更**：统一使用 GGUF Header 的能力（包括语言列表）。
-/// 预设文件仅用于获取展示信息（名称、描述、下载链接）。
+/// **核心变更**：
+/// 1. 统一使用 GGUF Header 的能力（包括语言列表）
+/// 2. 只识别标准格式：<model-name>-<quant>.gguf
+/// 3. 不识别的文件名直接跳过（返回 None）
+/// 4. 设置 filename 和 quant 字段
 fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
     let filename = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    // Extract model ID from filename (remove .gguf or .bin extension)
+    // 1. 提取量化版本（只支持标准格式）
+    let quant = extract_quant_from_filename(filename)?;
+
+    // 2. 提取基础 ID（移除量化后缀）
     let id = filename
         .strip_suffix(".gguf")
-        .or_else(|| filename.strip_suffix(".bin"))
-        .unwrap_or(filename)
+        .or_else(|| filename.strip_suffix(".bin"))?
         .to_string();
 
-    // Probe capabilities from GGUF file
+    let base_id = get_base_model_id(&id);
+
+    // 3. Probe capabilities from GGUF file
     let caps = probe_gguf_capabilities(path);
 
-    // Try to match against preset:
-    // 1. First try exact ID match (case-insensitive)
-    // 2. If no exact match, try base name match (e.g., "parakeet-unified-en-0.6b-F16" matches "parakeet-unified-en-0.6b-Q5_K_M")
-    let (preset, matched_by_base_name) = presets
+    // 4. 匹配预设（按基础 ID 匹配，不区分大小写）
+    let preset = presets
         .iter()
-        .find(|p| p.backend == Some(BackendType::TranscribeCpp) && p.id.to_lowercase() == id.to_lowercase())
-        .map(|p| (Some(p), false))
-        .unwrap_or_else(|| {
-            // Try base name match (case-insensitive)
-            let base_id = get_base_model_id(&id);
-            presets
-                .iter()
-                .find(|p| {
-                    p.backend == Some(BackendType::TranscribeCpp)
-                        && get_base_model_id(&p.id) == base_id
-                })
-                .map(|p| (Some(p), true))
-                .unwrap_or((None, false))
+        .find(|p| {
+            p.backend == Some(BackendType::TranscribeCpp)
+                && get_base_model_id(&p.id) == base_id
         });
 
     let size_mb = get_size_mb(path);
@@ -368,11 +406,20 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
     // 记录扫描到的实际路径
     let model_path = path.to_string_lossy().to_string();
 
-    // 使用完整 ID 作为显示名称，保留所有信息便于区分
-    // 例如：parakeet-unified-en-0.6b-F16, qwen3-asr-1.7b-q4_0
-    let name = id.clone();
+    // 5. 使用基础 ID 作为展示名称（不带量化后缀）
+    let name = preset.map(|p| p.name.clone()).unwrap_or_else(|| {
+        // 如果没有找到预设，使用基础 ID 作为名称
+        base_id.split('-').map(|s| {
+            // 首字母大写，其余小写
+            let mut chars = s.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+            }
+        }).collect::<Vec<_>>().join(" ")
+    });
 
-    // ✅ 核心变更：统一使用 GGUF Header 的能力，添加 fallback 逻辑
+    // 6. 统一使用 GGUF Header 的能力，添加 fallback 逻辑
     let languages = caps.languages.clone().or_else(|| {
         // Fallback 1: GGUF 缺失语言信息，尝试使用预设
         log::warn!(
@@ -389,7 +436,7 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
         vec!["zh".to_string(), "en".to_string()]
     });
 
-    // ✅ 核心变更：能力字段从 GGUF Header 读取，不是预设
+    // 7. 能力字段从 GGUF Header 读取
     let supports_auto_detect = caps.supports_language_detect;
     let supports_streaming = caps.supports_streaming;
     let supports_translation = caps.supports_translation;
@@ -404,20 +451,11 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
         supports_translation
     );
 
+    // 8. 创建 preset（使用基础 ID 作为 ID，不带量化后缀）
     if let Some(p) = preset {
-        // 使用实际文件的 ID（保留量化信息），继承预设的语言列表
-        // 这样不同量化版本会显示为独立条目，但语言列表正确
-        let display_name = if matched_by_base_name {
-            // 基础名称匹配时，使用文件名作为显示名称
-            name.clone()
-        } else {
-            // 精准匹配时，使用预设名称
-            p.name.clone()
-        };
-
-        Some(ModelPreset::asr_preset_with_path(
-            id.clone(), // 始终使用文件 ID，避免去重冲突
-            display_name,
+        Some(ModelPreset::asr_preset_with_filename(
+            base_id.clone(), // 使用基础 ID（不带量化后缀）
+            p.name.clone(),  // 使用预设名称
             size_mb
                 .map(|s| format!("{}MB", s))
                 .unwrap_or_else(|| p.size.clone()),
@@ -428,9 +466,11 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
-            p.accuracy_score, // 直接从预设获取
-            p.speed_score,    // 直接从预设获取
+            p.accuracy_score,
+            p.speed_score,
             Some(model_path),
+            filename.to_string(),
+            quant,
         ))
     } else {
         // Generate default preset for unknown GGUF model
@@ -448,8 +488,8 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             Some("用户自定义 GGUF 模型".to_string())
         };
 
-        Some(ModelPreset::asr_preset_with_path(
-            id.clone(),
+        Some(ModelPreset::asr_preset_with_filename(
+            base_id.clone(), // 使用基础 ID
             name,
             size_mb
                 .map(|s| format!("{}MB", s))
@@ -461,9 +501,11 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
-            None, // 未知模型没有分数
-            None, // 未知模型没有分数
+            None,
+            None,
             Some(model_path),
+            filename.to_string(),
+            quant,
         ))
     }
 }
@@ -587,28 +629,26 @@ mod tests {
     fn test_scan_unknown_gguf_model() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Create an unknown GGUF file
+        // Create an unknown GGUF file (non-standard format)
+        // According to design: files without standard <model>-<quant>.gguf format are not recognized
         create_test_gguf_file(temp_dir.path(), "custom-asr-model.gguf", 100 * 1024 * 1024);
 
         let models = scan_available_asr_models_from_path(temp_dir.path());
 
-        assert_eq!(models.len(), 1);
-        let model = &models[0];
-        assert_eq!(model.backend, Some(BackendType::TranscribeCpp));
-        assert!(model.description.is_some());
-        assert!(model.description.as_ref().unwrap().contains("用户自定义"));
+        // Should NOT be recognized (returns empty list)
+        assert_eq!(models.len(), 0, "Non-standard filename should not be recognized");
     }
 
     #[test]
     fn test_scan_gguf_various_architectures() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Create GGUF files for various architectures
+        // Create GGUF files for various architectures (with standard quantization format)
         let gguf_files = [
-            "parakeet-tdt-1.1b.gguf",
-            "sensevoice-small.gguf",
-            "voxtral-mini.gguf",
-            "moonshine-base.gguf",
+            "parakeet-tdt-1.1b-q5_0.gguf",
+            "sensevoice-small-q8_0.gguf",
+            "voxtral-mini-q5_k_m.gguf",
+            "moonshine-base-f16.gguf",
         ];
 
         for filename in gguf_files {
@@ -617,6 +657,7 @@ mod tests {
 
         let models = scan_available_asr_models_from_path(temp_dir.path());
 
+        // Should recognize all 4 files
         assert_eq!(models.len(), 4);
 
         // All should be TranscribeCpp backend

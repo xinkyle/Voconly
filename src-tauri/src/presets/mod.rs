@@ -127,6 +127,16 @@ pub struct ModelPreset {
     /// 扫描发现的模型实际路径（包括自定义目录中的模型）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+
+    /// Actual filename for GGUF models (e.g., "Qwen3-ASR-1.7B-Q5_K_M.gguf")
+    /// Only used for GGUF models with quantization variants
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+
+    /// Quantization version (e.g., "Q5_K_M", "Q8_0")
+    /// Only used for GGUF models with quantization variants
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quant: Option<String>,
 }
 
 fn default_model_type_asr() -> ModelType {
@@ -167,6 +177,8 @@ impl ModelPreset {
             n_ctx: None,
             recommended: None,
             path: None,
+            filename: None,
+            quant: None,
         }
     }
 
@@ -204,6 +216,49 @@ impl ModelPreset {
             n_ctx: None,
             recommended: None,
             path,
+            filename: None,
+            quant: None,
+        }
+    }
+
+    /// Create an ASR model preset with filename and quantization
+    pub fn asr_preset_with_filename(
+        id: String,
+        name: String,
+        size: String,
+        backend: BackendType,
+        download_urls: Vec<DownloadSourceInfo>,
+        languages: Vec<String>,
+        description: Option<String>,
+        supports_auto_detect: Option<bool>,
+        supports_streaming: Option<bool>,
+        supports_translation: Option<bool>,
+        accuracy_score: Option<f32>,
+        speed_score: Option<f32>,
+        path: Option<String>,
+        filename: String,
+        quant: String,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            size,
+            description,
+            download_urls,
+            model_type: ModelType::Asr,
+            backend: Some(backend),
+            languages,
+            supports_auto_detect,
+            supports_streaming,
+            supports_translation,
+            accuracy_score,
+            speed_score,
+            n_gpu_layers: None,
+            n_ctx: None,
+            recommended: None,
+            path,
+            filename: Some(filename),
+            quant: Some(quant),
         }
     }
 
@@ -236,6 +291,8 @@ impl ModelPreset {
             n_ctx: Some(n_ctx),
             recommended: Some(recommended),
             path: None,
+            filename: None,
+            quant: None,
         }
     }
 
@@ -268,6 +325,8 @@ impl ModelPreset {
             n_ctx: Some(n_ctx),
             recommended: Some(recommended),
             path: None,
+            filename: None,
+            quant: None,
         }
     }
 
@@ -478,12 +537,16 @@ mod tests {
         // Should contain ASR-specific fields but not LLM-specific fields
         assert!(json.contains("\"backend\":\"Onnx\""));
         assert!(json.contains("\"languages\""));
-        assert!(json.contains("\"supports_auto_detect\":true"));
-        assert!(json.contains("\"supports_streaming\":false"));
-        assert!(json.contains("\"supports_translation\":false"));
-        assert!(!json.contains("\"n_gpu_layers\""));
-        assert!(!json.contains("\"n_ctx\""));
+        // Note: field names are in camelCase due to serde(rename_all = "camelCase")
+        assert!(json.contains("\"supportsAutoDetect\":true"));
+        assert!(json.contains("\"supportsStreaming\":false"));
+        assert!(json.contains("\"supportsTranslation\":false"));
+        assert!(!json.contains("\"nGpuLayers\""));
+        assert!(!json.contains("\"nCtx\""));
         assert!(!json.contains("\"recommended\""));
+        // Should not contain GGUF-specific fields (filename, quant)
+        assert!(!json.contains("\"filename\""));
+        assert!(!json.contains("\"quant\""));
     }
 
     #[test]
@@ -503,11 +566,15 @@ mod tests {
         let json = serde_json::to_string(&preset).expect("Serialization failed");
 
         // Should contain LLM-specific fields but not ASR-specific fields
-        assert!(json.contains("\"n_gpu_layers\":-1"));
-        assert!(json.contains("\"n_ctx\":4096"));
+        // Note: field names are in camelCase due to serde(rename_all = "camelCase")
+        assert!(json.contains("\"nGpuLayers\":-1"));
+        assert!(json.contains("\"nCtx\":4096"));
         assert!(json.contains("\"recommended\":false"));
         assert!(!json.contains("\"backend\""));
         assert!(!json.contains("\"languages\""));
+        // Should not contain GGUF-specific fields (filename, quant)
+        assert!(!json.contains("\"filename\""));
+        assert!(!json.contains("\"quant\""));
     }
 
     #[test]
@@ -547,9 +614,9 @@ mod tests {
             "size": "~934MB",
             "description": "Qwen 1.5B instruct",
             "download_urls": [],
-            "model_type": "llm",
-            "n_gpu_layers": 0,
-            "n_ctx": 4096,
+            "modelType": "llm",
+            "nGpuLayers": 0,
+            "nCtx": 4096,
             "recommended": true
         }"#;
 

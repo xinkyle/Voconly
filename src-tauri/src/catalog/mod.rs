@@ -70,12 +70,116 @@ impl CatalogModel {
     }
 
     /// Create a single ModelPreset from CatalogModel
+    ///
+    /// For GGUF models (with files):
+    /// - Uses `default_quant` to select the file variant
+    /// - Sets `filename` and `quant` fields
+    /// - Falls back to Q5_K_M if no default specified
+    ///
+    /// For ONNX models:
+    /// - Returns a preset without filename/quant fields
     pub fn to_preset(&self) -> ModelPreset {
+        let backend = self.parse_backend();
+
+        // Handle GGUF models with multiple quantization variants
+        if let Some(files) = &self.files {
+            // Determine default quantization (Q5_K_M if not specified)
+            let default_quant = self
+                .default_quant
+                .as_ref()
+                .unwrap_or(&"Q5_K_M".to_string())
+                .clone();
+
+            // Find the file info for default quantization
+            let file_info = files.iter().find(|f| f.quant == default_quant);
+
+            if let Some(f) = file_info {
+                // Build complete download URLs with filename
+                let download_urls = self
+                    .download_urls
+                    .as_ref()
+                    .map(|urls| {
+                        urls.iter()
+                            .map(|u| DownloadSourceInfo {
+                                name: u.name.clone(),
+                                url: format!(
+                                    "{}/{}",
+                                    u.url.trim_end_matches('/'),
+                                    f.filename
+                                ),
+                                is_china_accessible: u.is_china_accessible,
+                                priority: u.priority,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                return ModelPreset::asr_preset_with_filename(
+                    self.id.clone(),
+                    self.name.clone(),
+                    format!("{}MB", f.size_bytes / 1024 / 1024),
+                    backend,
+                    download_urls,
+                    self.languages.clone(),
+                    self.description.clone(),
+                    Some(self.capabilities.lang_detect),
+                    Some(self.capabilities.streaming),
+                    Some(self.capabilities.translate),
+                    self.accuracy_score.map(|a| a as f32 / 100.0),
+                    self.speed_score.map(|s| s as f32 / 100.0),
+                    None, // path will be set by scanner
+                    f.filename.clone(),
+                    f.quant.clone(),
+                );
+            }
+
+            // If default_quant not found in files, use the first file
+            if let Some(f) = files.first() {
+                let download_urls = self
+                    .download_urls
+                    .as_ref()
+                    .map(|urls| {
+                        urls.iter()
+                            .map(|u| DownloadSourceInfo {
+                                name: u.name.clone(),
+                                url: format!(
+                                    "{}/{}",
+                                    u.url.trim_end_matches('/'),
+                                    f.filename
+                                ),
+                                is_china_accessible: u.is_china_accessible,
+                                priority: u.priority,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                return ModelPreset::asr_preset_with_filename(
+                    self.id.clone(),
+                    self.name.clone(),
+                    format!("{}MB", f.size_bytes / 1024 / 1024),
+                    backend,
+                    download_urls,
+                    self.languages.clone(),
+                    self.description.clone(),
+                    Some(self.capabilities.lang_detect),
+                    Some(self.capabilities.streaming),
+                    Some(self.capabilities.translate),
+                    self.accuracy_score.map(|a| a as f32 / 100.0),
+                    self.speed_score.map(|s| s as f32 / 100.0),
+                    None,
+                    f.filename.clone(),
+                    f.quant.clone(),
+                );
+            }
+        }
+
+        // ONNX models or models without files
         ModelPreset::asr_preset(
             self.id.clone(),
             self.name.clone(),
             self.size.clone().unwrap_or_else(|| "未知大小".to_string()),
-            self.parse_backend(),
+            backend,
             self.download_urls
                 .as_ref()
                 .map(|urls| {
@@ -99,48 +203,13 @@ impl CatalogModel {
         )
     }
 
-    /// Get all quantization variant presets (for GGUF models)
+    /// Get all quantization variant presets (deprecated)
+    ///
+    /// This method is kept for backward compatibility but now returns
+    /// only the default preset (using default_quant).
+    #[deprecated(note = "Use to_preset() instead. Multiple presets are no longer supported.")]
     pub fn to_presets(&self) -> Vec<ModelPreset> {
-        if let Some(files) = &self.files {
-            files
-                .iter()
-                .map(|f| {
-                    let id = format!("{}-{}", self.id, f.quant);
-                    ModelPreset::asr_preset(
-                        id,
-                        format!("{} {}", self.name, f.quant),
-                        format!("{}MB", f.size_bytes / 1024 / 1024),
-                        BackendType::TranscribeCpp,
-                        self.download_urls
-                            .as_ref()
-                            .map(|urls| {
-                                urls.iter()
-                                    .map(|u| DownloadSourceInfo {
-                                        name: u.name.clone(),
-                                        url: format!(
-                                            "{}/{}",
-                                            u.url.trim_end_matches('/'),
-                                            f.filename
-                                        ),
-                                        is_china_accessible: u.is_china_accessible,
-                                        priority: u.priority,
-                                    })
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
-                        self.languages.clone(),
-                        self.description.clone(),
-                        Some(self.capabilities.lang_detect),
-                        Some(self.capabilities.streaming),
-                        Some(self.capabilities.translate),
-                        self.accuracy_score.map(|a| a as f32 / 100.0),
-                        self.speed_score.map(|s| s as f32 / 100.0),
-                    )
-                })
-                .collect()
-        } else {
-            vec![self.to_preset()]
-        }
+        vec![self.to_preset()]
     }
 }
 

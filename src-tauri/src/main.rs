@@ -809,14 +809,8 @@ async fn set_float_panel_height(
 /// Open the model folder in file explorer
 #[tauri::command]
 async fn open_model_folder(model_id: String) -> Result<(), String> {
-    // Use unified detection from preset table
-    let backend = match crate::presets::get_model_backend(&model_id) {
-        crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
-        crate::backends::BackendType::Onnx => "onnx",
-    };
-
-    // Get model path
-    let model_path = crate::utils::downloader::get_model_path(&model_id, backend)?;
+    // 使用统一辅助函数获取正确路径
+    let model_path = crate::utils::downloader::get_model_path_from_preset(&model_id)?;
 
     // Get parent directory (or the file itself)
     let path_to_open = if model_path.exists() {
