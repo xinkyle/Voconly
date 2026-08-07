@@ -17,6 +17,9 @@ pub use asr::get_asr_presets;
 pub use asr_scanner::scan_available_asr_models;
 pub use llm::get_llm_presets;
 
+// Re-export get_base_model_id from utils for convenience
+pub use crate::utils::get_base_model_id;
+
 /// Download source information for model downloads
 /// Unified structure used by both ASR and LLM models
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -305,31 +308,6 @@ pub fn find_asr_preset_by_id(id: &str) -> Option<ModelPreset> {
 /// Find LLM preset by ID
 pub fn find_llm_preset_by_id(id: &str) -> Option<ModelPreset> {
     get_llm_presets().iter().find(|p| p.id == id).cloned()
-}
-
-/// Extract base model ID by removing quantization suffix (lowercase for case-insensitive matching)
-/// Examples:
-/// - "parakeet-unified-en-0.6b-Q5_K_M" → "parakeet-unified-en-0.6b"
-/// - "parakeet-unified-en-0.6b-F16" → "parakeet-unified-en-0.6b"
-/// - "qwen3-asr-1.7b-q4_0" → "qwen3-asr-1.7b"
-/// - "Qwen3-ASR-1.7B-Q5_K_M" → "qwen3-asr-1.7b" (lowercase)
-pub fn get_base_model_id(model_id: &str) -> String {
-    // Remove file extension first if present
-    let name = model_id
-        .strip_suffix(".gguf")
-        .or_else(|| model_id.strip_suffix(".bin"))
-        .or_else(|| model_id.strip_suffix(".onnx"))
-        .unwrap_or(model_id);
-
-    // Find quantization marker from right side (case-insensitive)
-    // Quantization markers: -Q, _Q, -F, _F, -IQ, _IQ (and lowercase variants)
-    let name_lower = name.to_lowercase();
-    for marker in ["-q", "_q", "-f", "_f", "-iq", "_iq"] {
-        if let Some(pos) = name_lower.rfind(marker) {
-            return name[..pos].to_lowercase(); // Return lowercase for case-insensitive matching
-        }
-    }
-    name.to_lowercase() // Return lowercase for case-insensitive matching
 }
 
 /// Check if a model ID refers to a LLM model

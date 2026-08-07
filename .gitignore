@@ -16,7 +16,8 @@ node_modules/
 # Tauri/Rust 构建输出
 src-tauri/target/
 src-tauri/target-doc/
-rust_target/
+src-tauri/
+rust_target/target-check-temp
 
 # whisper.cpp build sources (downloaded by scripts)
 build/whisper.cpp-src/
