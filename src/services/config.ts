@@ -416,6 +416,9 @@ export interface ModelPreset {
   // Model file/directory path (set by scanner for discovered models)
   // 扫描发现的模型实际路径（包括自定义目录中的模型）
   path?: string;
+  // Quantization info for GGUF models
+  filename?: string;  // Actual filename (e.g., "Qwen3-ASR-1.7B-Q5_K_M.gguf")
+  quant?: string;     // Quantization version (e.g., "Q5_K_M", "F16")
 }
 
 /**

@@ -65,7 +65,7 @@ pub fn scan_available_asr_models() -> Vec<ModelPreset> {
         }
     };
 
-    // 用于去重的集合（记录已扫描的模型 ID）
+    // 用于去重和版本比较的集合（记录已扫描的模型 ID）
     let mut seen_ids: HashSet<String> = HashSet::new();
     let mut models: Vec<ModelPreset> = Vec::new();
 
@@ -102,18 +102,40 @@ pub fn scan_available_asr_models() -> Vec<ModelPreset> {
         log::info!("扫描自定义 ASR 模型目录: {:?}", custom_dir_path);
         let custom_models = scan_single_directory(custom_path);
 
-        // 只添加未在默认目录中出现的模型（去重）
+        // 处理自定义目录中的模型（新模型添加，已存在的比较量化版本）
         let mut added_count = 0;
-        for model in custom_models {
-            if !seen_ids.contains(&model.id) {
-                seen_ids.insert(model.id.clone());
-                models.push(model);
+        for custom_model in custom_models {
+            if !seen_ids.contains(&custom_model.id) {
+                // 新模型，直接添加
+                seen_ids.insert(custom_model.id.clone());
+                models.push(custom_model);
                 added_count += 1;
             } else {
-                log::debug!(
-                    "模型 '{}' 已在默认目录中存在，跳过自定义目录中的同名模型",
-                    model.id
-                );
+                // 已存在，比较量化版本，选择更高的
+                if let Some(existing) = models.iter_mut().find(|m| m.id == custom_model.id) {
+                    let should_replace = match (&custom_model.quant, &existing.quant) {
+                        (Some(custom_quant), Some(existing_quant)) => {
+                            quant_priority(custom_quant) > quant_priority(existing_quant)
+                        }
+                        _ => false,
+                    };
+                    if should_replace {
+                        log::info!(
+                            "[Scanner] 替换为更高精度版本: {} ({} > {})",
+                            custom_model.id,
+                            custom_model.quant.as_ref().unwrap(),
+                            existing.quant.as_ref().unwrap()
+                        );
+                        *existing = custom_model;
+                    } else {
+                        log::debug!(
+                            "[Scanner] 保留现有版本: {} ({} >= {})",
+                            custom_model.id,
+                            existing.quant.as_ref().unwrap_or(&"N/A".to_string()),
+                            custom_model.quant.as_ref().unwrap_or(&"N/A".to_string())
+                        );
+                    }
+                }
             }
         }
         log::info!(
@@ -664,5 +686,78 @@ mod tests {
         for model in &models {
             assert_eq!(model.backend, Some(BackendType::TranscribeCpp));
         }
+    }
+
+    #[test]
+    fn test_single_directory_quant_selection() {
+        // Test: Single directory with multiple quantization versions of same model
+        // Should select the highest precision version
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create multiple quantization versions of the same model
+        create_test_gguf_file(temp_dir.path(), "qwen3-asr-1.7b-q5_k_m.gguf", 100 * 1024 * 1024);
+        create_test_gguf_file(temp_dir.path(), "qwen3-asr-1.7b-q8_0.gguf", 150 * 1024 * 1024);
+        create_test_gguf_file(temp_dir.path(), "qwen3-asr-1.7b-f16.gguf", 200 * 1024 * 1024);
+
+        let models = scan_available_asr_models_from_path(temp_dir.path());
+
+        // Should only return one model (highest precision)
+        assert_eq!(models.len(), 1, "Should deduplicate to one model");
+        let model = &models[0];
+        assert_eq!(model.id, "qwen3-asr-1.7b");
+        assert_eq!(model.quant, Some("F16".to_string()), "Should select F16 (highest precision)");
+    }
+
+    #[test]
+    fn test_multi_directory_quant_comparison() {
+        // Test: Two directories with different quantization versions
+        // Should select the highest precision version across all directories
+        let default_dir = TempDir::new().unwrap();
+        let custom_dir = TempDir::new().unwrap();
+
+        // Default directory: Q5_K_M version (lower precision)
+        create_test_gguf_file(default_dir.path(), "whisper-large-q5_k_m.gguf", 100 * 1024 * 1024);
+
+        // Custom directory: Q8_0 version (higher precision)
+        create_test_gguf_file(custom_dir.path(), "whisper-large-q8_0.gguf", 150 * 1024 * 1024);
+
+        // Simulate the multi-directory scanning logic
+        let mut seen_ids: HashSet<String> = HashSet::new();
+        let mut models: Vec<ModelPreset> = Vec::new();
+
+        // Scan default directory first
+        let default_models = scan_single_directory(default_dir.path());
+        for model in default_models {
+            seen_ids.insert(model.id.clone());
+            models.push(model);
+        }
+
+        // Scan custom directory and compare quantization
+        let custom_models = scan_single_directory(custom_dir.path());
+        for custom_model in custom_models {
+            if !seen_ids.contains(&custom_model.id) {
+                seen_ids.insert(custom_model.id.clone());
+                models.push(custom_model);
+            } else {
+                // Compare and potentially replace with higher precision version
+                if let Some(existing) = models.iter_mut().find(|m| m.id == custom_model.id) {
+                    let should_replace = match (&custom_model.quant, &existing.quant) {
+                        (Some(custom_quant), Some(existing_quant)) => {
+                            quant_priority(custom_quant) > quant_priority(existing_quant)
+                        }
+                        _ => false,
+                    };
+                    if should_replace {
+                        *existing = custom_model;
+                    }
+                }
+            }
+        }
+
+        // Verify result
+        assert_eq!(models.len(), 1, "Should deduplicate to one model");
+        let model = &models[0];
+        assert_eq!(model.id, "whisper-large");
+        assert_eq!(model.quant, Some("Q8_0".to_string()), "Should select Q8_0 from custom directory (higher precision than Q5_K_M)");
     }
 }

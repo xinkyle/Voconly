@@ -110,7 +110,12 @@ function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWith
   if (asrModels) {
     const asrModel = asrModels.find(m => m.preset.id === modelId);
     if (asrModel) {
-      return asrModel.preset.name;
+      const name = asrModel.preset.name;
+      // Add quantization version if available
+      if (asrModel.preset.quant) {
+        return `${name} (${asrModel.preset.quant})`;
+      }
+      return name;
     }
   }
 
@@ -461,7 +466,7 @@ function SceneCard({
 
     return {
       id: model.preset.id,
-      name: model.preset.name,
+      name: model.preset.quant ? `${model.preset.name} (${model.preset.quant})` : model.preset.name,
       backend: model.preset.backend || 'Whisper',
       size: model.preset.size,
       downloaded: isDownloaded,
@@ -852,21 +857,8 @@ function SceneCard({
                       </div>
                     )}
 
-                    {/* Status badge and Language selector - top right corner */}
-                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                      {/* Language selector for downloaded models - left of check icon */}
-                      {isDownloaded && m.languages && m.languages.length > 0 && onModelLanguageChange && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <LanguageSelector
-                            languages={m.supportsAutoDetect ? ['auto', ...m.languages] : m.languages}
-                            currentLanguage={m.defaultLanguage || (m.supportsAutoDetect ? 'auto' : m.languages[0])}
-                            disabled={false}
-                            direction="down"
-                            onChange={(lang) => onModelLanguageChange(m.id, lang)}
-                            t={t}
-                          />
-                        </div>
-                      )}
+                    {/* Status badge - top right corner */}
+                    <div className="absolute top-2 right-2 z-10">
                       {isDownloaded && (
                         <CheckIcon className="w-4 h-4 text-emerald-600" />
                       )}

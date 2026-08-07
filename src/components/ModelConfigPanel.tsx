@@ -293,7 +293,7 @@ function AsrModelCard({
             <div className="flex-1 min-w-0">
               {/* Model Name */}
               <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
-                {model.preset.name}
+                {model.preset.name}{model.preset.quant && ` (${model.preset.quant})`}
               </h3>
               {/* Description */}
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
