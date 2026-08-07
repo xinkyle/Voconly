@@ -92,7 +92,7 @@
     "custom": "自定义",
     "accuracy": "准确度",
     "speed": "速度",
-    "streaming": "实时转录",
+    "streaming": "流式",
     "descriptions": {
       "whisperTiny": "适合快速测试，速度极快但准确度较低",
       "whisperBase": "适合日常使用，速度与准确度平衡",

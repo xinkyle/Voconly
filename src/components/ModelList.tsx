@@ -391,8 +391,8 @@ export default function ModelList({ downloadStates = {}, onDownload, onDownloadC
                 {model.descriptionKey ? t(model.descriptionKey) : model.description || ''}
               </div>
 
-              {/* Accuracy and speed scores for ASR models */}
-              {model.modelType === 'asr' && (model.accuracyScore || model.speedScore) && (
+              {/* Accuracy, speed scores and streaming badge for ASR models */}
+              {model.modelType === 'asr' && (model.accuracyScore || model.speedScore || model.supportsStreaming) && (
                 <div className="mt-2 flex items-center gap-4">
                   {model.accuracyScore && (
                     <ScoreBar label={t('models.accuracy')} score={model.accuracyScore} color="blue" />
@@ -400,14 +400,12 @@ export default function ModelList({ downloadStates = {}, onDownload, onDownloadC
                   {model.speedScore && (
                     <ScoreBar label={t('models.speed')} score={model.speedScore} color="green" />
                   )}
-                </div>
-              )}
-
-              {/* Streaming support badge */}
-              {model.modelType === 'asr' && model.supportsStreaming && (
-                <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                  <AudioLines className="w-3.5 h-3.5" />
-                  <span>{t('models.streaming')}</span>
+                  {model.supportsStreaming && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200">
+                      <AudioLines className="w-3 h-3" />
+                      {t('models.streaming')}
+                    </span>
+                  )}
                 </div>
               )}
 

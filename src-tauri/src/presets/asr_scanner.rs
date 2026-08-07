@@ -20,7 +20,6 @@
 //! 这样实现零配置自动发现，未知模型也能正常使用。
 
 use crate::backends::{probe_gguf_capabilities, BackendType};
-use crate::catalog::{get_accuracy_score, get_speed_score};
 use crate::config::load_config;
 use crate::presets::{get_asr_presets, get_base_model_id, ModelPreset};
 use crate::utils::downloader::get_model_storage_dir;
@@ -405,11 +404,6 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
         supports_translation
     );
 
-    // ✅ 分数直接从 catalog 获取，不依赖预设匹配
-    // 使用基础模型 ID 匹配，支持任意量化版本
-    let accuracy_score = get_accuracy_score(&id);
-    let speed_score = get_speed_score(&id);
-
     if let Some(p) = preset {
         // 使用实际文件的 ID（保留量化信息），继承预设的语言列表
         // 这样不同量化版本会显示为独立条目，但语言列表正确
@@ -434,8 +428,8 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
-            accuracy_score, // 从 catalog 获取
-            speed_score,    // 从 catalog 获取
+            p.accuracy_score, // 直接从预设获取
+            p.speed_score,    // 直接从预设获取
             Some(model_path),
         ))
     } else {
@@ -467,8 +461,8 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
             supports_auto_detect,
             supports_streaming,
             supports_translation,
-            accuracy_score, // 从 catalog 获取
-            speed_score,    // 从 catalog 获取
+            None, // 未知模型没有分数
+            None, // 未知模型没有分数
             Some(model_path),
         ))
     }

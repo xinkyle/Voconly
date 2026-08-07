@@ -1,26 +1,11 @@
 {
-  "catalog_version": 1,
+  "catalog_version": 2,
   "models": [
     {
-      "id": "Qwen3-ASR-1.7B-Q5_K_M",
-      "name": "Qwen3-ASR-1.7B Q5_K_M",
+      "id": "Qwen3-ASR-1.7B",
+      "name": "Qwen3-ASR 1.7B",
       "architecture": "qwen3",
       "backend": "TranscribeCpp",
-      "size": "~1.5GB",
-      "download_urls": [
-        {
-          "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/Qwen3-ASR-1.7B-Q5_K_M.gguf",
-          "is_china_accessible": true,
-          "priority": 0
-        },
-        {
-          "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/Qwen3-ASR-1.7B-Q5_K_M.gguf",
-          "is_china_accessible": false,
-          "priority": 1
-        }
-      ],
       "languages": ["zh", "zh-yue", "en", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl", "sv", "da", "fi", "pl", "cs", "fil", "fa", "el", "hu", "mk", "ro"],
       "capabilities": {
         "streaming": false,
@@ -29,28 +14,35 @@
       },
       "speed_score": 63,
       "accuracy_score": 87,
-      "description": "中文/英文混合识别，支持30种语言+22种中文方言，中文WER 5.2%"
-    },
-    {
-      "id": "cohere-transcribe-03-2026-Q5_K_M",
-      "name": "Cohere Transcribe 03-2026 Q5_K_M",
-      "architecture": "cohere_asr",
-      "backend": "TranscribeCpp",
-      "size": "~1.7GB",
+      "description": "中文/英文混合识别，支持30种语言+22种中文方言，中文WER 5.2%",
+      "files": [
+        {
+          "filename": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 1610612736
+        }
+      ],
+      "default_quant": "Q5_K_M",
       "download_urls": [
         {
           "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/cohere-transcribe-03-2026-gguf/resolve/main/cohere-transcribe-03-2026-Q5_K_M.gguf",
+          "url": "https://modelscope.cn/models/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/",
           "is_china_accessible": true,
           "priority": 0
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/cohere-transcribe-03-2026-gguf/resolve/main/cohere-transcribe-03-2026-Q5_K_M.gguf",
+          "url": "https://huggingface.co/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "cohere-transcribe-03-2026",
+      "name": "Cohere Transcribe 03-2026",
+      "architecture": "cohere_asr",
+      "backend": "TranscribeCpp",
       "languages": ["zh", "en", "ja", "ko", "de", "fr", "es", "it", "pt", "el", "nl", "pl", "vi", "ar"],
       "capabilities": {
         "streaming": false,
@@ -59,28 +51,35 @@
       },
       "speed_score": 63,
       "accuracy_score": 92,
-      "description": "HuggingFace Open ASR排行榜#1，WER 5.42%，14种语言支持"
-    },
-    {
-      "id": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M",
-      "name": "Nemotron 3.5 ASR Streaming 0.6B Q5_K_M",
-      "architecture": "parakeet",
-      "backend": "TranscribeCpp",
-      "size": "~534MB",
+      "description": "HuggingFace Open ASR排行榜#1，WER 5.42%，14种语言支持",
+      "files": [
+        {
+          "filename": "cohere-transcribe-03-2026-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 1825361100
+        }
+      ],
+      "default_quant": "Q5_K_M",
       "download_urls": [
         {
           "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "url": "https://modelscope.cn/models/voconly/cohere-transcribe-03-2026-gguf/resolve/main/",
           "is_china_accessible": true,
           "priority": 0
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "url": "https://huggingface.co/voconly/cohere-transcribe-03-2026-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "nemotron-3.5-asr-streaming-0.6b",
+      "name": "Nemotron 3.5 ASR Streaming 0.6B",
+      "architecture": "parakeet",
+      "backend": "TranscribeCpp",
       "languages": ["ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hi", "hr", "hu", "it", "ja", "ko", "lt", "lv", "nb", "nl", "nn", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "th", "tr", "uk", "vi", "zh"],
       "capabilities": {
         "streaming": true,
@@ -89,28 +88,35 @@
       },
       "speed_score": 84,
       "accuracy_score": 82,
-      "description": "流式处理，80ms超低延迟，39种语言，纯CPU可运行"
-    },
-    {
-      "id": "parakeet-tdt-0.6b-v3-Q5_K_M",
-      "name": "Parakeet TDT 0.6B v3 Q5_K_M",
-      "architecture": "parakeet",
-      "backend": "TranscribeCpp",
-      "size": "~524MB",
+      "description": "流式处理，80ms超低延迟，39种语言，纯CPU可运行",
+      "files": [
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 560988672
+        }
+      ],
+      "default_quant": "Q5_K_M",
       "download_urls": [
         {
           "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "url": "https://modelscope.cn/models/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/",
           "is_china_accessible": true,
           "priority": 0
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "url": "https://huggingface.co/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "parakeet-tdt-0.6b-v3",
+      "name": "Parakeet TDT 0.6B v3",
+      "architecture": "parakeet",
+      "backend": "TranscribeCpp",
       "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
       "capabilities": {
         "streaming": false,
@@ -119,28 +125,35 @@
       },
       "speed_score": 79,
       "accuracy_score": 88,
-      "description": "TDT架构，约48倍Whisper吞吐量，25种欧洲语言，自动语言检测"
-    },
-    {
-      "id": "parakeet-unified-en-0.6b-Q5_K_M",
-      "name": "Parakeet Unified EN 0.6B Q5_K_M",
-      "architecture": "parakeet",
-      "backend": "TranscribeCpp",
-      "size": "~516MB",
+      "description": "TDT架构，约48倍Whisper吞吐量，25种欧洲语言，自动语言检测",
+      "files": [
+        {
+          "filename": "parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 550502400
+        }
+      ],
+      "default_quant": "Q5_K_M",
       "download_urls": [
         {
           "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/parakeet-unified-en-0.6b-Q5_K_M.gguf",
+          "url": "https://modelscope.cn/models/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/",
           "is_china_accessible": true,
           "priority": 0
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/parakeet-unified-en-0.6b-Q5_K_M.gguf",
+          "url": "https://huggingface.co/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "parakeet-unified-en-0.6b",
+      "name": "Parakeet Unified EN 0.6B",
+      "architecture": "parakeet",
+      "backend": "TranscribeCpp",
       "languages": ["en"],
       "capabilities": {
         "streaming": true,
@@ -149,28 +162,35 @@
       },
       "speed_score": 79,
       "accuracy_score": 90,
-      "description": "英语专项优化，统一离线/流式推理，最低160ms延迟"
-    },
-    {
-      "id": "whisper-large-v3-turbo-Q5_K_M",
-      "name": "Whisper Large v3 Turbo Q5_K_M",
-      "architecture": "whisper",
-      "backend": "TranscribeCpp",
-      "size": "~591MB",
+      "description": "英语专项优化，统一离线/流式推理，最低160ms延迟",
+      "files": [
+        {
+          "filename": "parakeet-unified-en-0.6b-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 541065216
+        }
+      ],
+      "default_quant": "Q5_K_M",
       "download_urls": [
         {
           "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/whisper-large-v3-turbo-gguf/resolve/main/whisper-large-v3-turbo-Q5_K_M.gguf",
+          "url": "https://modelscope.cn/models/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/",
           "is_china_accessible": true,
           "priority": 0
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/whisper-large-v3-turbo-gguf/resolve/main/whisper-large-v3-turbo-Q5_K_M.gguf",
+          "url": "https://huggingface.co/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
-      ],
+      ]
+    },
+    {
+      "id": "whisper-large-v3-turbo",
+      "name": "Whisper Large v3 Turbo",
+      "architecture": "whisper",
+      "backend": "TranscribeCpp",
       "languages": ["af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "ky", "la", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "mt", "my", "ne", "nl", "nn", "no", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sa", "sd", "si", "sk", "sl", "so", "sq", "sr", "su", "sv", "sw", "ta", "te", "tg", "th", "tk", "tl", "tr", "tt", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"],
       "capabilities": {
         "streaming": false,
@@ -179,14 +199,44 @@
       },
       "speed_score": 42,
       "accuracy_score": 87,
-      "description": "99种语言覆盖，相比Large v3约8倍速度提升，支持翻译"
+      "description": "99种语言覆盖，相比Large v3约8倍速度提升，支持翻译",
+      "files": [
+        {
+          "filename": "whisper-large-v3-turbo-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 620756992
+        }
+      ],
+      "default_quant": "Q5_K_M",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/whisper-large-v3-turbo-gguf/resolve/main/",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly/whisper-large-v3-turbo-gguf/resolve/main/",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ]
     },
     {
       "id": "sensevoice-small",
       "name": "SenseVoice Small",
       "architecture": "sensevoice",
       "backend": "Onnx",
-      "size": "229MB",
+      "languages": ["zh", "zh-yue", "en", "ja", "ko"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 85,
+      "accuracy_score": 90,
+      "description": "中文/粤语识别优于 Whisper，支持情绪识别",
       "download_urls": [
         {
           "name": "ModelScope",
@@ -200,23 +250,22 @@
           "is_china_accessible": false,
           "priority": 2
         }
-      ],
-      "languages": ["zh", "zh-yue", "en", "ja", "ko"],
-      "capabilities": {
-        "streaming": false,
-        "translate": false,
-        "lang_detect": true
-      },
-      "speed_score": 85,
-      "accuracy_score": 90,
-      "description": "中文/粤语识别优于 Whisper，支持情绪识别"
+      ]
     },
     {
       "id": "parakeet-v3",
       "name": "Parakeet V3",
       "architecture": "parakeet",
       "backend": "Onnx",
-      "size": "640MB",
+      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": false
+      },
+      "speed_score": 88,
+      "accuracy_score": 87,
+      "description": "NVIDIA 高速语音识别，平均 WER 6.05%，支持25种欧洲语言",
       "download_urls": [
         {
           "name": "ModelScope",
@@ -230,16 +279,7 @@
           "is_china_accessible": false,
           "priority": 2
         }
-      ],
-      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
-      "capabilities": {
-        "streaming": true,
-        "translate": false,
-        "lang_detect": false
-      },
-      "speed_score": 88,
-      "accuracy_score": 87,
-      "description": "NVIDIA 高速语音识别，平均 WER 6.05%，支持25种欧洲语言"
+      ]
     }
   ]
 }

@@ -5,7 +5,6 @@
 
 use crate::backends::BackendType;
 use crate::presets::{DownloadSourceInfo, ModelPreset};
-use crate::utils::get_base_model_id;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
@@ -157,37 +156,6 @@ pub fn find_model(id: &str) -> Option<&CatalogModel> {
     CATALOG.iter().find(|m| m.id == id)
 }
 
-/// Find a model by ID, with fallback to base model ID.
-///
-/// First tries exact match, then tries matching with base model ID
-/// (quantization suffix removed).
-fn find_model_with_fallback(id: &str) -> Option<&CatalogModel> {
-    // Try exact match first
-    if let Some(model) = find_model(id) {
-        return Some(model);
-    }
-
-    // Try base model ID match
-    let base_id = get_base_model_id(id);
-    CATALOG.iter().find(|m| m.id.to_lowercase() == base_id)
-}
-
-/// Get speed score (0-100 → 0.0-1.0)
-///
-/// Automatically extracts base model ID for matching.
-/// E.g., "sensevoice-small-q8" will match "sensevoice-small" in catalog.
-pub fn get_speed_score(id: &str) -> Option<f32> {
-    find_model_with_fallback(id).and_then(|m| m.speed_score.map(|s| s as f32 / 100.0))
-}
-
-/// Get accuracy score (0-100 → 0.0-1.0)
-///
-/// Automatically extracts base model ID for matching.
-/// E.g., "sensevoice-small-q8" will match "sensevoice-small" in catalog.
-pub fn get_accuracy_score(id: &str) -> Option<f32> {
-    find_model_with_fallback(id).and_then(|m| m.accuracy_score.map(|a| a as f32 / 100.0))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,30 +179,8 @@ mod tests {
 
     #[test]
     fn can_find_models() {
-        assert!(find_model("Qwen3-ASR-1.7B-Q5_K_M").is_some());
-        assert!(find_model("cohere-transcribe-03-2026-Q5_K_M").is_some());
-    }
-
-    #[test]
-    fn score_conversion_works() {
-        // Qwen3-ASR should have speed 63 and accuracy 87
-        assert_eq!(get_speed_score("Qwen3-ASR-1.7B-Q5_K_M"), Some(0.63));
-        assert_eq!(get_accuracy_score("Qwen3-ASR-1.7B-Q5_K_M"), Some(0.87));
-    }
-
-    #[test]
-    fn score_lookup_with_quant_suffix() {
-        // sensevoice-small-q8 should match sensevoice-small
-        assert_eq!(get_speed_score("sensevoice-small-q8"), Some(0.85));
-        assert_eq!(get_accuracy_score("sensevoice-small-q8"), Some(0.90));
-
-        // Qwen3-ASR with different quant should match
-        assert_eq!(get_speed_score("Qwen3-ASR-1.7B-Q8_0"), Some(0.63));
-        assert_eq!(get_accuracy_score("Qwen3-ASR-1.7B-q4"), Some(0.87));
-
-        // Unknown model should return None
-        assert_eq!(get_speed_score("unknown-model-q8"), None);
-        assert_eq!(get_accuracy_score("unknown-model-q8"), None);
+        assert!(find_model("Qwen3-ASR-1.7B").is_some());
+        assert!(find_model("cohere-transcribe-03-2026").is_some());
     }
 
     #[test]
