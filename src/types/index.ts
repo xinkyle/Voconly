@@ -164,7 +164,7 @@ export interface HistoryRecord {
   timestamp: number;
   content: string;
   duration: number;  // 录音时长（秒）
-  wordCount: number; // 字数
+  wordCount: number; // 字数/词数（中文按字，英文按词）
 }
 
 // ============== LLM 类型 ==============

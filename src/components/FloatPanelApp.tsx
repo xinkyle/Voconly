@@ -5,6 +5,7 @@ import { listen, invoke } from '../utils/tauri';
 import { subscribeToLlmProgress } from '../services/llm';
 import { estimateTranscribeTime, estimateLlmTime, initPerformanceCache, initLlmPerformanceCache } from '../services/performance';
 import { createLogger } from '../services/log';
+import { countWords } from '../utils/i18n';  // 导入智能统计函数
 import type { LlmErrorPayload } from '../types';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -1333,7 +1334,7 @@ export default function FloatPanelApp() {
               {/* 字数徽章 - 录音时始终显示，无内容时显示 0 */}
               {showCancelButton && (
                 <span className={`preview-count-badge ${!hasPreviewContent ? 'empty' : ''}`}>
-                  {previewText.length}
+                  {countWords(previewText)}
                 </span>
               )}
 

@@ -32,7 +32,7 @@ import { checkModelExists } from './services/downloader';
 import { processTextForSceneWithProgress, getLlmProfile } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
-import { translateSceneName } from './utils/i18n';
+import { translateSceneName, countWords } from './utils/i18n';
 import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
@@ -879,7 +879,7 @@ function App() {
         // 历史记录保存
         const currentRecorder = recorderRef.current;
         const duration = currentRecorder?.lastAudioData?.duration || 0;
-        const wordCount = recognizedText.length;
+        const wordCount = countWords(recognizedText);  // 智能统计：中文按字，英文按词
         const newRecord = await addHistoryRecord({
           timestamp: Date.now(),
           content: recognizedText,
@@ -941,7 +941,7 @@ function App() {
       const duration = recorderRef.current?.lastAudioData?.duration || 0;
       // 如果 LLM 处理成功，保存 LLM 结果；否则保存原始识别文本
       const historyContent = llmResult.processed && llmResult.text ? llmResult.text : previewText;
-      const wordCount = historyContent.length;
+      const wordCount = countWords(historyContent);  // 智能统计：中文按字，英文按词
       const newRecord = await addHistoryRecord({
         timestamp: Date.now(),
         content: historyContent,
