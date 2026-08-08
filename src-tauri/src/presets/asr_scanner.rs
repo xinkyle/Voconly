@@ -35,6 +35,11 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
+// 导入架构默认值函数
+use crate::backends::gguf_capabilities::{
+    get_default_lang_detect, get_default_streaming, get_default_translation,
+};
+
 /// Scan available ASR models from the storage directory
 ///
 /// Returns a list of ModelPreset for all discovered models.
@@ -458,10 +463,54 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
         vec!["zh".to_string(), "en".to_string()]
     });
 
-    // 7. 能力字段从 GGUF Header 读取
-    let supports_auto_detect = caps.supports_language_detect;
-    let supports_streaming = caps.supports_streaming;
-    let supports_translation = caps.supports_translation;
+    // 7. 能力字段使用三级 fallback：GGUF Header → 预设文件 → 硬编码默认值
+    let supports_auto_detect = caps.supports_language_detect
+        .or_else(|| preset.and_then(|p| p.supports_auto_detect))
+        .or_else(|| {
+            caps.architecture.as_ref().and_then(|arch| {
+                let default = get_default_lang_detect(arch);
+                if default.is_some() {
+                    log::debug!(
+                        "[Scanner] {} 使用架构默认值: lang_detect={:?}",
+                        id,
+                        default
+                    );
+                }
+                default
+            })
+        });
+
+    let supports_streaming = caps.supports_streaming
+        .or_else(|| preset.and_then(|p| p.supports_streaming))
+        .or_else(|| {
+            caps.architecture.as_ref().and_then(|arch| {
+                let default = get_default_streaming(arch);
+                if default.is_some() {
+                    log::debug!(
+                        "[Scanner] {} 使用架构默认值: streaming={:?}",
+                        id,
+                        default
+                    );
+                }
+                default
+            })
+        });
+
+    let supports_translation = caps.supports_translation
+        .or_else(|| preset.and_then(|p| p.supports_translation))
+        .or_else(|| {
+            caps.architecture.as_ref().and_then(|arch| {
+                let default = get_default_translation(arch);
+                if default.is_some() {
+                    log::debug!(
+                        "[Scanner] {} 使用架构默认值: translation={:?}",
+                        id,
+                        default
+                    );
+                }
+                default
+            })
+        });
 
     // 记录能力信息
     log::info!(

@@ -288,6 +288,7 @@ impl GgufCapabilities {
     /// Create capabilities for Cohere architecture
     ///
     /// Cohere audio models do NOT support streaming transcription (offline only).
+    /// Cohere Transcribe 03-2026 需要指定语言，不支持自动语言检测。
     /// 支持14种语言
     ///
     /// 注意：此函数仅用于文件名推断的 fallback，不用于 GGUF Header 解析。
@@ -297,7 +298,7 @@ impl GgufCapabilities {
             architecture: Some("cohere".to_string()),
             supports_streaming: Some(false),
             supports_translation: Some(false),
-            supports_language_detect: Some(true),
+            supports_language_detect: Some(false),
             languages: get_default_languages("cohere"),
         }
     }
@@ -492,7 +493,21 @@ pub fn probe_gguf_capabilities(path: &Path) -> GgufCapabilities {
 /// This is the preferred method as it provides accurate architecture information.
 fn probe_from_gguf_header(path: &Path) -> Option<GgufCapabilities> {
     match read_header_metadata(path) {
-        Ok(meta) => Some(GgufCapabilities::from_metadata(&meta)),
+        Ok(meta) => {
+            // 输出 GGUF header 原始能力数据，用于调试
+            log::info!(
+                "[GGUF Header] {:?} -> architecture={:?}, name={:?}, variant={:?}, languages={:?}, streaming={:?}, translate={:?}, lang_detect={:?}",
+                path.file_name().unwrap_or_default(),
+                meta.get_str(KEY_ARCH),
+                meta.get_str(KEY_NAME),
+                meta.get_str(KEY_VARIANT),
+                meta.get_string_array(KEY_LANGUAGES),
+                meta.get_bool(KEY_CAP_STREAMING),
+                meta.get_bool(KEY_CAP_TRANSLATE),
+                meta.get_bool(KEY_CAP_LANG_DETECT)
+            );
+            Some(GgufCapabilities::from_metadata(&meta))
+        }
         Err(e) => {
             log::warn!("[GGUF] 无法解析 header: {} ({:?})", e, path);
             None
@@ -648,7 +663,7 @@ fn probe_from_filename(path: &Path) -> GgufCapabilities {
 /// Get default streaming capability for an architecture
 ///
 /// Used as fallback when GGUF header doesn't contain streaming capability.
-fn get_default_streaming(arch: &str) -> Option<bool> {
+pub fn get_default_streaming(arch: &str) -> Option<bool> {
     match arch {
         "parakeet" | "voxtral" | "voxtral_realtime" | "canary" | "canary_qwen" | "gigaam" | "nemotron" => Some(true),
         "whisper" | "qwen3_asr" | "sensevoice" | "moonshine" | "moonshine_streaming" | "cohere" | "cohere_asr" => Some(false),
@@ -659,7 +674,7 @@ fn get_default_streaming(arch: &str) -> Option<bool> {
 /// Get default translation capability for an architecture
 ///
 /// Used as fallback when GGUF header doesn't contain translation capability.
-fn get_default_translation(arch: &str) -> Option<bool> {
+pub fn get_default_translation(arch: &str) -> Option<bool> {
     match arch {
         "whisper" | "canary" | "canary_qwen" => Some(true),
         "parakeet" | "qwen3_asr" | "voxtral" | "voxtral_realtime" | "sensevoice" | "moonshine" | "moonshine_streaming" | "gigaam" | "cohere" | "cohere_asr" | "nemotron" => Some(false),
@@ -670,10 +685,10 @@ fn get_default_translation(arch: &str) -> Option<bool> {
 /// Get default language detection capability for an architecture
 ///
 /// Used as fallback when GGUF header doesn't contain language detection capability.
-fn get_default_lang_detect(arch: &str) -> Option<bool> {
+pub fn get_default_lang_detect(arch: &str) -> Option<bool> {
     match arch {
-        "whisper" | "qwen3_asr" | "voxtral" | "voxtral_realtime" | "sensevoice" | "canary" | "canary_qwen" | "cohere" | "cohere_asr" | "nemotron" => Some(true),
-        "parakeet" | "moonshine" | "moonshine_streaming" | "gigaam" => Some(false),
+        "whisper" | "qwen3_asr" | "voxtral" | "voxtral_realtime" | "sensevoice" | "canary" | "canary_qwen" | "nemotron" => Some(true),
+        "parakeet" | "moonshine" | "moonshine_streaming" | "gigaam" | "cohere" | "cohere_asr" => Some(false),
         _ => None,
     }
 }
@@ -1042,13 +1057,14 @@ mod tests {
         assert_eq!(get_default_lang_detect("voxtral"), Some(true));
         assert_eq!(get_default_lang_detect("sensevoice"), Some(true));
         assert_eq!(get_default_lang_detect("canary"), Some(true));
-        assert_eq!(get_default_lang_detect("cohere"), Some(true));
         assert_eq!(get_default_lang_detect("nemotron"), Some(true));
 
         // 测试不支持语言检测的架构
         assert_eq!(get_default_lang_detect("parakeet"), Some(false));
         assert_eq!(get_default_lang_detect("moonshine"), Some(false));
         assert_eq!(get_default_lang_detect("gigaam"), Some(false));
+        assert_eq!(get_default_lang_detect("cohere"), Some(false));
+        assert_eq!(get_default_lang_detect("cohere_asr"), Some(false));
 
         // 测试未知架构
         assert_eq!(get_default_lang_detect("unknown_arch"), None);
