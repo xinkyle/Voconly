@@ -47,7 +47,7 @@
       "capabilities": {
         "streaming": false,
         "translate": false,
-        "lang_detect": true
+        "lang_detect": false
       },
       "speed_score": 63,
       "accuracy_score": 92,
