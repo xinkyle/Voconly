@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import type {
   AsrModelWithStatus,
   LlmModelWithStatus,
@@ -21,7 +22,7 @@ import type { DownloadProgress, DownloadCompleteEvent } from '../services/downlo
 import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
 import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
-import { AudioLines } from 'lucide-react';
+import { AudioLines, Info } from 'lucide-react';
 
 const log = createLogger('ModelConfigPanel');
 
@@ -806,10 +807,39 @@ export default function ModelConfigPanel({
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.asrTitle')}</h2>
                   {hasDownloadedAsr ? (
-                    <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-900 text-white rounded-full">
-                      <CheckIcon className="w-3 h-3" />
-                      {t('models.ready')}
-                    </span>
+                    <>
+                      <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-900 text-white rounded-full">
+                        <CheckIcon className="w-3 h-3" />
+                        {t('models.ready')}
+                      </span>
+                      {/* Info icon with hover tooltip */}
+                      <div className="relative group">
+                        <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                        <div className="absolute top-full left-0 z-50 pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                          <div className="w-72 bg-white rounded-lg shadow-lg border border-gray-200 p-3 text-xs">
+                            <p className="font-medium text-gray-900 mb-2">{t('modelConfig.asrMoreModelsInfo')}</p>
+                            <div className="space-y-1 mb-2">
+                              <button
+                                onClick={() => openUrl('https://modelscope.cn/profile/voconly')}
+                                className="text-blue-600 hover:text-blue-700 hover:underline block"
+                              >
+                                ModelScope (魔搭社区)
+                              </button>
+                              <button
+                                onClick={() => openUrl('https://huggingface.co/voconly')}
+                                className="text-blue-600 hover:text-blue-700 hover:underline block"
+                              >
+                                HuggingFace
+                              </button>
+                            </div>
+                            <div className="border-t border-gray-200 pt-2 mt-2">
+                              <p className="text-gray-600 mb-1">{t('modelConfig.asrQuantizationPriority')}</p>
+                              <p className="text-gray-500">{t('modelConfig.asrDownloadHint')}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <span className="px-2 py-0.5 text-xs font-medium bg-red-50 text-red-600 rounded-full border border-red-200">
                       必须选择

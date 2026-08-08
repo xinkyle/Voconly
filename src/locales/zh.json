@@ -200,7 +200,7 @@
     "title": "模型配置",
     "subtitle": "配置语音识别和大模型，选择适合您的方案",
     "asrTitle": "语音转文本模型",
-    "asrSubtitle": "语音识别核心引擎，必须下载一个才能使用",
+    "asrSubtitle": "语音识别核心引擎，必须下载一个才能使用。更多模型下载方式请悬停 ⓘ 图标查看",
     "asrRequired": "需要下载语音模型",
     "asrRequiredDesc": "请从下方选择并下载一个语音模型，这是使用语音输入的必要条件",
     "llmTitle": "本地大语言模型",
@@ -226,7 +226,10 @@
     "customDirModalTitle": "自定义模型目录",
     "customDirModalDesc": "添加包含 GGUF/ONNX 模型文件的文件夹，系统将自动扫描并显示在模型列表中",
     "addCustomDir": "添加模型文件夹",
-    "noCustomDirs": "暂无导入的目录"
+    "noCustomDirs": "暂无导入的目录",
+    "asrMoreModelsInfo": "更多模型的量化版本可从以下平台下载：",
+    "asrQuantizationPriority": "当模型有多个量化版本时，系统自动展示最高量化等级版本。优先级排序：F16 > Q8 > Q6 > Q5 > Q4",
+    "asrDownloadHint": "下载后将模型文件放入默认 models 目录，或通过「导入外部模型」按钮添加模型文件夹即可使用。"
   },
   "dialog": {
     "modelNotDownloaded": "模型未下载",

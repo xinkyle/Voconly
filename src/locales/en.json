@@ -200,7 +200,7 @@
     "title": "Model Configuration",
     "subtitle": "Configure voice recognition and LLM models for your needs",
     "asrTitle": "Speech-to-Text Models",
-    "asrSubtitle": "Core speech recognition engine, at least one required",
+    "asrSubtitle": "Core speech recognition engine, at least one required. Hover over the ⓘ icon for more model download options",
     "asrRequired": "ASR Model Required",
     "asrRequiredDesc": "Please select and download a speech model from below. This is required to use voice input.",
     "llmTitle": "Local LLM Models",
@@ -226,7 +226,10 @@
     "customDirModalTitle": "Custom Model Directories",
     "customDirModalDesc": "Add folders containing GGUF/ONNX model files, they will be automatically scanned and shown in the model list",
     "addCustomDir": "Add Model Folder",
-    "noCustomDirs": "No imported directories"
+    "noCustomDirs": "No imported directories",
+    "asrMoreModelsInfo": "More quantized models available from:",
+    "asrQuantizationPriority": "When multiple quantization versions are available, the system automatically displays the highest quantization level. Priority order: F16 > Q8 > Q6 > Q5 > Q4",
+    "asrDownloadHint": "Download model files to the default models directory, or use 'Import External Models' to add model folders."
   },
   "dialog": {
     "modelNotDownloaded": "Model not downloaded",
