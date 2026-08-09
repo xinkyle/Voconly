@@ -26,6 +26,27 @@ import { AudioLines, Info } from 'lucide-react';
 
 const log = createLogger('ModelConfigPanel');
 
+// Get model size (formatted: GB for >= 1GB, MB for < 1GB)
+// Reuse logic from HomePanel.tsx
+function getModelSize(model: AsrModelWithStatus | LlmModelWithStatus): string {
+  // Use actual size from disk if available
+  if (model.sizeMb) {
+    const mb = model.sizeMb;
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(1)}GB`;
+    }
+    return `${mb}MB`;
+  }
+  // Or use preset size
+  if (model.preset.size) {
+    const sizeStr = model.preset.size.toUpperCase();
+    if (sizeStr.includes('GB') || sizeStr.includes('MB')) {
+      return model.preset.size;
+    }
+  }
+  return '';
+}
+
 // Score bar component for model quality metrics
 const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
   <div className="flex items-center gap-1.5">
@@ -295,6 +316,7 @@ function AsrModelCard({
               {/* Model Name */}
               <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
                 {model.preset.name}{model.preset.quant && ` (${model.preset.quant})`}
+                {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
               </h3>
               {/* Description */}
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
@@ -394,7 +416,10 @@ function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDo
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0 pr-6">
             {/* Model Name */}
-            <h3 className="font-semibold text-sm text-gray-800">{model.preset.name}</h3>
+            <h3 className="font-semibold text-sm text-gray-800">
+              {model.preset.name}
+              {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
+            </h3>
             {/* Description */}
             <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
           </div>
