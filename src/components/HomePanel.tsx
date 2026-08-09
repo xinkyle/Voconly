@@ -1019,7 +1019,7 @@ export default function HomePanel({
   triggerSelectModelSceneId,
   onTriggerSelectModelCleared
 }: HomePanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
   const [listeningSceneId, setListeningSceneId] = useState<string | null>(null);
   const [selectingSceneId, setSelectingSceneId] = useState<string | null>(null);
@@ -1183,11 +1183,11 @@ export default function HomePanel({
     setSelectingSceneId(sceneId);
   };
 
-  const handleModelSelect = useCallback((sceneId: string, modelId: string) => {
+  const handleModelSelect = useCallback(async (sceneId: string, modelId: string) => {
     log.debug(`handleModelSelect called: sceneId=${sceneId}, modelId=${modelId}`);
     const scene = localScenes.find(s => s.id === sceneId);
     if (!scene || scene.modelId === modelId) {
-      log.debug('No change or scene not found');
+      log.debug('No change or scene found');
       setSelectingSceneId(null);
       return;
     }
@@ -1198,13 +1198,56 @@ export default function HomePanel({
     setLocalScenes(newScenes);
     setSelectingSceneId(null);
 
+    // 自动设置默认语言偏好（如果还没有设置）
+    // 使用与 UI 显示相同的推荐逻辑
+    const asrModel = asrModels.find(m => m.preset.id === modelId);
+    if (asrModel && !modelLanguagePrefs[modelId]) {
+      const languages = asrModel.preset.languages || [];
+      const supportsAutoDetect = asrModel.preset.supportsAutoDetect ?? (languages.length > 10);
+
+      // 智能推荐逻辑：
+      // 1. 如果模型支持自动检测，使用 auto
+      // 2. 如果界面语言在支持列表中，使用界面语言
+      // 3. 否则使用第一个支持的语言
+      const recommendedLanguage = supportsAutoDetect
+        ? 'auto'
+        : (() => {
+            const i18nLanguage = i18n.language || 'zh';
+            const langCode = i18nLanguage.split('-')[0];
+            if (languages.includes(langCode)) {
+              return langCode;
+            }
+            return languages[0] || 'auto';
+          })();
+
+      log.info(`[ModelSelect] 自动设置默认语言: ${recommendedLanguage} for model ${modelId}`);
+
+      // 内联保存语言偏好逻辑
+      try {
+        const config = await loadConfig();
+        const updatedPrefs = {
+          ...(config.modelLanguagePrefs || {}),
+          [modelId]: recommendedLanguage,
+        };
+        await saveConfig({
+          ...config,
+          modelLanguagePrefs: updatedPrefs
+        });
+        if (onModelLanguagePrefsChange) {
+          onModelLanguagePrefsChange(updatedPrefs);
+        }
+      } catch (error) {
+        log.error(`Failed to save language config: ${error}`);
+      }
+    }
+
     if (onSave) {
       log.debug('Calling onSave');
       onSave(newScenes);
     } else {
       log.debug('No onSave callback');
     }
-  }, [localScenes, onSave]);
+  }, [localScenes, onSave, asrModels, modelLanguagePrefs, onModelLanguagePrefsChange, i18n]);
 
   // Handle shortcut click
   const handleShortcutClick = useCallback((sceneId: string) => {

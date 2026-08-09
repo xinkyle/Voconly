@@ -340,13 +340,14 @@ pub async fn transcribe_audio(
     };
 
     // Build transcribe params
-    // 确定语言：优先使用请求参数，其次使用用户配置的语言偏好
+    // 确定语言：优先使用请求参数，其次使用用户偏好
+    // 语言选择逻辑由前端负责，后端只读取配置
     let language = if let Some(lang) = request.language {
         // 请求参数中指定了语言，直接使用
         info!("[Transcribe] 使用请求指定的语言: {}", lang);
         lang
     } else {
-        // 没有指定语言，从用户偏好或预设中获取
+        // 从配置中获取用户偏好（前端已设置好推荐值）
         let config = services
             .config
             .lock()
@@ -356,41 +357,18 @@ pub async fn transcribe_audio(
         let scene = config.scenes.iter().find(|s| s.id == request.scene_id);
         let model_id = scene.map(|s| s.model_id.clone()).unwrap_or_default();
 
-        // 1. 首先检查用户偏好
-        let lang = if let Some(pref_lang) = config.model_language_prefs.get(&model_id) {
-            info!("[Transcribe] 使用用户偏好语言: {} for model {}", pref_lang, model_id);
-            pref_lang.clone()
-        } else {
-            // 2. 从缓存获取模型信息（包含扫描时检测的能力）
-            // 释放 config 锁后再获取缓存锁，避免锁竞争
-            drop(config);
-
-            let cached_models = services
-                .asr_models_cache
-                .lock()
-                .map(|cache| cache.models.clone())
-                .unwrap_or_default();
-
-            if let Some(preset) = cached_models.iter().find(|p| p.id == model_id) {
-                // 从缓存找到模型，使用其能力
-                let default_lang = if preset.supports_auto_detect.unwrap_or(false) {
-                    "auto".to_string()
-                } else {
-                    preset.languages.first().cloned().unwrap_or_else(|| "auto".to_string())
-                };
-                info!(
-                    "[Transcribe] 使用模型默认语言: {} for model {} (languages: {:?})",
-                    default_lang, model_id, preset.languages
-                );
-                default_lang
-            } else {
-                // 缓存中也没有，使用 auto（让模型自己决定）
-                info!("[Transcribe] 模型 {} 不在缓存中，使用 auto", model_id);
+        // 直接使用用户偏好，前端已在选择模型时设置
+        config
+            .model_language_prefs
+            .get(&model_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                info!("[Transcribe] 模型 {} 没有语言偏好，使用 auto", model_id);
                 "auto".to_string()
-            }
-        };
-        lang
+            })
     };
+
+    info!("[Transcribe] 最终使用语言: {}", language);
 
     let mut params = TranscribeParams::default();
     params.language = language;
@@ -465,43 +443,26 @@ pub fn transcribe_samples_internal(
         .find(|s| s.id == scene_id)
         .ok_or_else(|| format!("Scene not found: {}", scene_id))?;
 
-    // 确定语言：从用户偏好或缓存中获取
-    let language = if let Some(pref_lang) = config.model_language_prefs.get(&scene.model_id) {
-        // 用户偏好存在时，使用偏好语言
-        info!(
-            "[Transcribe] 使用用户偏好语言: {} for model {}",
-            pref_lang, scene.model_id
-        );
-        pref_lang.clone()
-    } else {
-        // 从缓存获取模型信息（包含扫描时检测的能力）
-        let cached_models = services
-            .asr_models_cache
-            .lock()
-            .map(|cache| cache.models.clone())
-            .unwrap_or_default();
-
-        if let Some(preset) = cached_models.iter().find(|p| p.id == scene.model_id) {
-            // 从缓存找到模型，使用其能力
-            let default_lang = if preset.supports_auto_detect.unwrap_or(false) {
-                "auto".to_string()
-            } else {
-                preset.languages.first().cloned().unwrap_or_else(|| "auto".to_string())
-            };
+    // 确定语言：直接使用用户偏好（前端已设置好推荐值）
+    // 语言选择逻辑由前端负责，后端只读取配置
+    let language = config
+        .model_language_prefs
+        .get(&scene.model_id)
+        .cloned()
+        .unwrap_or_else(|| {
+            // 兜底：如果前端没有设置偏好，使用 auto
+            // 正常情况前端会在选择模型时自动设置推荐语言
             info!(
-                "[Transcribe] 使用模型默认语言: {} for model {} (languages: {:?})",
-                default_lang, scene.model_id, preset.languages
-            );
-            default_lang
-        } else {
-            // 缓存中也没有，使用 auto（让模型自己决定）
-            info!(
-                "[Transcribe] 模型 {} 不在缓存中，使用 auto",
+                "[Transcribe] 模型 {} 没有语言偏好，使用 auto",
                 scene.model_id
             );
             "auto".to_string()
-        }
-    };
+        });
+
+    info!(
+        "[Transcribe] 使用语言: {} for model {}",
+        language, scene.model_id
+    );
 
     let mut params = TranscribeParams::default();
     params.language = language;
