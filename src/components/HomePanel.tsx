@@ -497,7 +497,7 @@ function SceneCard({
       }`}>
         <div className="flex items-center gap-2.5">
           <div className={`p-1 rounded-md ${
-            scene.enabled ? 'bg-amber-50 text-amber-600' : 'bg-gray-200 text-gray-400'
+            scene.enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-200 text-gray-400'
           }`}>
             <SceneIcon />
           </div>
@@ -520,8 +520,8 @@ function SceneCard({
                 !scene.enabled
                   ? 'text-gray-300 cursor-not-allowed'
                   : llmEnabled
-                    ? 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                    : 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                    ? 'text-white bg-emerald-600 hover:bg-emerald-700'
+                    : 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
               }`}
               title={!scene.enabled ? t('home.sceneDisabled') : llmEnabled ? t('home.llmEnabled') : t('home.llmConfig')}
             >

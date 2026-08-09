@@ -671,8 +671,8 @@ export default function SceneList({
                     onClick={() => setLlmConfigScene(scene)}
                     className={`p-2 rounded-lg transition-all duration-200 ${
                       llmEnabled
-                        ? 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                        : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'
+                        ? 'text-white bg-emerald-600 hover:bg-emerald-700'
+                        : 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
                     }`}
                     title={llmEnabled ? t('home.llmEnabled') : t('sceneList.llmConfig')}
                   >

@@ -1261,11 +1261,11 @@ function App() {
           {hasUpdate && (
             <button
               onClick={() => setShowUpdateDialog(true)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-green-50 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
               title={t('update.newVersionAvailable')}
             >
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              <span className="text-xs text-green-600 font-medium">{t('update.newVersionBadge')}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span className="text-xs text-emerald-600 font-medium">{t('update.newVersionBadge')}</span>
             </button>
           )}
         </div>
@@ -1419,7 +1419,12 @@ function App() {
               />
             )}
             {activeNav === 'settings' && settingsTab === 'about' && (
-              <SettingsAbout />
+              <SettingsAbout
+                onUpdateAvailable={(versionInfo) => {
+                  setUpdateVersionInfo(versionInfo);
+                  setHasUpdate(true);
+                }}
+              />
             )}
             {activeNav === 'dictionary' && (
               <SettingsDictionary />

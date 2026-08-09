@@ -307,51 +307,35 @@ export default function UpdateDialog({
         </div>
 
         {/* Footer buttons */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
-          {/* Available state: Cancel, Install Now */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-center">
+          {/* Available state: Install Now only (user can close via X) */}
           {dialogState === 'available' && (
-            <>
-              <button
-                onClick={onClose}
-                className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {t('update.cancel')}
-              </button>
-              <button
-                onClick={handleInstall}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-colors"
-              >
-                {t('update.installNow')}
-              </button>
-            </>
+            <button
+              onClick={handleInstall}
+              className="px-8 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-colors"
+            >
+              {t('update.installNow')}
+            </button>
           )}
 
           {/* Downloading state: Cancel only - restores to available state */}
           {dialogState === 'downloading' && (
             <button
               onClick={handleCancelDownload}
-              className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-8 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
             >
               {t('update.cancel')}
             </button>
           )}
 
-          {/* Error state: Cancel, Try Again */}
+          {/* Error state: Try Again */}
           {dialogState === 'error' && (
-            <>
-              <button
-                onClick={onClose}
-                className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {t('update.cancel')}
-              </button>
-              <button
-                onClick={handleRetry}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-colors"
-              >
-                {t('update.tryAgain')}
-              </button>
-            </>
+            <button
+              onClick={handleRetry}
+              className="px-8 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-colors"
+            >
+              {t('update.tryAgain')}
+            </button>
           )}
         </div>
       </div>

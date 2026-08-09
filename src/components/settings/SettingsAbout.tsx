@@ -16,7 +16,12 @@ const LogoIcon = ({ className = 'w-7 h-7' }: { className?: string }) => (
   />
 );
 
-export default function SettingsAbout() {
+interface SettingsAboutProps {
+  /** Callback when update is available (to update title bar badge) */
+  onUpdateAvailable?: (versionInfo: RemoteVersionInfo) => void;
+}
+
+export default function SettingsAbout({ onUpdateAvailable }: SettingsAboutProps) {
   const { t } = useTranslation();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -47,6 +52,8 @@ export default function SettingsAbout() {
       if (result.hasUpdate && result.versionInfo) {
         setUpdateVersionInfo(result.versionInfo);
         setShowUpdateDialog(true);
+        // Notify parent to show title bar badge
+        onUpdateAvailable?.(result.versionInfo);
       } else {
         setUpdateStatus(t('settings.about.latestVersion'));
       }
