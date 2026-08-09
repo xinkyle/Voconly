@@ -101,6 +101,22 @@ const ASR_MODEL_LOGO_MAP: Record<string, string> = {
   'cohere': 'cohere-logo.svg',
 };
 
+// 推荐模型配置（根据语言场景推荐）
+// 中文场景推荐：Qwen3-ASR（中英混合）、SenseVoice（中文优）
+const ZH_RECOMMENDED_MODELS: Set<string> = new Set([
+  'Qwen3-ASR-1.7B',
+  'qwen3-asr-1.7b',
+  'sensevoice-small',
+  'SenseVoice-Small',
+]);
+// 英文场景推荐：Parakeet Unified EN、Cohere Transcribe
+const EN_RECOMMENDED_MODELS: Set<string> = new Set([
+  'parakeet-unified-en-0.6b',
+  'Parakeet-Unified-EN-0.6B',
+  'cohere-transcribe-03-2026',
+  'Cohere-Transcribe-03-2026',
+]);
+
 // Get ASR model logo path based on model id
 const getAsrModelLogo = (modelId: string): string => {
   const lowerModelId = modelId.toLowerCase();
@@ -255,6 +271,7 @@ interface AsrModelCardProps {
   onDownload: () => void;
   onDownloadCancel?: () => void;
   t: (key: string) => string;
+  currentLanguage: string;  // 当前系统语言
 }
 
 function AsrModelCard({
@@ -266,11 +283,23 @@ function AsrModelCard({
   onDownload,
   onDownloadCancel,
   t,
+  currentLanguage,
 }: AsrModelCardProps) {
   const isDownloaded = model.downloaded;
   const knownModel = DEFAULT_ASR_MODELS.find((m) => m.id === model.preset.id);
   const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
   const logoPath = getAsrModelLogo(model.preset.id);
+
+  // 根据当前语言决定是否显示推荐徽章
+  const shouldShowRecommendation = (): boolean => {
+    const isZhLanguage = currentLanguage.startsWith('zh');
+    if (isZhLanguage) {
+      return ZH_RECOMMENDED_MODELS.has(model.preset.id);
+    } else {
+      return EN_RECOMMENDED_MODELS.has(model.preset.id);
+    }
+  };
+  const showRecommendation = shouldShowRecommendation();
 
   return (
     <div
@@ -313,11 +342,19 @@ function AsrModelCard({
               />
             )}
             <div className="flex-1 min-w-0">
-              {/* Model Name */}
-              <h3 className={`font-semibold text-sm truncate ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
-                {model.preset.name}{model.preset.quant && ` (${model.preset.quant})`}
-                {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
-              </h3>
+              {/* Model Name with recommendation badge */}
+              <div className={`flex items-center gap-2 ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
+                <h3 className="font-semibold text-sm truncate">
+                  {model.preset.name}{model.preset.quant && ` (${model.preset.quant})`}
+                  {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
+                </h3>
+                {/* Recommendation badge */}
+                {showRecommendation && (
+                  <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white">
+                    推荐
+                  </span>
+                )}
+              </div>
               {/* Description */}
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
               {/* Accuracy, Speed Scores and Streaming Badge */}
@@ -544,8 +581,9 @@ export default function ModelConfigPanel({
   selectedAsrModelId,
   onConfigUpdate,
 }: ModelConfigPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { showToast } = useToast();
+  const currentLanguage = i18n.language;
 
   // State
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
@@ -908,6 +946,7 @@ export default function ModelConfigPanel({
                 onDownload={() => handleAsrDownload(model)}
                 onDownloadCancel={() => handleDownloadCancel(model.preset.id)}
                 t={t}
+                currentLanguage={currentLanguage}
               />
             ))}
           </div>

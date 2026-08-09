@@ -13,8 +13,8 @@
         "lang_detect": true
       },
       "speed_score": 63,
-      "accuracy_score": 87,
-      "description": "中文/英文混合识别，支持30种语言+22种中文方言，中文WER 5.2%",
+      "accuracy_score": 92,
+      "description": "中英文混合录入效果最佳，30种语言+22种中文方言，资源消耗偏大",
       "files": [
         {
           "filename": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
@@ -50,8 +50,8 @@
         "lang_detect": false
       },
       "speed_score": 63,
-      "accuracy_score": 92,
-      "description": "HuggingFace Open ASR排行榜#1，WER 5.42%，14种语言支持",
+      "accuracy_score": 90,
+      "description": "HuggingFace Open ASR排行榜#1，支持14种语言",
       "files": [
         {
           "filename": "cohere-transcribe-03-2026-Q5_K_M.gguf",
@@ -113,43 +113,6 @@
       ]
     },
     {
-      "id": "parakeet-tdt-0.6b-v3",
-      "name": "Parakeet TDT 0.6B v3",
-      "architecture": "parakeet",
-      "backend": "TranscribeCpp",
-      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
-      "capabilities": {
-        "streaming": false,
-        "translate": false,
-        "lang_detect": true
-      },
-      "speed_score": 79,
-      "accuracy_score": 88,
-      "description": "TDT架构，约48倍Whisper吞吐量，25种欧洲语言，自动语言检测",
-      "files": [
-        {
-          "filename": "parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
-          "quant": "Q5_K_M",
-          "size_bytes": 550502400
-        }
-      ],
-      "default_quant": "Q5_K_M",
-      "download_urls": [
-        {
-          "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/",
-          "is_china_accessible": true,
-          "priority": 0
-        },
-        {
-          "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/parakeet-tdt-0.6b-v3-gguf/resolve/main/",
-          "is_china_accessible": false,
-          "priority": 1
-        }
-      ]
-    },
-    {
       "id": "parakeet-unified-en-0.6b",
       "name": "Parakeet Unified EN 0.6B",
       "architecture": "parakeet",
@@ -162,7 +125,7 @@
       },
       "speed_score": 79,
       "accuracy_score": 90,
-      "description": "英语专项优化，统一离线/流式推理，最低160ms延迟",
+      "description": "英语专项优化，支持流式推理，最低160ms延迟",
       "files": [
         {
           "filename": "parakeet-unified-en-0.6b-Q5_K_M.gguf",
@@ -199,7 +162,7 @@
       },
       "speed_score": 42,
       "accuracy_score": 87,
-      "description": "99种语言覆盖，相比Large v3约8倍速度提升，支持翻译",
+      "description": "99种语言覆盖，内置翻译功能",
       "files": [
         {
           "filename": "whisper-large-v3-turbo-Q5_K_M.gguf",
@@ -234,9 +197,9 @@
         "translate": false,
         "lang_detect": true
       },
-      "speed_score": 85,
-      "accuracy_score": 90,
-      "description": "中文/粤语识别优于 Whisper，支持情绪识别",
+      "speed_score": 95,
+      "accuracy_score": 86,
+      "description": "纯中文识别效果不错，中英混合识别差，系统资源要求不高",
       "download_urls": [
         {
           "name": "ModelScope",
@@ -247,35 +210,6 @@
         {
           "name": "HuggingFace",
           "url": "https://huggingface.co/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
-          "is_china_accessible": false,
-          "priority": 2
-        }
-      ]
-    },
-    {
-      "id": "parakeet-v3",
-      "name": "Parakeet V3",
-      "architecture": "parakeet",
-      "backend": "Onnx",
-      "languages": ["en", "fr", "es", "de", "it", "pt", "nl", "bg", "hr", "cs", "da", "et", "fi", "el", "hu", "lv", "lt", "mt", "pl", "ro", "sk", "sl", "sv", "ru", "uk"],
-      "capabilities": {
-        "streaming": false,
-        "translate": false,
-        "lang_detect": false
-      },
-      "speed_score": 88,
-      "accuracy_score": 87,
-      "description": "NVIDIA 高速语音识别，平均 WER 6.05%，支持25种欧洲语言",
-      "download_urls": [
-        {
-          "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/parakeet-v3/resolve/main/parakeet-v3.zip",
-          "is_china_accessible": true,
-          "priority": 1
-        },
-        {
-          "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/parakeet-v3/resolve/main/parakeet-v3.zip",
           "is_china_accessible": false,
           "priority": 2
         }
