@@ -228,7 +228,7 @@
     "addCustomDir": "Add Model Folder",
     "noCustomDirs": "No imported directories",
     "asrMoreModelsInfo": "More quantized models available from:",
-    "asrQuantizationPriority": "When multiple quantization versions are available, the system automatically displays the highest quantization level. Priority order: F16 > Q8 > Q6 > Q5 > Q4",
+    "asrQuantizationPriority": "When multiple quantization versions are available, the system automatically uses the highest precision version (F16 > Q8 > Q6 > Q5 > Q4). Manual selection of quantization version is not supported at this time.",
     "asrDownloadHint": "Download model files to the default models directory, or use 'Import External Models' to add model folders."
   },
   "dialog": {

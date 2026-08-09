@@ -1524,8 +1524,8 @@ fn build_console_filter() -> env_filter::Filter {
             info!("Using RUST_LOG environment variable: {}", spec);
         }
         _ => {
-            // 默认 Info 级别
-            builder.filter_level(log::LevelFilter::Info);
+            // 默认 Warn 级别（release 版本减少噪音）
+            builder.filter_level(log::LevelFilter::Warn);
         }
     }
 
