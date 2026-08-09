@@ -415,7 +415,7 @@ function SceneCard({
   isSelectingPromptType,
   onPromptTypeSelect,
   onLanguageChange,
-  onModelLanguageChange,
+  onModelLanguageChange: _onModelLanguageChange,
 }: SceneCardProps) {
   const { t, i18n } = useTranslation();
 

@@ -33,7 +33,7 @@ export default function AboutModal({ isOpen, onClose }: AboutModalProps) {
   // Copy email to clipboard
   const copyEmail = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText('laoxingai@139.com');
+      await navigator.clipboard.writeText('voconly@139.com');
     } catch (err) {
       console.error('Failed to copy email:', err);
     }
