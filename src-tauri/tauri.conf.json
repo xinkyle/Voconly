@@ -27,8 +27,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "src-tauri/resources/models/*": "resources/models/",
-      "src-tauri/resources/*.dll": ""
+      "resources/models/*": "resources/models/",
+      "resources/*.dll": ""
     },
     "windows": {
       "nsis": {
