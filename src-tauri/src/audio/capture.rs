@@ -1307,86 +1307,117 @@ struct StreamingRecordingStopped {
 }
 
 /// Frame resampler for converting input sample rate to 16kHz
+/// Uses rubato's Fft resampler for high-quality sinc interpolation
+use rubato::{Fft, FixedSync, Resampler};
+use audioadapter_buffers::direct::InterleavedSlice;
+
 struct FrameResampler {
+    resampler: Option<Fft<f32>>,
     input_rate: usize,
     output_rate: usize,
     frame_duration: Duration,
-    buffer: Vec<f32>,
+    input_buffer: Vec<f32>,
+    frame_samples: usize,
 }
 
 impl FrameResampler {
     fn new(input_rate: usize, output_rate: usize, frame_duration: Duration) -> Self {
+        let frame_samples = (input_rate as f64 * frame_duration.as_secs_f64()) as usize;
+
+        // Create resampler only if rates differ
+        let resampler = if input_rate != output_rate {
+            Some(
+                Fft::new(
+                    input_rate,
+                    output_rate,
+                    frame_samples,
+                    1, // mono
+                    FixedSync::Input,
+                )
+                .expect("Failed to create FFT resampler"),
+            )
+        } else {
+            None
+        };
+
         Self {
+            resampler,
             input_rate,
             output_rate,
             frame_duration,
-            buffer: Vec::new(),
+            input_buffer: Vec::new(),
+            frame_samples,
         }
     }
 
     fn push<F: FnMut(&[f32])>(&mut self, samples: &[f32], callback: &mut F) {
-        self.buffer.extend(samples);
+        // No resampling needed
+        if self.resampler.is_none() {
+            callback(samples);
+            return;
+        }
 
-        // Calculate frame size in samples
-        let frame_samples = (self.input_rate as f64 * self.frame_duration.as_secs_f64()) as usize;
+        // Buffer input samples
+        self.input_buffer.extend(samples);
 
-        while self.buffer.len() >= frame_samples {
-            let frame: Vec<f32> = self.buffer.drain(..frame_samples).collect();
+        // Process chunks when enough data is available
+        if let Some(ref mut resampler) = self.resampler {
+            while self.input_buffer.len() >= resampler.input_frames_next() {
+                let needed = resampler.input_frames_next();
+                let input_chunk: Vec<f32> = self.input_buffer.drain(..needed).collect();
 
-            // Resample if needed — use weighted average (box filter) instead of
-            // nearest-neighbor for better quality during downsampling
-            if self.input_rate != self.output_rate {
-                let ratio = self.input_rate as f64 / self.output_rate as f64;
-                let output_len = (frame.len() as f64 / ratio) as usize;
-                let mut resampled = Vec::with_capacity(output_len);
-                for i in 0..output_len {
-                    let src_start = (i as f64 * ratio) as usize;
-                    let src_end = ((i as f64 + 1.0) * ratio) as usize;
-                    let end = src_end.min(frame.len());
-                    if src_start < end {
-                        let sum: f32 = frame[src_start..end].iter().sum();
-                        resampled.push(sum / (end - src_start) as f32);
-                    } else {
-                        resampled.push(frame.get(src_start).copied().unwrap_or(0.0));
-                    }
-                }
-                callback(&resampled);
-            } else {
-                callback(&frame);
+                // Create adapter for interleaved mono data
+                let input_adapter = InterleavedSlice::new(&input_chunk, 1, needed)
+                    .expect("Failed to create input adapter");
+
+                // Get expected output size
+                let output_frames = resampler.output_frames_next();
+                let mut output_buffer = vec
+![0.0f32; output_frames];
+                let mut output_adapter = InterleavedSlice::new_mut(&mut output_buffer, 1, output_frames)
+                    .expect("Failed to create output adapter");
+
+                // Process resampling
+                resampler
+                    .process_into_buffer(&input_adapter, &mut output_adapter, None)
+                    .expect("Resampling failed");
+
+                callback(&output_buffer);
             }
         }
     }
 
     fn finish<F: FnMut(&[f32])>(&mut self, callback: &mut F) {
-        if !self.buffer.is_empty() {
-            // Pad to frame size
-            let frame_samples =
-                (self.input_rate as f64 * self.frame_duration.as_secs_f64()) as usize;
-            while self.buffer.len() < frame_samples {
-                self.buffer.push(0.0);
-            }
-            let frame: Vec<f32> = self.buffer.drain(..).collect();
+        if self.input_buffer.is_empty() {
+            return;
+        }
 
-            // Resample if needed — weighted average (same as push)
-            if self.input_rate != self.output_rate {
-                let ratio = self.input_rate as f64 / self.output_rate as f64;
-                let output_len = (frame.len() as f64 / ratio) as usize;
-                let mut resampled = Vec::with_capacity(output_len);
-                for i in 0..output_len {
-                    let src_start = (i as f64 * ratio) as usize;
-                    let src_end = ((i as f64 + 1.0) * ratio) as usize;
-                    let end = src_end.min(frame.len());
-                    if src_start < end {
-                        let sum: f32 = frame[src_start..end].iter().sum();
-                        resampled.push(sum / (end - src_start) as f32);
-                    } else {
-                        resampled.push(frame.get(src_start).copied().unwrap_or(0.0));
-                    }
-                }
-                callback(&resampled);
-            } else {
-                callback(&frame);
+        // Pad with zeros to match required input size
+        if let Some(ref mut resampler) = self.resampler {
+            let needed = resampler.input_frames_next();
+            while self.input_buffer.len() < needed {
+                self.input_buffer.push(0.0);
             }
+
+            let input_chunk: Vec<f32> = self.input_buffer.drain(..).collect();
+
+            // Create adapter for interleaved mono data
+            let input_adapter = InterleavedSlice::new(&input_chunk, 1, needed)
+                .expect("Failed to create input adapter");
+
+            // Get expected output size
+            let output_frames = resampler.output_frames_next();
+            let mut output_buffer = vec
+![0.0f32; output_frames];
+            let mut output_adapter = InterleavedSlice::new_mut(&mut output_buffer, 1, output_frames)
+                .expect("Failed to create output adapter");
+
+            // Process resampling
+            resampler
+                .process_into_buffer(&input_adapter, &mut output_adapter, None)
+                .expect("Resampling failed");
+
+            callback(&output_buffer);
         }
     }
 }
