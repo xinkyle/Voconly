@@ -27,8 +27,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "resources/models/*": "resources/models/",
-      "resources/*.dll": ""
+      "resources/models/*": "resources/models/"
     },
     "windows": {
       "nsis": {
