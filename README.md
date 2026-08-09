@@ -78,15 +78,14 @@
 ### 从源码构建
 
 ```powershell
-# 1. 安装依赖
+# 1. 一键配置环境（检查并安装依赖）
 .\setup.ps1
 
-# 2. 开发模式运行
-pnpm tauri dev
-
-# 3. 或构建发布版本
-pnpm tauri build
+# 2. 启动开发服务器
+.\start-dev.ps1
 ```
+
+> **提示**：如果没有 GPU 或不想安装 Vulkan SDK，使用 `.\setup.ps1 -SkipVulkan`
 
 ---
 

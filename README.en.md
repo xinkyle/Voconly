@@ -81,15 +81,14 @@ Go to the [Releases](https://github.com/xinkyle/Voconly/releases) page to downlo
 ### Build from Source
 
 ```powershell
-# 1. Install dependencies
+# 1. Setup environment (check and install dependencies)
 .\setup.ps1
 
-# 2. Run in development mode
-pnpm tauri dev
-
-# 3. Or build release version
-pnpm tauri build
+# 2. Start development server
+.\start-dev.ps1
 ```
+
+> **Tip**: If you don't have a GPU or don't want to install Vulkan SDK, use `.\setup.ps1 -SkipVulkan`
 
 ---
 
