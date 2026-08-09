@@ -93,7 +93,8 @@ src/loglist
 public/icons/preview.html
 
 # AI 模型文件（太大不提交）
-models/
+# 注意：只忽略根目录的 models/，不忽略 src-tauri/resources/models/
+/models/
 
 # Claude Code 项目指令文件（本地配置）
 CLAUDE.md
