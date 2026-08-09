@@ -1,15 +1,11 @@
 # Voconly Setup Script
-# One-click setup: check dependencies, install missing tools, download prebuilt libraries
+# One-click setup: check dependencies, install missing tools, configure environment
 #
 # Usage: powershell -File setup.ps1
 #        or run directly: ./setup.ps1
 
 param(
-    [string]$Platform = "windows-vulkan",
-    [string]$Version = "1.7.0",
-    [string]$Repo = "xinkyle/Voconly",
-    [switch]$SkipVulkan,  # Force skip Vulkan (for systems without GPU)
-    [switch]$Force        # Force re-download prebuilt libraries
+    [switch]$SkipVulkan  # Force skip Vulkan (for systems without GPU)
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,7 +24,7 @@ Write-Host ""
 # Section 1: Check System Dependencies
 # ============================================
 
-Write-Host "[1/5] Checking system dependencies..." -ForegroundColor Yellow
+Write-Host "[1/4] Checking system dependencies..." -ForegroundColor Yellow
 Write-Host ""
 
 $MissingDeps = @()
@@ -231,7 +227,7 @@ Write-Host ""
 # Section 2: Check GPU Support
 # ============================================
 
-Write-Host "[2/5] Checking GPU support..." -ForegroundColor Yellow
+Write-Host "[2/4] Checking GPU support..." -ForegroundColor Yellow
 Write-Host ""
 
 $HasGPU = $false
@@ -269,7 +265,6 @@ try {
 if ($SkipVulkan) {
     Write-Host "  [INFO] SkipVulkan flag set, using CPU mode" -ForegroundColor Yellow
     $NeedsVulkan = $false
-    $Platform = "windows-cpu"
 }
 
 if ($HasGPU) {
@@ -278,7 +273,6 @@ if ($HasGPU) {
 } else {
     Write-Host "  [INFO] No dedicated GPU detected, using CPU mode" -ForegroundColor Yellow
     $NeedsVulkan = $false
-    $Platform = "windows-cpu"
 }
 
 Write-Host ""
@@ -287,7 +281,7 @@ Write-Host ""
 # Section 3: Check/Install Vulkan SDK (if needed)
 # ============================================
 
-Write-Host "[3/5] Checking Vulkan SDK..." -ForegroundColor Yellow
+Write-Host "[3/4] Checking Vulkan SDK..." -ForegroundColor Yellow
 Write-Host ""
 
 if ($NeedsVulkan) {
@@ -339,7 +333,6 @@ if ($NeedsVulkan) {
             if ($UserChoice -eq "cpu") {
                 Write-Host "  [INFO] Switching to CPU mode" -ForegroundColor Yellow
                 $NeedsVulkan = $false
-                $Platform = "windows-cpu"
             } else {
                 exit 1
             }
@@ -352,117 +345,10 @@ if ($NeedsVulkan) {
 Write-Host ""
 
 # ============================================
-# Section 4: Download Prebuilt Libraries
+# Section 4: Install npm dependencies
 # ============================================
 
-Write-Host "[4/5] Checking prebuilt libraries..." -ForegroundColor Yellow
-Write-Host ""
-
-$PrebuiltDir = Join-Path $ProjectRoot "prebuilt\whisper-cpp\$Platform"
-
-# Required libraries
-$Libraries = @(
-    "whisper.lib",
-    "ggml.lib",
-    "ggml-base.lib",
-    "ggml-cpu.lib"
-)
-
-if ($NeedsVulkan) {
-    $Libraries += "ggml-vulkan.lib"
-}
-
-# Check if all libraries exist
-$AllExist = $true
-$MissingLibs = @()
-
-foreach ($Lib in $Libraries) {
-    $LibPath = Join-Path $PrebuiltDir $Lib
-    if (Test-Path $LibPath) {
-        $Size = (Get-Item $LibPath).Length / 1MB
-        Write-Host "  [OK] $Lib ($([math]::Round($Size, 2)) MB)" -ForegroundColor Green
-    } else {
-        Write-Host "  [MISSING] $Lib" -ForegroundColor Red
-        $AllExist = $false
-        $MissingLibs += $Lib
-    }
-}
-
-if ($AllExist -and -not $Force) {
-    Write-Host ""
-    Write-Host "  All prebuilt libraries already exist!" -ForegroundColor Green
-} else {
-    Write-Host ""
-    if ($Force) {
-        Write-Host "  [INFO] Force flag set, re-downloading..." -ForegroundColor Yellow
-    }
-    Write-Host "  Missing libraries: $($MissingLibs -join ', ')" -ForegroundColor Yellow
-    Write-Host "  Downloading from GitHub Releases..." -ForegroundColor Yellow
-    Write-Host ""
-
-    # Create directory
-    if (-not (Test-Path $PrebuiltDir)) {
-        New-Item -ItemType Directory -Path $PrebuiltDir -Force | Out-Null
-    }
-
-    # Download URL
-    $DownloadUrl = "https://github.com/$Repo/releases/download/whisper-v$Version/$Platform.zip"
-    $ZipPath = Join-Path $ProjectRoot "prebuilt\$Platform.zip"
-
-    Write-Host "  URL: $DownloadUrl" -ForegroundColor Gray
-
-    try {
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
-        Write-Host "  [OK] Download completed" -ForegroundColor Green
-    } catch {
-        Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red
-        Write-Host ""
-        Write-Host "  Possible reasons:" -ForegroundColor Yellow
-        Write-Host "    1. Prebuilt libraries not yet uploaded to GitHub Releases" -ForegroundColor Gray
-        Write-Host "    2. Network connection issue" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "  Options:" -ForegroundColor Yellow
-        Write-Host "    A) Build from source (requires CMake + VS2022):" -ForegroundColor Gray
-        Write-Host "       cd prebuilt && build-whisper-libs.bat" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "    B) Wait for prebuilt libraries to be uploaded" -ForegroundColor Gray
-        Write-Host ""
-        exit 1
-    }
-
-    # Extract
-    Write-Host "  Extracting..." -ForegroundColor Yellow
-    try {
-        Expand-Archive -Path $ZipPath -DestinationPath "$ProjectRoot\prebuilt" -Force
-        Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
-        Write-Host "  [OK] Extraction completed" -ForegroundColor Green
-    } catch {
-        Write-Host "  [ERROR] Extraction failed: $_" -ForegroundColor Red
-        exit 1
-    }
-
-    # Verify
-    Write-Host ""
-    Write-Host "  Verifying downloaded libraries..." -ForegroundColor Yellow
-    foreach ($Lib in $Libraries) {
-        $LibPath = Join-Path $PrebuiltDir $Lib
-        if (Test-Path $LibPath) {
-            $Size = (Get-Item $LibPath).Length / 1MB
-            Write-Host "  [OK] $Lib ($([math]::Round($Size, 2)) MB)" -ForegroundColor Green
-        } else {
-            Write-Host "  [ERROR] $Lib still missing after download!" -ForegroundColor Red
-            exit 1
-        }
-    }
-}
-
-Write-Host ""
-
-# ============================================
-# Section 5: Install npm dependencies
-# ============================================
-
-Write-Host "[5/5] Installing npm dependencies..." -ForegroundColor Yellow
+Write-Host "[4/4] Installing npm dependencies..." -ForegroundColor Yellow
 Write-Host ""
 
 $NodeModulesPath = Join-Path $ProjectRoot "node_modules"
@@ -471,21 +357,20 @@ if (Test-Path $NodeModulesPath) {
     Write-Host "  node_modules exists, checking if update needed..." -ForegroundColor Gray
 }
 
-Write-Host "  Running: pnpm install" -ForegroundColor Gray
+Write-Host "  Running: npm install" -ForegroundColor Gray
+Write-Host "  (warnings about deprecated packages are normal)" -ForegroundColor DarkGray
 
-try {
-    Push-Location $ProjectRoot
-    $PnpmResult = pnpm install 2>&1
-    Pop-Location
+# Use cmd to run npm install, avoiding PowerShell stderr handling issues
+Push-Location $ProjectRoot
+cmd /c "npm install 2>&1" | Out-Null
+$ExitCode = $LASTEXITCODE
+Pop-Location
 
-    if ($LASTEXITCODE -eq 0 -or $PnpmResult -match "Done") {
-        Write-Host "  [OK] npm dependencies installed" -ForegroundColor Green
-    } else {
-        Write-Host "  [WARN] pnpm install may have issues" -ForegroundColor Yellow
-        Write-Host "  Output: $PnpmResult" -ForegroundColor Gray
-    }
-} catch {
-    Write-Host "  [ERROR] pnpm install failed: $_" -ForegroundColor Red
+if ($ExitCode -eq 0) {
+    Write-Host "  [OK] npm dependencies installed" -ForegroundColor Green
+} else {
+    Write-Host "  [ERROR] npm install failed with exit code: $ExitCode" -ForegroundColor Red
+    Write-Host "  Try running manually: npm install" -ForegroundColor Yellow
     exit 1
 }
 
@@ -503,21 +388,17 @@ Write-Host ""
 Write-Host "Summary:" -ForegroundColor Yellow
 Write-Host "  - Rust: $(rustc --version)" -ForegroundColor Green
 Write-Host "  - Node.js: $(node --version)" -ForegroundColor Green
-Write-Host "  - pnpm: $(pnpm --version)" -ForegroundColor Green
+Write-Host "  - npm: $(npm --version)" -ForegroundColor Green
 Write-Host "  - GPU: $(if ($HasGPU) { $GPUInfo } else { 'None (CPU mode)' })" -ForegroundColor Green
 Write-Host "  - Vulkan SDK: $(if ($NeedsVulkan -and $env:VULKAN_SDK) { $env:VULKAN_SDK } else { 'Not needed' })" -ForegroundColor Green
-Write-Host "  - Platform: $Platform" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Build the project:" -ForegroundColor Gray
-Write-Host "     cargo build" -ForegroundColor White
+Write-Host "  Run the development server:" -ForegroundColor Gray
+Write-Host "    ./start-dev.ps1" -ForegroundColor White
 Write-Host ""
-Write-Host "  2. Or run in development mode:" -ForegroundColor Gray
-Write-Host "     pnpm tauri dev" -ForegroundColor White
-Write-Host ""
-Write-Host "  3. Or build release version:" -ForegroundColor Gray
-Write-Host "     pnpm tauri build" -ForegroundColor White
+Write-Host "  Or build release version:" -ForegroundColor Gray
+Write-Host "    npm run tauri build" -ForegroundColor White
 Write-Host ""
 
 Write-Host "Note: Whisper models will be downloaded automatically when you first use the app." -ForegroundColor Yellow
