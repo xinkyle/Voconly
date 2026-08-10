@@ -252,7 +252,7 @@ export const zh: Translation = {
         items: ['关于我们', '开源项目', '隐私政策', '服务条款'],
       },
     },
-    copyright: '© 2024 Voconly. All rights reserved.',
+    copyright: '© 2026 Voconly. All rights reserved.',
     legal: {
       privacy: '隐私政策',
       terms: '服务条款',
@@ -387,7 +387,7 @@ export const en: Translation = {
         items: ['About Us', 'Open Source', 'Privacy Policy', 'Terms of Service'],
       },
     },
-    copyright: '© 2024 Voconly. All rights reserved.',
+    copyright: '© 2026 Voconly. All rights reserved.',
     legal: {
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',

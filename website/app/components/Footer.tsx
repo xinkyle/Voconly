@@ -111,6 +111,8 @@ function FooterContent() {
                 <a
                   key={social.label}
                   href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-9 h-9 rounded-lg flex items-center justify-center text-white/40 hover:text-[var(--color-accent)] hover:bg-white/5 transition-all border border-transparent hover:border-white/10"
                   aria-label={social.label}
                 >
