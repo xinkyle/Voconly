@@ -130,7 +130,7 @@ export const zh: Translation = {
   nav: {
     features: '功能',
     pricing: '定价',
-    download: '下载',
+    download: '下载更多',
     learnMore: '了解更多',
   },
   hero: {
@@ -186,7 +186,7 @@ export const zh: Translation = {
       description: '基于 Whisper.cpp 和 Tauri 构建的开源语音输入工具',
       features: ['无限次语音输入', '本地运行，隐私无忧', '智能润色、自动生成摘要', 'Windows/Mac/Linux 三平台通用', '所有未来更新免费', '开源代码，安全可信'],
       badge: '开源',
-      cta: '立即下载',
+      cta: '下载更多',
       github: '查看源码',
     },
     trust: {
@@ -236,7 +236,7 @@ export const zh: Translation = {
     description: '说出来，就行了。本地语音输入，隐私无忧，三平台通用。',
     ctaTitle: '每天省下 30 分钟打字时间',
     ctaSubtitle: '已有 1,000+ 用户在使用，免费版无需注册，下载即用',
-    downloadBtn: '立即下载 Voconly',
+    downloadBtn: '下载更多',
     freeInfo: 'Windows · macOS · Linux 三平台通用',
     links: {
       product: {
@@ -265,7 +265,7 @@ export const en: Translation = {
   nav: {
     features: 'Features',
     pricing: 'Pricing',
-    download: 'Download',
+    download: 'More Downloads',
     learnMore: 'Learn More',
   },
   hero: {
@@ -321,7 +321,7 @@ export const en: Translation = {
       description: 'Open source voice input tool based on Whisper.cpp and Tauri',
       features: ['Unlimited voice inputs', 'Local processing, zero privacy risk', 'Smart polish & auto summary', 'Cross-platform: Windows/Mac/Linux', 'All future updates free', 'Open source, trusted & secure'],
       badge: 'Open Source',
-      cta: 'Download Now',
+      cta: 'More Downloads',
       github: 'View Source',
     },
     trust: {
@@ -371,7 +371,7 @@ export const en: Translation = {
     description: 'Desktop voice input tool with offline Whisper recognition. Privacy-first, hands-free in any app.',
     ctaTitle: 'Try It Now',
     ctaSubtitle: 'Start free, 50 inputs per day - try before you buy',
-    downloadBtn: 'Download Voconly',
+    downloadBtn: 'More Downloads',
     freeInfo: 'Free version forever',
     links: {
       product: {
