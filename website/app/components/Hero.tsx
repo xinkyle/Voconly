@@ -106,12 +106,14 @@ export default function Hero() {
           >
             {platforms.map((platform) => {
               const Icon = platform.icon;
+              // 直接下载文件不需要 target="_blank"，跳转页面需要
+              const needNewTab = !platform.available;
               return (
                 <motion.a
                   key={platform.name}
                   href={platform.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={needNewTab ? '_blank' : undefined}
+                  rel={needNewTab ? 'noopener noreferrer' : undefined}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className={`inline-flex items-center gap-2 py-3 px-5 rounded-lg font-body font-medium transition-all ${
