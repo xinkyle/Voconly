@@ -4,13 +4,15 @@ import { motion } from 'framer-motion';
 import { Download as DownloadIcon, Monitor, Apple, Terminal } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
 
+const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
+
 const platforms = [
   {
     nameKey: 'download.windows.name',
     icon: Monitor,
-    version: 'v1.2.0',
-    size: '45 MB',
-    href: '#',
+    version: 'v0.3.6',
+    size: '~45 MB',
+    href: GITHUB_RELEASE_URL,
     available: true,
     availableKey: 'download.windows.available',
     color: 'blue',
@@ -18,19 +20,19 @@ const platforms = [
   {
     nameKey: 'download.mac.name',
     icon: Apple,
-    version: 'v1.2.0',
-    size: '52 MB',
-    href: '#',
-    available: true,
-    availableKey: 'download.mac.available',
+    version: '',
+    size: '',
+    href: GITHUB_RELEASE_URL,
+    available: false,
+    availableKey: 'download.mac.comingSoon',
     color: 'green',
   },
   {
     nameKey: 'download.linux.name',
     icon: Terminal,
-    version: 'v1.2.0',
-    size: '48 MB',
-    href: '#',
+    version: '',
+    size: '',
+    href: GITHUB_RELEASE_URL,
     available: false,
     availableKey: 'download.linux.comingSoon',
     color: 'yellow',
@@ -153,6 +155,8 @@ export default function Download() {
                     {platform.available ? (
                       <motion.a
                         href={platform.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="download-button inline-flex items-center gap-2 bg-primary text-on-primary text-button-md font-medium px-5 py-2.5 rounded-md transition-all duration-200"
@@ -184,7 +188,7 @@ export default function Download() {
             {t('download.info.opensource')}
           </p>
           <p className="flex items-center justify-center gap-4">
-            <a href="#" className="text-body hover:text-ink underline underline-offset-2 transition-colors">
+            <a href={GITHUB_RELEASE_URL} target="_blank" rel="noopener noreferrer" className="text-body hover:text-ink underline underline-offset-2 transition-colors">
               {t('download.info.changelog')}
             </a>
             <span className="text-hairline">·</span>

@@ -35,7 +35,9 @@ function CTA() {
           </p>
 
           <a
-            href="#download"
+            href="https://github.com/xinkyle/Voconly/releases"
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn-primary text-base py-4 px-8 inline-flex items-center gap-2 group"
           >
             {t('footer.downloadBtn')}
@@ -72,7 +74,7 @@ function FooterContent() {
 
   const socialLinks = [
     { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Github, href: '#', label: 'GitHub' },
+    { icon: Github, href: 'https://github.com/xinkyle/Voconly', label: 'GitHub' },
   ];
 
   return (

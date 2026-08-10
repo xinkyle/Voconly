@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Languages, ChevronDown, Download } from 'lucide-react';
+import { Languages, ChevronDown, Download, Github } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
 
 export default function Navbar() {
@@ -47,24 +47,35 @@ export default function Navbar() {
       }`}
     >
       {/* Logo */}
-      <a href="#" className="flex items-center gap-2.5">
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 32 32"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="text-white"
+      <div className="flex items-center gap-3">
+        <a href="#" className="flex items-center gap-2.5">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 32 32"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-white"
+          >
+            {/* T字Logo */}
+            <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
+            <path
+              d="M8 8h16v4h-6v12h-4V12H8V8z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="font-display text-xl text-white">Voconly</span>
+        </a>
+        <a
+          href="https://github.com/xinkyle/Voconly"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+          title="GitHub"
         >
-          {/* T字Logo */}
-          <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
-          <path
-            d="M8 8h16v4h-6v12h-4V12H8V8z"
-            fill="currentColor"
-          />
-        </svg>
-        <span className="font-display text-xl text-white">Voconly</span>
-      </a>
+          <Github className="w-4 h-4 text-white/70 hover:text-white" />
+        </a>
+      </div>
 
       {/* Navigation Links - Desktop */}
       <div className="hidden md:flex items-center gap-8">
@@ -117,7 +128,9 @@ export default function Navbar() {
 
         {/* Download Button */}
         <a
-          href="#download"
+          href="https://github.com/xinkyle/Voconly/releases"
+          target="_blank"
+          rel="noopener noreferrer"
           className="btn-primary text-sm py-2 px-4 inline-flex items-center gap-2"
         >
           <Download className="w-4 h-4" />

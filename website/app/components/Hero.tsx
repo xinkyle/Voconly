@@ -81,7 +81,9 @@ export default function Hero() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <a
-              href="#download"
+              href="https://github.com/xinkyle/Voconly/releases"
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn-primary text-base py-4 px-8 inline-flex items-center gap-2 group"
             >
               <Download className="w-5 h-5" />

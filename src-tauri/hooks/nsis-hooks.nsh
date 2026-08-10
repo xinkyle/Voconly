@@ -1,6 +1,25 @@
 ; Voconly NSIS Installer Hooks
 ; Customizes installation to use Voconly\Application directory structure
 
+; ===== 多语言字符串定义 =====
+; 英文
+LangString UNINSTALL_TITLE ${LANG_ENGLISH} "Uninstall Voconly"
+LangString UNINSTALL_PROMPT ${LANG_ENGLISH} "Do you want to keep your personal data?$\r$\n$\r$\n\
+✓ Voice model files$\r$\n\
+✓ Scene configurations and shortcuts$\r$\n\
+✓ Recording history$\r$\n$\r$\n\
+[Yes] Keep data, uninstall program only$\r$\n\
+[No] Delete all data completely"
+
+; 中文
+LangString UNINSTALL_TITLE ${LANG_SIMPCHINESE} "卸载 Voconly"
+LangString UNINSTALL_PROMPT ${LANG_SIMPCHINESE} "是否保留您的个人数据？$\r$\n$\r$\n\
+✓ 语音模型文件$\r$\n\
+✓ 场景配置与快捷键$\r$\n\
+✓ 录音历史记录$\r$\n$\r$\n\
+【是】保留数据，仅卸载程序$\r$\n\
+【否】完全删除所有数据"
+
 !macro NSIS_HOOK_PREINSTALL
   ; 写入调试日志到文件
   FileOpen $0 "$TEMP\voconly-install.log" a
@@ -57,15 +76,9 @@
 
   ; 正常卸载时询问用户关于数据保留
   MessageBox MB_YESNO \
-    "卸载 Voconly$\r$\n$\r$\n\
-    ━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\n\
-    是否保留您的个人数据？$\r$\n$\r$\n\
-    ✓ 语音模型文件$\r$\n\
-    ✓ 场景配置与快捷键$\r$\n\
-    ✓ 录音历史记录$\r$\n$\r$\n\
-    ━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\n\
-    【是】保留数据，仅卸载程序$\r$\n\
-    【否】完全删除所有数据$\r$\n" \
+    "$(UNINSTALL_TITLE)$\r$\n$\r$\n\
+━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\n\
+$(UNINSTALL_PROMPT)" \
     IDYES keep_data IDNO delete_all
 
   delete_all:
