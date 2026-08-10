@@ -108,7 +108,9 @@ export default function Features() {
           className="mt-16 text-center"
         >
           <a
-            href="#download"
+            href="https://github.com/xinkyle/Voconly/releases"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-[var(--color-accent)] hover:text-white transition-colors group font-body"
           >
             <span>免费下载，每天无限使用</span>
