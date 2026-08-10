@@ -1,12 +1,36 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Download, Sparkles } from 'lucide-react';
+import { Download, Sparkles, Monitor, Apple, Terminal } from 'lucide-react';
 import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
+const WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.6/Voconly_0.3.6_x64-setup.exe';
+const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
+
 export default function Hero() {
   const { t, lang } = useI18n();
+
+  const platforms = [
+    {
+      name: 'Windows',
+      icon: Monitor,
+      href: WINDOWS_DOWNLOAD_URL,
+      available: true,
+    },
+    {
+      name: 'macOS',
+      icon: Apple,
+      href: GITHUB_RELEASE_URL,
+      available: false,
+    },
+    {
+      name: 'Linux',
+      icon: Terminal,
+      href: GITHUB_RELEASE_URL,
+      available: false,
+    },
+  ];
 
   return (
     <section className="relative min-h-screen overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
@@ -73,25 +97,38 @@ export default function Hero() {
             {t('hero.description')}
           </motion.p>
 
-          {/* CTA 按钮 */}
+          {/* CTA 按钮 - 三个系统下载按钮 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-wrap items-center justify-center gap-3"
           >
-            <a
-              href="https://github.com/xinkyle/Voconly/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary text-base py-4 px-8 inline-flex items-center gap-2 group"
-            >
-              <Download className="w-5 h-5" />
-              {t('hero.downloadBtn')}
-            </a>
-            <a href="#features" className="btn-secondary text-base py-4 px-8">
-              {t('hero.learnMoreBtn')}
-            </a>
+            {platforms.map((platform) => {
+              const Icon = platform.icon;
+              return (
+                <motion.a
+                  key={platform.name}
+                  href={platform.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`inline-flex items-center gap-2 py-3 px-5 rounded-lg font-body font-medium transition-all ${
+                    platform.available
+                      ? 'bg-[var(--color-accent)] text-[var(--color-bg-primary)] hover:shadow-lg hover:shadow-[var(--color-accent)]/20'
+                      : 'bg-white/5 text-white/50 border border-white/10 cursor-default'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{platform.name}</span>
+                  {platform.available && <Download className="w-4 h-4" />}
+                  {!platform.available && (
+                    <span className="text-xs opacity-60">{lang === 'zh' ? '即将推出' : 'Soon'}</span>
+                  )}
+                </motion.a>
+              );
+            })}
           </motion.div>
 
           {/* 应用截图 */}
