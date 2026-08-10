@@ -85,7 +85,17 @@ export default function Navbar() {
             href={link.href}
             className="font-body text-sm text-white/60 hover:text-white transition-colors"
           >
-            {link.name}
+            {link.href === '#pricing' ? (
+              <>
+                {lang === 'zh' ? (
+                  <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
+                ) : (
+                  <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
+                )}
+              </>
+            ) : (
+              link.name
+            )}
           </a>
         ))}
       </div>
