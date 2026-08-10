@@ -129,7 +129,7 @@ export interface Translation {
 export const zh: Translation = {
   nav: {
     features: '功能',
-    pricing: '定价',
+    pricing: '定价（免费）',
     download: '下载更多',
     learnMore: '了解更多',
   },
@@ -264,7 +264,7 @@ export const zh: Translation = {
 export const en: Translation = {
   nav: {
     features: 'Features',
-    pricing: 'Pricing',
+    pricing: 'Pricing (Free)',
     download: 'More Downloads',
     learnMore: 'Learn More',
   },
