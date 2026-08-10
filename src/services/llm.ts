@@ -315,6 +315,12 @@ export interface LlmModelWithStatus {
     name: string;
     size: string;
     description: string;
+    downloadUrls: {
+      name: string;
+      url: string;
+      isChinaAccessible: boolean;
+      priority: number;
+    }[];
     nGpuLayers: number;
     nCtx: number;
     recommended: boolean;

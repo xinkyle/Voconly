@@ -1736,6 +1736,8 @@ export default function HomePanel({
         <LlmConfigModal
           isOpen={!!llmConfigScene}
           scene={llmConfigScene}
+          downloadStates={downloadStates}
+          onDownload={onDownload}
           onClose={() => {
             setLlmConfigScene(null);
             // 关闭时重新加载预设（用户可能添加/删除了自定义预设）

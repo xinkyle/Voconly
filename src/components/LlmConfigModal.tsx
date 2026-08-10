@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LlmProfile, UserPromptType, UserPromptPresets, Scene, LlmProviderInstance, ProviderWithConfig } from '../types';
-import { getLlmProfile, saveLlmProfile, getProviderList, getLlmPromptPresets, saveLlmPromptPresets, getCachedProviderModels, refreshProviderModels, saveProviderConfig } from '../services/llm';
+import type { LlmProfile, UserPromptType, UserPromptPresets, Scene, LlmProviderInstance, ProviderWithConfig, Model } from '../types';
+import type { DownloadProgress } from '../services/downloader';
+import { getLlmProfile, saveLlmProfile, getProviderList, getLlmPromptPresets, saveLlmPromptPresets, saveProviderConfig } from '../services/llm';
 import { createLogger } from '../services/log';
 import { translateSceneName } from '../utils/i18n';
 import ProviderSelectModal from './ProviderSelectModal';
+import LlmModelSelectModal from './LlmModelSelectModal';
 
 const log = createLogger('LlmConfigModal');
 
@@ -19,6 +21,10 @@ interface LlmConfigModalProps {
   onSave?: (profile: LlmProfile) => void;
   /** Callback to open Provider settings */
   onOpenProviderSettings?: () => void;
+  /** Global download states from App.tsx */
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
+  /** Callback to trigger download */
+  onDownload?: (model: Model) => void;
 }
 
 // Default profile for a new scene
@@ -100,6 +106,8 @@ export default function LlmConfigModal({
   scene,
   onSave,
   onOpenProviderSettings,
+  downloadStates = {},
+  onDownload,
 }: LlmConfigModalProps) {
   const { t } = useTranslation();
   // State
@@ -117,12 +125,11 @@ export default function LlmConfigModal({
   const [isAddingPreset, setIsAddingPreset] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
-  // Available models from current provider
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(false);
-
   // Provider select modal
   const [showProviderSelect, setShowProviderSelect] = useState(false);
+
+  // LLM model select modal
+  const [showLlmModelSelect, setShowLlmModelSelect] = useState(false);
 
   // 当前语言的预设（按语言存储）
   const [presets, setPresets] = useState<UserPromptPresets>({
@@ -139,10 +146,6 @@ export default function LlmConfigModal({
   // Load profile and presets on open
   useEffect(() => {
     if (!isOpen) return;
-
-    // Reset loading state
-    setModelsLoading(false);
-    setAvailableModels([]);
 
     const loadData = async () => {
       // 1. Load presets first (single storage)
@@ -242,60 +245,6 @@ export default function LlmConfigModal({
     loadData();
   }, [isOpen, scene.id]);
 
-  // Load models when provider changes (user switches to a different provider)
-  useEffect(() => {
-    if (!isOpen || !providerMeta?.meta.id) return;
-
-    const loadModelsForProvider = async () => {
-      setModelsLoading(true);
-      setAvailableModels([]);
-      try {
-        // 先查缓存
-        const cachedModels = await getCachedProviderModels(providerMeta.meta.id);
-        if (cachedModels.length > 0) {
-          setAvailableModels(cachedModels);
-          // 如果当前 model 不在列表中，选第一个
-          if (!cachedModels.includes(model) && cachedModels.length > 0) {
-            setModel(cachedModels[0]);
-          }
-        } else {
-          // 无缓存，从 API 获取
-          const models = await refreshProviderModels(providerMeta.meta.id);
-          setAvailableModels(models);
-          if (models.length > 0) {
-            setModel(models[0]);
-          }
-        }
-      } catch (err) {
-        log.error(`Failed to load models for provider ${providerMeta.meta.id}: ${err}`);
-      } finally {
-        setModelsLoading(false);
-      }
-    };
-
-    loadModelsForProvider();
-  }, [isOpen, providerMeta?.meta.id]);
-
-  // Handle refresh button click - force reload from API
-  const handleRefreshModels = async () => {
-    if (!providerMeta) return;
-
-    setModelsLoading(true);
-    try {
-      const models = await refreshProviderModels(providerMeta.meta.id);
-      setAvailableModels(models);
-      // Keep current selection if it exists in the new list
-      if (!models.includes(model) && models.length > 0) {
-        setModel(models[0]);
-      }
-      log.debug(`Refreshed ${models.length} models for provider ${providerMeta.meta.id}`);
-    } catch (err) {
-      log.error(`Failed to refresh models: ${err}`);
-    } finally {
-      setModelsLoading(false);
-    }
-  };
-
   // Handle user prompt type change - directly update the display value
   const handleUserPromptTypeChange = (type: UserPromptType | string) => {
     // 调试日志：检查 presets 状态
@@ -384,7 +333,6 @@ export default function LlmConfigModal({
   // Handle provider selection
   const handleSelectProvider = useCallback((selectedProviderId: string, instance: LlmProviderInstance) => {
     setProviderId(selectedProviderId);
-    setAvailableModels([]);
     // Update providerMeta
     getProviderList().then(providers => {
       const selected = providers.find(p => p.meta.id === selectedProviderId);
@@ -402,6 +350,13 @@ export default function LlmConfigModal({
     setShowProviderSelect(false);
   }, []);
 
+  // Handle LLM model selection
+  const handleLlmModelSelect = useCallback((modelId: string) => {
+    setModel(modelId);
+    setShowLlmModelSelect(false);
+    log.debug(`Selected LLM model: ${modelId}`);
+  }, []);
+
   // Save profile
   const handleSave = useCallback(async () => {
     // Validate: if enabled, must have a valid model and provider
@@ -414,11 +369,6 @@ export default function LlmConfigModal({
       if (!model || model.trim() === '') {
         log.error('Cannot save: enabled but no model selected');
         alert(t('llmConfig.modelRequired'));
-        return;
-      }
-      if (availableModels.length === 0) {
-        log.error('Cannot save: enabled but no models available');
-        alert(t('llmConfig.providerNotRunning'));
         return;
       }
     }
@@ -494,7 +444,7 @@ export default function LlmConfigModal({
     } finally {
       setSaving(false);
     }
-  }, [scene.id, enabled, providerId, model, userPromptType, userPromptCustom, currentPromptValue, maxTokens, temperature, presets, onSave, onClose, availableModels, providerMeta]);
+  }, [scene.id, enabled, providerId, model, userPromptType, userPromptCustom, currentPromptValue, maxTokens, temperature, presets, onSave, onClose, providerMeta]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -591,40 +541,20 @@ export default function LlmConfigModal({
                 </div>
               </div>
 
-              {/* 模型选择 - 自定义下拉 + 刷新按钮 */}
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {/* 下拉框 */}
-                <div className="relative flex-1">
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    disabled={!enabled || modelsLoading || availableModels.length === 0}
-                    className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:opacity-50 cursor-pointer"
-                  >
-                    {modelsLoading ? (
-                      <option>{t('llmConfig.loadingModels')}</option>
-                    ) : availableModels.length === 0 ? (
-                      <option>{t('llmConfig.noModelsError')}</option>
-                    ) : (
-                      [...new Set(availableModels)].map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                {/* 刷新按钮 */}
-                <button
-                  type="button"
-                  onClick={handleRefreshModels}
-                  disabled={modelsLoading || !enabled || !providerMeta}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title={t('llmConfig.refreshModels')}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              {/* 模型选择 - 按钮弹窗选择 */}
+              <div
+                onClick={() => enabled && setShowLlmModelSelect(true)}
+                className={`flex-1 min-w-0 ${enabled ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed opacity-50'} rounded-lg px-2 py-1 transition-colors`}
+              >
+                <span className="text-xs text-gray-500">{t('llmConfig.selectModel')}</span>
+                <div className="flex items-center gap-1">
+                  <span className={`text-sm font-medium truncate ${model ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {model || t('provider.selectModel')}
+                  </span>
+                  <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </button>
+                </div>
               </div>
             </div>
 
@@ -778,6 +708,17 @@ export default function LlmConfigModal({
         selectedProviderId={providerId}
         onSelect={handleSelectProvider}
         onClose={() => setShowProviderSelect(false)}
+      />
+    )}
+
+    {/* LLM Model Select Modal */}
+    {showLlmModelSelect && (
+      <LlmModelSelectModal
+        selectedId={model}
+        onSelect={handleLlmModelSelect}
+        onCancel={() => setShowLlmModelSelect(false)}
+        downloadStates={downloadStates}
+        onDownload={onDownload}
       />
     )}
   </>
