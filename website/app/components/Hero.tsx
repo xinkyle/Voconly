@@ -38,9 +38,9 @@ export default function Hero() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* 中心光晕 */}
         <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-30"
+          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-35"
           style={{
-            background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(0, 212, 170, 0.25), transparent 70%)',
+            background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(0, 212, 170, 0.3), transparent 70%)',
           }}
         />
         {/* 微妙网格 */}
