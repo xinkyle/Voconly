@@ -101,7 +101,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="font-body text-base text-white/40 mb-12 max-w-2xl mx-auto leading-relaxed"
+            className="font-body text-base text-white/40 mb-12 max-w-3xl mx-auto leading-relaxed"
           >
             {t('hero.description')}
           </motion.p>
@@ -149,7 +149,7 @@ export default function Hero() {
             transition={{ duration: 0.7, delay: 0.5 }}
             className="mt-16 relative"
           >
-            <div className="relative mx-auto max-w-3xl">
+            <div className="relative mx-auto max-w-4xl">
               {/* 截图光晕 */}
               <div
                 className="absolute -inset-4 blur-3xl opacity-20"
@@ -157,17 +157,13 @@ export default function Hero() {
                   background: 'radial-gradient(ellipse 80% 50% at 50% 100%, var(--color-accent), transparent)',
                 }}
               />
-              <motion.div
-                className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl"
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              >
+              <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl">
                 <img
                   src={lang === 'zh' ? '/demo_cn.gif' : '/demo_en.gif'}
                   alt="Voconly Demo"
                   className="w-full h-auto"
                 />
-              </motion.div>
+              </div>
             </div>
           </motion.div>
         </div>

@@ -2,15 +2,21 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Languages, ChevronDown, Download, Github, Menu, X } from 'lucide-react';
+import { Languages, ChevronDown, Download, Github, Menu, X, ArrowLeft } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 export default function Navbar() {
   const { lang, setLang, t } = useI18n();
+  const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 是否在详情页（如 /faq）
+  const isDetailPage = pathname !== '/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,6 +60,7 @@ export default function Navbar() {
   const navLinks = [
     { name: t('nav.features'), href: '#features' },
     { name: t('nav.pricing'), href: '#pricing' },
+    { name: t('nav.faq'), href: '/#faq' },
     { name: t('nav.download'), href: '#download' },
   ];
 
@@ -70,43 +77,73 @@ export default function Navbar() {
         }`}
       >
         {/* Logo - 左侧 */}
-        <a href="#" className="flex items-center gap-2 flex-shrink-0">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 32 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="text-white"
-          >
-            <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
-            <path d="M8 8h16v4h-6v12h-4V12H8V8z" fill="currentColor" />
-          </svg>
-          <span className="font-display text-lg sm:text-xl text-white">Voconly</span>
-        </a>
-
-        {/* 导航链接 - 绝对居中 */}
-        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8">
-          {navLinks.map((link) => (
-            <a
-              key={link.name}
-              href={link.href}
-              className="font-body text-sm text-white/60 hover:text-white transition-colors"
+        {isDetailPage ? (
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="text-white"
             >
-              {link.href === '#pricing' ? (
-                <>
-                  {lang === 'zh' ? (
-                    <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
-                  ) : (
-                    <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
-                  )}
-                </>
-              ) : (
-                link.name
-              )}
-            </a>
-          ))}
-        </div>
+              <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
+              <path d="M8 8h16v4h-6v12h-4V12H8V8z" fill="currentColor" />
+            </svg>
+            <span className="font-display text-lg sm:text-xl text-white">Voconly</span>
+          </Link>
+        ) : (
+          <a href="#" className="flex items-center gap-2 flex-shrink-0">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="text-white"
+            >
+              <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
+              <path d="M8 8h16v4h-6v12h-4V12H8V8z" fill="currentColor" />
+            </svg>
+            <span className="font-display text-lg sm:text-xl text-white">Voconly</span>
+          </a>
+        )}
+
+        {/* 导航链接 - 绝对居中（仅首页显示） */}
+        {!isDetailPage && (
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8">
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                className="font-body text-sm text-white/60 hover:text-white transition-colors"
+              >
+                {link.href === '#pricing' ? (
+                  <>
+                    {lang === 'zh' ? (
+                      <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
+                    ) : (
+                      <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
+                    )}
+                  </>
+                ) : (
+                  link.name
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* 详情页：返回首页按钮 */}
+        {isDetailPage && (
+          <Link
+            href="/"
+            className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 font-body text-sm text-white/60 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {lang === 'zh' ? '返回首页' : 'Back to Home'}
+          </Link>
+        )}
 
         {/* 右侧按钮 - 右对齐 */}
         <div className="hidden md:flex items-center gap-3 ml-auto">
@@ -218,26 +255,37 @@ export default function Navbar() {
 
               {/* 导航链接 */}
               <div className="flex-1 p-4 space-y-2">
-                {navLinks.map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.href}
+                {isDetailPage ? (
+                  <Link
+                    href="/"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
+                    className="flex items-center gap-2 py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
                   >
-                    {link.href === '#pricing' ? (
-                      <>
-                        {lang === 'zh' ? (
-                          <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
-                        ) : (
-                          <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
-                        )}
-                      </>
-                    ) : (
-                      link.name
-                    )}
-                  </a>
-                ))}
+                    <ArrowLeft className="w-4 h-4" />
+                    {lang === 'zh' ? '返回首页' : 'Back to Home'}
+                  </Link>
+                ) : (
+                  navLinks.map((link) => (
+                    <a
+                      key={link.name}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
+                    >
+                      {link.href === '#pricing' ? (
+                        <>
+                          {lang === 'zh' ? (
+                            <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
+                          ) : (
+                            <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
+                          )}
+                        </>
+                      ) : (
+                        link.name
+                      )}
+                    </a>
+                  ))
+                )}
               </div>
 
               {/* 底部按钮 */}

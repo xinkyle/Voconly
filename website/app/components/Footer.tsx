@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { ArrowRight, Github, Twitter } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
+import Link from 'next/link';
 
 // CTA 区块
 function CTA() {
@@ -127,16 +128,31 @@ function FooterContent() {
             <div key={section.title}>
               <h3 className="font-body text-sm font-semibold text-white mb-4">{section.title}</h3>
               <ul className="space-y-2">
-                {section.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="font-body text-sm text-white/40 hover:text-white transition-colors"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
+                {section.links.map((link) => {
+                  // 常见问题链接跳转到 FAQ 页面
+                  const isFaq = link === '常见问题' || link === 'FAQ';
+                  const href = isFaq ? '/faq' : '#';
+
+                  return (
+                    <li key={link}>
+                      {isFaq ? (
+                        <Link
+                          href={href}
+                          className="font-body text-sm text-white/40 hover:text-white transition-colors"
+                        >
+                          {link}
+                        </Link>
+                      ) : (
+                        <a
+                          href={href}
+                          className="font-body text-sm text-white/40 hover:text-white transition-colors"
+                        >
+                          {link}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

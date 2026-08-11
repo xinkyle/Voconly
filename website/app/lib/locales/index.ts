@@ -4,6 +4,7 @@ export interface Translation {
   nav: {
     features: string;
     pricing: string;
+    faq: string;
     download: string;
     learnMore: string;
   };
@@ -130,6 +131,7 @@ export const zh: Translation = {
   nav: {
     features: '功能',
     pricing: '定价（免费）',
+    faq: '常见问题',
     download: '下载更多',
     learnMore: '了解更多',
   },
@@ -265,6 +267,7 @@ export const en: Translation = {
   nav: {
     features: 'Features',
     pricing: 'Pricing (Free)',
+    faq: 'FAQ',
     download: 'More Downloads',
     learnMore: 'Learn More',
   },
@@ -401,6 +404,7 @@ export const translations: Record<Language, Translation> = { zh, en };
 export type TranslationKey =
   | 'nav.features'
   | 'nav.pricing'
+  | 'nav.faq'
   | 'nav.download'
   | 'nav.learnMore'
   | 'hero.title'
