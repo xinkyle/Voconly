@@ -183,7 +183,7 @@ export const zh: Translation = {
     opensource: {
       name: '免费开源',
       price: '¥0',
-      description: '基于 Whisper.cpp 和 Tauri 构建的开源语音输入工具',
+      description: '本地语音识别，隐私安全',
       features: ['无限次语音输入', '本地运行，隐私无忧', '智能润色、自动生成摘要', 'Windows/Mac/Linux 三平台通用', '所有未来更新免费', '开源代码，安全可信'],
       badge: '开源',
       cta: '下载更多',
@@ -224,7 +224,7 @@ export const zh: Translation = {
       comingSoon: '即将推出',
     },
     info: {
-      opensource: '开源项目，基于 Whisper.cpp 和 Tauri 构建',
+      opensource: '开源项目，本地运行',
       changelog: '查看更新日志',
       requirements: '系统要求',
       docs: '使用文档',
@@ -314,11 +314,11 @@ export const en: Translation = {
   },
   pricing: {
     title: 'Free & Open Source',
-    subtitle: 'Built with Whisper.cpp and Tauri, free forever',
+    subtitle: 'Local voice recognition, privacy first',
     opensource: {
       name: 'Free & Open Source',
       price: '$0',
-      description: 'Open source voice input tool based on Whisper.cpp and Tauri',
+      description: 'Local voice recognition, privacy safe',
       features: ['Unlimited voice inputs', 'Local processing, zero privacy risk', 'Smart polish & auto summary', 'Cross-platform: Windows/Mac/Linux', 'All future updates free', 'Open source, trusted & secure'],
       badge: 'Open Source',
       cta: 'More Downloads',
@@ -359,7 +359,7 @@ export const en: Translation = {
       comingSoon: 'Coming Soon',
     },
     info: {
-      opensource: 'Open source project, built with Whisper.cpp and Tauri',
+      opensource: 'Open source, runs locally',
       changelog: 'Changelog',
       requirements: 'System Requirements',
       docs: 'Documentation',
