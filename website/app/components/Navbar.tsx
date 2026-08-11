@@ -63,21 +63,21 @@ export default function Navbar() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 flex items-center justify-between px-4 sm:px-6 lg:px-12 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 flex items-center px-4 sm:px-6 lg:px-12 transition-all duration-300 ${
           isScrolled
             ? 'bg-[var(--color-bg-primary)]/95 backdrop-blur-xl border-b border-white/5'
             : 'bg-transparent'
         }`}
       >
-        {/* Logo */}
-        <a href="#" className="flex items-center gap-2">
+        {/* Logo - 左侧 */}
+        <a href="#" className="flex items-center gap-2 flex-shrink-0">
           <svg
             width="28"
             height="28"
             viewBox="0 0 32 32"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="text-white flex-shrink-0"
+            className="text-white"
           >
             <rect width="32" height="32" rx="8" fill="currentColor" fillOpacity="0.1" />
             <path d="M8 8h16v4h-6v12h-4V12H8V8z" fill="currentColor" />
@@ -85,8 +85,8 @@ export default function Navbar() {
           <span className="font-display text-lg sm:text-xl text-white">Voconly</span>
         </a>
 
-        {/* Desktop: Nav Links + Right Side */}
-        <div className="hidden md:flex items-center gap-8">
+        {/* 导航链接 - 绝对居中 */}
+        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8">
           {navLinks.map((link) => (
             <a
               key={link.name}
@@ -108,8 +108,8 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Desktop: Language + Download */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* 右侧按钮 - 右对齐 */}
+        <div className="hidden md:flex items-center gap-3 ml-auto">
           {/* Language Switcher */}
           <div ref={dropdownRef} className="relative">
             <button
@@ -173,7 +173,7 @@ export default function Navbar() {
           aria-label={lang === 'zh' ? '打开菜单' : 'Open menu'}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-menu"
-          className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-white/5 border border-white/10"
+          className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-white/5 border border-white/10 ml-auto"
         >
           <Menu className="w-5 h-5 text-white/70" />
         </button>
