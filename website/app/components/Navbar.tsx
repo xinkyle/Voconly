@@ -64,6 +64,8 @@ export default function Navbar() {
     { name: t('nav.download'), href: '#download' },
   ];
 
+  const isAboutPage = pathname === '/about';
+
   return (
     <>
       <motion.nav
@@ -147,7 +149,15 @@ export default function Navbar() {
 
         {/* 右侧按钮 - 右对齐 */}
         <div className="hidden md:flex items-center gap-3 ml-auto">
-          {/* Language Switcher */}
+          {/* About Link */}
+            <Link
+              href="/about"
+              className="font-body text-sm text-white/60 hover:text-white transition-colors"
+            >
+              {lang === 'zh' ? '关于' : 'About'}
+            </Link>
+
+            {/* Language Switcher */}
           <div ref={dropdownRef} className="relative">
             <button
               onClick={() => setLangOpen(!langOpen)}
@@ -256,35 +266,53 @@ export default function Navbar() {
               {/* 导航链接 */}
               <div className="flex-1 p-4 space-y-2">
                 {isDetailPage ? (
-                  <Link
-                    href="/"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    {lang === 'zh' ? '返回首页' : 'Back to Home'}
-                  </Link>
-                ) : (
-                  navLinks.map((link) => (
-                    <a
-                      key={link.name}
-                      href={link.href}
+                  <>
+                    <Link
+                      href="/"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      {lang === 'zh' ? '返回首页' : 'Back to Home'}
+                    </Link>
+                    <Link
+                      href="/about"
                       onClick={() => setMobileMenuOpen(false)}
                       className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
                     >
-                      {link.href === '#pricing' ? (
-                        <>
-                          {lang === 'zh' ? (
-                            <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
-                          ) : (
-                            <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
-                          )}
-                        </>
-                      ) : (
-                        link.name
-                      )}
-                    </a>
-                  ))
+                      {lang === 'zh' ? '关于我们' : 'About Us'}
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {navLinks.map((link) => (
+                      <a
+                        key={link.name}
+                        href={link.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
+                      >
+                        {link.href === '#pricing' ? (
+                          <>
+                            {lang === 'zh' ? (
+                              <>定价（<span className="text-[var(--color-accent)] font-bold">免费</span>）</>
+                            ) : (
+                              <>Pricing (<span className="text-[var(--color-accent)] font-bold">Free</span>)</>
+                            )}
+                          </>
+                        ) : (
+                          link.name
+                        )}
+                      </a>
+                    ))}
+                    <Link
+                      href="/about"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
+                    >
+                      {lang === 'zh' ? '关于我们' : 'About Us'}
+                    </Link>
+                  </>
                 )}
               </div>
 

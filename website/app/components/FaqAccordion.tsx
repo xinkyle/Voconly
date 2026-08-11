@@ -26,7 +26,7 @@ export function FaqAccordion({ item }: FaqAccordionProps) {
       </button>
       {isOpen && (
         <div className="px-5 pb-4 pt-0">
-          <div className="font-body text-white/70 text-sm leading-relaxed whitespace-pre-line">
+          <div className="font-body text-white/70 text-base leading-relaxed whitespace-pre-line">
             {item.answer}
           </div>
         </div>

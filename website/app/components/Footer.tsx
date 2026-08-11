@@ -131,11 +131,13 @@ function FooterContent() {
                 {section.links.map((link) => {
                   // 常见问题链接跳转到 FAQ 页面
                   const isFaq = link === '常见问题' || link === 'FAQ';
-                  const href = isFaq ? '/faq' : '#';
+                  // 关于我们链接跳转到 About 页面
+                  const isAbout = link === '关于我们' || link === 'About Us';
+                  const href = isFaq ? '/faq' : isAbout ? '/about' : '#';
 
                   return (
                     <li key={link}>
-                      {isFaq ? (
+                      {(isFaq || isAbout) ? (
                         <Link
                           href={href}
                           className="font-body text-sm text-white/40 hover:text-white transition-colors"
