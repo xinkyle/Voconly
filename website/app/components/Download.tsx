@@ -10,7 +10,7 @@ const platforms = [
   {
     nameKey: 'download.windows.name',
     icon: Monitor,
-    version: 'v0.3.7',
+    version: 'v0.3.6',
     size: '~45 MB',
     href: GITHUB_RELEASE_URL,
     available: true,

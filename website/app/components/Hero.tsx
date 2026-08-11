@@ -5,7 +5,7 @@ import { Download, Sparkles, Monitor, Apple, Terminal } from 'lucide-react';
 import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
-const WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
+const WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.6/Voconly_0.3.6_x64-setup.exe';
 const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
 
 export default function Hero() {
