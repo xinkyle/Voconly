@@ -243,15 +243,15 @@ export const zh: Translation = {
     links: {
       product: {
         title: '产品',
-        items: ['功能介绍', '定价方案', '更新日志', '路线图'],
+        items: ['功能介绍', '定价方案'],
       },
       support: {
         title: '支持',
-        items: ['使用文档', '常见问题', '反馈建议', '联系我们'],
+        items: ['常见问题', '反馈建议', '联系我们'],
       },
       company: {
         title: '关于',
-        items: ['关于我们', '开源项目', '隐私政策', '服务条款'],
+        items: ['关于我们', '开源项目'],
       },
     },
     copyright: '© 2026 Voconly. All rights reserved.',
@@ -379,15 +379,15 @@ export const en: Translation = {
     links: {
       product: {
         title: 'Product',
-        items: ['Features', 'Pricing', 'Changelog', 'Roadmap'],
+        items: ['Features', 'Pricing'],
       },
       support: {
         title: 'Support',
-        items: ['Documentation', 'FAQ', 'Feedback', 'Contact'],
+        items: ['FAQ', 'Feedback', 'Contact'],
       },
       company: {
         title: 'About',
-        items: ['About Us', 'Open Source', 'Privacy Policy', 'Terms of Service'],
+        items: ['About Us', 'Open Source'],
       },
     },
     copyright: '© 2026 Voconly. All rights reserved.',
