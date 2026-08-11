@@ -5,39 +5,8 @@ import { Download as DownloadIcon, Monitor, Apple, Terminal } from 'lucide-react
 import { useI18n } from '../lib/i18n-context';
 
 const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
-
-const platforms = [
-  {
-    nameKey: 'download.windows.name',
-    icon: Monitor,
-    version: 'v0.3.6',
-    size: '~45 MB',
-    href: GITHUB_RELEASE_URL,
-    available: true,
-    availableKey: 'download.windows.available',
-    color: 'blue',
-  },
-  {
-    nameKey: 'download.mac.name',
-    icon: Apple,
-    version: '',
-    size: '',
-    href: GITHUB_RELEASE_URL,
-    available: false,
-    availableKey: 'download.mac.comingSoon',
-    color: 'green',
-  },
-  {
-    nameKey: 'download.linux.name',
-    icon: Terminal,
-    version: '',
-    size: '',
-    href: GITHUB_RELEASE_URL,
-    available: false,
-    availableKey: 'download.linux.comingSoon',
-    color: 'yellow',
-  },
-];
+const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
+const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.6/Voconly_0.3.6_x64-setup.exe';
 
 // 颜色配置
 const colorConfig = {
@@ -59,7 +28,43 @@ const colorConfig = {
 };
 
 export default function Download() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+
+  // 中文用户从 Gitee 下载，英文用户从 GitHub 下载
+  const windowsDownloadUrl = lang === 'zh' ? GITEE_WINDOWS_DOWNLOAD_URL : GITHUB_WINDOWS_DOWNLOAD_URL;
+
+  const platforms = [
+    {
+      nameKey: 'download.windows.name',
+      icon: Monitor,
+      version: lang === 'zh' ? 'v0.3.7' : 'v0.3.6',
+      size: '~45 MB',
+      href: windowsDownloadUrl,
+      available: true,
+      availableKey: 'download.windows.available',
+      color: 'blue',
+    },
+    {
+      nameKey: 'download.mac.name',
+      icon: Apple,
+      version: '',
+      size: '',
+      href: GITHUB_RELEASE_URL,
+      available: false,
+      availableKey: 'download.mac.comingSoon',
+      color: 'green',
+    },
+    {
+      nameKey: 'download.linux.name',
+      icon: Terminal,
+      version: '',
+      size: '',
+      href: GITHUB_RELEASE_URL,
+      available: false,
+      availableKey: 'download.linux.comingSoon',
+      color: 'yellow',
+    },
+  ];
 
   return (
     <section id="download" className="py-32 px-6 lg:px-12 relative">

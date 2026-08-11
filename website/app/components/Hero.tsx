@@ -5,17 +5,21 @@ import { Download, Sparkles, Monitor, Apple, Terminal } from 'lucide-react';
 import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
-const WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.6/Voconly_0.3.6_x64-setup.exe';
 const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
+const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
+const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
 
 export default function Hero() {
   const { t, lang } = useI18n();
+
+  // 中文用户从 Gitee 下载，英文用户从 GitHub 下载
+  const windowsDownloadUrl = lang === 'zh' ? GITEE_WINDOWS_DOWNLOAD_URL : GITHUB_WINDOWS_DOWNLOAD_URL;
 
   const platforms = [
     {
       name: 'Windows',
       icon: Monitor,
-      href: WINDOWS_DOWNLOAD_URL,
+      href: windowsDownloadUrl,
       available: true,
     },
     {
@@ -77,7 +81,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display text-5xl sm:text-6xl lg:text-7xl text-white mb-6 leading-[1.1] tracking-tight"
+            className="font-display text-5xl sm:text-6xl lg:text-7xl text-white mb-20 leading-[1.1] tracking-tight"
           >
             {t('hero.title')}
           </motion.h1>
