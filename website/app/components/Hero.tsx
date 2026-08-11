@@ -101,7 +101,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="font-body text-base text-white/40 mb-12 max-w-xl mx-auto leading-relaxed"
+            className="font-body text-base text-white/40 mb-12 max-w-2xl mx-auto leading-relaxed"
           >
             {t('hero.description')}
           </motion.p>

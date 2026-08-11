@@ -4,8 +4,7 @@
 
 :root {
   /* 字体系统 - DM Serif Display + DM Sans */
-  --font-display: var(--font-display), 'DM Serif Display', serif;
-  --font-body: var(--font-body), 'DM Sans', system-ui, sans-serif;
+  /* Next.js 会自动注入 --font-display 和 --font-body 变量 */
 
   /* 精简颜色系统：深色基调 + 青色调为主 */
   --color-bg-primary: #0a0b0f;
