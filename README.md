@@ -1,12 +1,10 @@
 # Voconly - 本地 AI 语音输入助手
 
-说出来，AI 帮你整理成文。
-
-本地优先的语音转文字工具，数据不上传，断网也能用。
+Voconly 是一款本地优先的 AI 语音输入助手（语音转文字工具），说出来，AI 帮你整理成文。语音数据不上传，断网也能用。支持 Whisper、SenseVoice、Parakeet、Qwen-Asr 等语音识别模型，可配合 LLM 进行润色、翻译、会议纪要等后处理。适用于内容创作、邮件撰写、会议记录、灵感速记等场景。
 
 ![Voconly演示](demo_cn.gif)
 
-[立即下载](https://github.com/xinkyle/Voconly/releases) | [使用场景](#使用场景) | [参与贡献](#参与贡献)
+[立即下载](https://github.com/xinkyle/Voconly/releases) | [官网](https://www.voconly.com) | [使用场景](#使用场景) | [参与贡献](#参与贡献)
 
 ---
 
