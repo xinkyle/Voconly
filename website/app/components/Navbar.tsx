@@ -149,15 +149,7 @@ export default function Navbar() {
 
         {/* 右侧按钮 - 右对齐 */}
         <div className="hidden md:flex items-center gap-3 ml-auto">
-          {/* About Link */}
-            <Link
-              href="/about"
-              className="font-body text-sm text-white/60 hover:text-white transition-colors"
-            >
-              {lang === 'zh' ? '关于' : 'About'}
-            </Link>
-
-            {/* Language Switcher */}
+          {/* Language Switcher */}
           <div ref={dropdownRef} className="relative">
             <button
               onClick={() => setLangOpen(!langOpen)}

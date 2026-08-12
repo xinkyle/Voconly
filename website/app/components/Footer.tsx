@@ -94,12 +94,20 @@ function FooterContent() {
     'Open Source': 'https://github.com/xinkyle/Voconly',
   };
 
+  // 内部页面链接映射
+  const pageLinks: Record<string, string> = {
+    '常见问题': '/faq',
+    'FAQ': '/faq',
+    '关于我们': '/about',
+    'About Us': '/about',
+    '博客': '/blog',
+    'Blog': '/blog',
+  };
+
   // 获取链接地址
   const getLinkHref = (link: string): string => {
-    // 常见问题
-    if (link === '常见问题' || link === 'FAQ') return '/faq';
-    // 关于我们
-    if (link === '关于我们' || link === 'About Us') return '/about';
+    // 内部页面链接
+    if (pageLinks[link]) return pageLinks[link];
     // 外部链接
     if (externalLinks[link]) return externalLinks[link];
     // 锚点链接
@@ -112,8 +120,7 @@ function FooterContent() {
 
   // 判断链接类型
   const isInternalPageLink = (link: string): boolean => {
-    return link === '常见问题' || link === 'FAQ' ||
-           link === '关于我们' || link === 'About Us';
+    return !!pageLinks[link];
   };
 
   const isExternalLink = (link: string): boolean => {

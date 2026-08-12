@@ -13,6 +13,8 @@ upload-release.ps1
 # Dependencies
 node_modules/
 
+docs/
+
 # Tauri/Rust 构建输出
 src-tauri/target/
 src-tauri/target-doc/

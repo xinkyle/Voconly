@@ -243,7 +243,7 @@ export const zh: Translation = {
     links: {
       product: {
         title: '产品',
-        items: ['功能介绍', '定价方案'],
+        items: ['功能介绍', '定价方案', '博客'],
       },
       support: {
         title: '支持',
@@ -379,7 +379,7 @@ export const en: Translation = {
     links: {
       product: {
         title: 'Product',
-        items: ['Features', 'Pricing'],
+        items: ['Features', 'Pricing', 'Blog'],
       },
       support: {
         title: 'Support',
