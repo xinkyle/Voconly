@@ -51,6 +51,7 @@ export interface Translation {
       title: string;
       description: string;
     };
+    downloadCta: string;
   };
   pricing: {
     title: string;
