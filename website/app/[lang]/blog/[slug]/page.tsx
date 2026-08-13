@@ -5,43 +5,68 @@ import ReactMarkdown from 'react-markdown';
 import { getPostBySlug, getAllPosts } from '../../../lib/blog';
 import Navbar from '../../../components/Navbar';
 import Footer from '../../../components/Footer';
+import type { Language } from '../../../lib/locales';
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; lang: Language }>;
 }
 
 // 预生成所有博客文章页面
 export async function generateStaticParams() {
-  const posts = getAllPosts();
-  return posts.map((post) => ({
-    slug: post.slug,
-  }));
+  const slugs: Array<{ slug: string; lang: string }> = [];
+
+  for (const lang of ['zh', 'en'] as Language[]) {
+    const posts = getAllPosts(lang);
+    for (const post of posts) {
+      slugs.push({ slug: post.slug, lang });
+    }
+  }
+
+  return slugs;
 }
 
 // 动态生成元数据
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const { slug, lang } = await params;
+  const post = getPostBySlug(slug, lang);
 
   if (!post) {
     return {
-      title: '文章不存在 - Voconly',
+      title: lang === 'zh' ? '文章不存在 - Voconly' : 'Post Not Found - Voconly',
     };
   }
 
   return {
     title: `${post.title} - Voconly`,
     description: post.description,
+    alternates: {
+      canonical: `https://voconly.com/${lang}/blog/${slug}/`,
+      languages: {
+        'zh-CN': `https://voconly.com/zh/blog/${slug}/`,
+        'en': `https://voconly.com/en/blog/${slug}/`,
+      },
+    },
   };
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
-  const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const { slug, lang } = await params;
+  const post = getPostBySlug(slug, lang);
 
   if (!post) {
     notFound();
   }
+
+  const translations = {
+    zh: {
+      backToBlog: '← 返回博客',
+    },
+    en: {
+      backToBlog: '← Back to Blog',
+    },
+  };
+
+  const t = translations[lang] || translations.zh;
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
@@ -52,17 +77,17 @@ export default async function BlogPostPage({ params }: PageProps) {
           {/* Breadcrumb */}
           <div className="mb-6">
             <Link
-              href="/blog"
+              href={`/${lang}/blog`}
               className="font-body text-sm text-white/50 hover:text-white transition-colors"
             >
-              ← 返回博客
+              {t.backToBlog}
             </Link>
           </div>
 
           {/* Header */}
           <header className="mb-10">
             <time className="font-body text-sm text-white/50 mb-2 block">
-              {new Date(post.date).toLocaleDateString('zh-CN')}
+              {new Date(post.date).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US')}
             </time>
             <h1 className="font-display text-3xl sm:text-4xl text-white mb-4">
               {post.title}
