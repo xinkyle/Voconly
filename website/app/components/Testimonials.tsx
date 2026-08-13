@@ -7,10 +7,10 @@ export default function Testimonials() {
   const { t } = useI18n();
 
   const stats = [
-    { value: '1K+', label: t('testimonials.stats.users.label') },
     { value: '99+', label: t('testimonials.stats.languages.label') },
-    { value: '100%', label: t('testimonials.stats.accuracy.label') },
+    { value: '本地', label: t('testimonials.stats.accuracy.label') },
     { value: '3', label: t('testimonials.stats.platforms.label') },
+    { value: '9+', label: t('testimonials.stats.models.label') },
   ];
 
   return (

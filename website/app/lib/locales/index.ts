@@ -143,7 +143,7 @@ export const zh: Translation = {
     learnMoreBtn: '看看怎么用',
     shortcutHint: '或按下',
     platformInfo: '支持 Windows / Mac / Linux',
-    badge: '1,000+ 用户每天省下 30 分钟打字时间',
+    badge: '本地运行，离线可用，数据安全',
     freeOpenSource: '免费开源',
     trustBadges: {
       offline: '断网也能用',
@@ -198,13 +198,13 @@ export const zh: Translation = {
     },
   },
   testimonials: {
-    title: '1,000+ 用户正在用',
-    subtitle: '内容创作者、程序员、会议记录员每天都在省时间',
+    title: '技术亮点',
+    subtitle: '多种本地模型 + 量化方案，自由平衡速度与质量',
     stats: {
-      users: { value: '1K+', label: '活跃用户' },
       languages: { value: '99+', label: '支持语言' },
       accuracy: { value: '本地', label: '隐私保护' },
       platforms: { value: '3', label: '跨平台' },
+      models: { value: '9+', label: '本地语音模型' },
     },
   },
   download: {
@@ -237,7 +237,7 @@ export const zh: Translation = {
   footer: {
     description: '说出来，就行了。本地语音输入，隐私无忧，三平台通用。',
     ctaTitle: '每天省下 30 分钟打字时间',
-    ctaSubtitle: '已有 1,000+ 用户在使用，免费版无需注册，下载即用',
+    ctaSubtitle: '本地运行，离线可用，数据安全',
     downloadBtn: '下载更多',
     freeInfo: 'Windows · macOS · Linux 三平台通用',
     links: {
@@ -279,7 +279,7 @@ export const en: Translation = {
     learnMoreBtn: 'Learn More',
     shortcutHint: 'or press',
     platformInfo: 'Available for Windows / Mac / Linux',
-    badge: '1,000+ users save 30 minutes of typing every day',
+    badge: 'Local processing, offline ready, data stays private',
     freeOpenSource: 'Free & Open Source',
     trustBadges: {
       offline: 'Local Run',
