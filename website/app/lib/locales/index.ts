@@ -74,10 +74,10 @@ export interface Translation {
     title: string;
     subtitle: string;
     stats: {
-      users: { value: string; label: string };
       languages: { value: string; label: string };
       accuracy: { value: string; label: string };
       platforms: { value: string; label: string };
+      models: { value: string; label: string };
     };
   };
   download: {
@@ -198,7 +198,7 @@ export const zh: Translation = {
     },
   },
   testimonials: {
-    title: '技术亮点',
+    title: '核心优势',
     subtitle: '多种本地模型 + 量化方案，自由平衡速度与质量',
     stats: {
       languages: { value: '99+', label: '支持语言' },
@@ -334,13 +334,13 @@ export const en: Translation = {
     },
   },
   testimonials: {
-    title: 'Built for Professionals',
-    subtitle: 'Developers, content creators, multilingual workers love it',
+    title: 'Key Advantages',
+    subtitle: 'Multiple local models + quantization options, balance speed and quality freely',
     stats: {
-      users: { value: '10+', label: 'Languages' },
-      languages: { value: '99%', label: 'Offline' },
+      languages: { value: '99+', label: 'Languages' },
       accuracy: { value: 'Local', label: 'Privacy' },
       platforms: { value: '3', label: 'Platforms' },
+      models: { value: '9+', label: 'Voice Models' },
     },
   },
   download: {
