@@ -14,8 +14,13 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'voconly-lang';
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Language>('zh');
+interface I18nProviderProps {
+  children: ReactNode;
+  initialLang?: Language;
+}
+
+export function I18nProvider({ children, initialLang = 'zh' }: I18nProviderProps) {
+  const [lang, setLangState] = useState<Language>(initialLang);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Language | null;

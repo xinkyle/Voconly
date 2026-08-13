@@ -178,6 +178,7 @@ export const zh: Translation = {
       title: '说外语也行',
       description: '自动识别 99 种语言，不用切换输入法。跟外国同事开会、看外文资料，说就行。',
     },
+    downloadCta: '免费下载，每天无限使用',
   },
   pricing: {
     title: '完全免费',
@@ -314,6 +315,7 @@ export const en: Translation = {
       title: 'Multi-language Support',
       description: 'Auto-detects Chinese, English, Japanese, Korean and 10+ other languages. No need to switch input methods.',
     },
+    downloadCta: 'Free Download, Unlimited Daily Use',
   },
   pricing: {
     title: 'Free & Open Source',
@@ -433,6 +435,7 @@ export type TranslationKey =
   | 'features.privacy.description'
   | 'features.multiLang.title'
   | 'features.multiLang.description'
+  | 'features.downloadCta'
   | 'pricing.title'
   | 'pricing.subtitle'
   | 'pricing.opensource.name'

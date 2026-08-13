@@ -15,9 +15,6 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 是否在详情页（如 /faq）
-  const isDetailPage = pathname !== '/';
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -57,14 +54,21 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [mobileMenuOpen]);
 
+  // 获取带语言前缀的链接
+  const getLocalizedLink = (path: string): string => {
+    if (path.startsWith('#')) return path;
+    return `/${lang}${path}`;
+  };
+
+  // 判断是否为详情页（非首页）
+  const isDetailPage = pathname !== '/' && pathname !== `/${lang}/`;
+
   const navLinks = [
     { name: t('nav.features'), href: '#features' },
     { name: t('nav.pricing'), href: '#pricing' },
-    { name: t('nav.faq'), href: '/#faq' },
+    { name: t('nav.faq'), href: getLocalizedLink('/faq') },
     { name: t('nav.download'), href: '#download' },
   ];
-
-  const isAboutPage = pathname === '/about';
 
   return (
     <>
@@ -80,7 +84,7 @@ export default function Navbar() {
       >
         {/* Logo - 左侧 */}
         {isDetailPage ? (
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <Link href={`/${lang}/`} className="flex items-center gap-2 flex-shrink-0">
             <svg
               width="28"
               height="28"
@@ -139,7 +143,7 @@ export default function Navbar() {
         {/* 详情页：返回首页按钮 */}
         {isDetailPage && (
           <Link
-            href="/"
+            href={`/${lang}/`}
             className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 font-body text-sm text-white/60 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -260,7 +264,7 @@ export default function Navbar() {
                 {isDetailPage ? (
                   <>
                     <Link
-                      href="/"
+                      href={`/${lang}/`}
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center gap-2 py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
                     >
@@ -268,7 +272,7 @@ export default function Navbar() {
                       {lang === 'zh' ? '返回首页' : 'Back to Home'}
                     </Link>
                     <Link
-                      href="/about"
+                      href={getLocalizedLink('/about')}
                       onClick={() => setMobileMenuOpen(false)}
                       className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
                     >
@@ -298,7 +302,7 @@ export default function Navbar() {
                       </a>
                     ))}
                     <Link
-                      href="/about"
+                      href={getLocalizedLink('/about')}
                       onClick={() => setMobileMenuOpen(false)}
                       className="block py-3 px-4 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors font-body"
                     >

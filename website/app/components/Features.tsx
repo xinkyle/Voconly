@@ -113,7 +113,7 @@ export default function Features() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-[var(--color-accent)] hover:text-white transition-colors group font-body"
           >
-            <span>免费下载，每天无限使用</span>
+            <span>{t('features.downloadCta')}</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
         </motion.div>

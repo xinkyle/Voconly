@@ -8,7 +8,7 @@ export default function Testimonials() {
 
   const stats = [
     { value: '99+', label: t('testimonials.stats.languages.label') },
-    { value: '本地', label: t('testimonials.stats.accuracy.label') },
+    { value: t('testimonials.stats.accuracy.value'), label: t('testimonials.stats.accuracy.label') },
     { value: '3', label: t('testimonials.stats.platforms.label') },
     { value: '9+', label: t('testimonials.stats.models.label') },
   ];

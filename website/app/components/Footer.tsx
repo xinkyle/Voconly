@@ -57,9 +57,9 @@ function CTA() {
 
 // Footer 内容组件
 function FooterContent() {
-  const { t, get } = useI18n();
+  const { t, get, lang } = useI18n();
   const pathname = usePathname();
-  const isHomePage = pathname === '/';
+  const isHomePage = pathname === '/' || pathname === `/${lang}/`;
 
   const footerLinks = [
     {
@@ -94,7 +94,7 @@ function FooterContent() {
     'Open Source': 'https://github.com/xinkyle/Voconly',
   };
 
-  // 内部页面链接映射
+  // 内部页面链接映射（不带语言前缀，由 getLocalizedLink 添加）
   const pageLinks: Record<string, string> = {
     '常见问题': '/faq',
     'FAQ': '/faq',
@@ -104,15 +104,20 @@ function FooterContent() {
     'Blog': '/blog',
   };
 
+  // 获取带语言前缀的链接
+  const getLocalizedLink = (path: string): string => {
+    return `/${lang}${path}`;
+  };
+
   // 获取链接地址
   const getLinkHref = (link: string): string => {
     // 内部页面链接
-    if (pageLinks[link]) return pageLinks[link];
+    if (pageLinks[link]) return getLocalizedLink(pageLinks[link]);
     // 外部链接
     if (externalLinks[link]) return externalLinks[link];
     // 锚点链接
     if (anchorLinks[link]) {
-      return isHomePage ? anchorLinks[link] : '/' + anchorLinks[link];
+      return isHomePage ? anchorLinks[link] : getLocalizedLink('') + anchorLinks[link];
     }
     // 其他
     return '#';

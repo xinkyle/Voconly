@@ -1,19 +1,31 @@
-import Hero from './components/Hero';
-import Features from './components/Features';
-import Pricing from './components/Pricing';
-import FaqSection from './components/FaqSection';
-import Testimonials from './components/Testimonials';
-import Footer from './components/Footer';
+'use client';
+
+import { useEffect } from 'react';
 
 export default function Home() {
+  useEffect(() => {
+    // Check localStorage for preferred language
+    const storedLang = localStorage.getItem('voconly-lang');
+
+    if (storedLang && (storedLang === 'zh' || storedLang === 'en')) {
+      window.location.replace(`/${storedLang}/`);
+      return;
+    }
+
+    // Check browser language
+    const browserLang = navigator.language.toLowerCase();
+    const lang = browserLang.startsWith('zh') ? 'zh' : 'en';
+
+    // Redirect to detected language
+    window.location.replace(`/${lang}/`);
+  }, []);
+
   return (
-    <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
-      <Hero />
-      <Features />
-      <Pricing />
-      <FaqSection />
-      <Testimonials />
-      <Footer />
-    </main>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-primary)' }}>
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    </div>
   );
 }

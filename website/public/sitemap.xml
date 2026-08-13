@@ -1,47 +1,121 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- 首页 -->
   <url>
     <loc>https://voconly.com/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://voconly.com/"/>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
+  <!-- 中文首页 -->
   <url>
-    <loc>https://voconly.com/blog</loc>
+    <loc>https://voconly.com/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://voconly.com/"/>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- 英文首页 -->
+  <url>
+    <loc>https://voconly.com/en/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://voconly.com/"/>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- 博客列表 -->
+  <url>
+    <loc>https://voconly.com/zh/blog/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/blog/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/blog/"/>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://voconly.com/blog/voconly-usage-guide</loc>
+    <loc>https://voconly.com/en/blog/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/blog/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/blog/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- 博客文章 -->
+  <url>
+    <loc>https://voconly.com/zh/blog/voconly-usage-guide/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://voconly.com/blog/asr-model-selection-chinese</loc>
+    <loc>https://voconly.com/en/blog/voconly-usage-guide/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://voconly.com/blog/asr-model-selection-english</loc>
+    <loc>https://voconly.com/zh/blog/asr-model-selection-chinese/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://voconly.com/blog/llm-quantization-guide</loc>
+    <loc>https://voconly.com/en/blog/asr-model-selection-english/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://voconly.com/faq</loc>
+    <loc>https://voconly.com/zh/blog/llm-quantization-guide/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://voconly.com/en/blog/llm-quantization-guide/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- FAQ -->
+  <url>
+    <loc>https://voconly.com/zh/faq/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/faq/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/faq/"/>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://voconly.com/about</loc>
+    <loc>https://voconly.com/en/faq/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/faq/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/faq/"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <!-- 关于我们 -->
+  <url>
+    <loc>https://voconly.com/zh/about/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/about/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/about/"/>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://voconly.com/feedback</loc>
+    <loc>https://voconly.com/en/about/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/about/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/about/"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <!-- 反馈 -->
+  <url>
+    <loc>https://voconly.com/zh/feedback/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/feedback/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/feedback/"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://voconly.com/en/feedback/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://voconly.com/zh/feedback/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://voconly.com/en/feedback/"/>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
