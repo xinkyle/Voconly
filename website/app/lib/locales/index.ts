@@ -137,7 +137,7 @@ export const zh: Translation = {
   },
   hero: {
     title: '说出来，就行了',
-    subtitle: '不用联网，无需切换窗口，在任何应用中直接语音输入',
+    subtitle: '开源离线语音输入，不用联网，在任何应用中直接语音打字',
     description: '写文档手指累？开会腾不出手？Voconly 让你按一下快捷键就能语音输入。更棒的是——可为不同场景配置不同快捷键：简单润色、专业改写、会议总结、翻译……双击直出结果，效率翻倍。本地运行，隐私无忧。',
     downloadBtn: '免费下载',
     learnMoreBtn: '看看怎么用',
@@ -152,7 +152,7 @@ export const zh: Translation = {
     },
   },
   features: {
-    title: '解决这些烦恼',
+    title: '离线语音输入，隐私无忧',
     subtitle: '不是替代键盘，而是让输入更轻松',
     scenarios: {
       title: '多场景快捷键',
@@ -171,7 +171,7 @@ export const zh: Translation = {
       description: '本地识别速度快，边说边看文字上屏。支持中文、英文及中英文混合输入。',
     },
     privacy: {
-      title: '你的声音留在本地',
+      title: '本地语音识别，数据不上传',
       description: '会议记录、私密想法、商业机密——不会被上传到任何服务器。本地处理，比任何云端识别都安心。',
     },
     multiLang: {
@@ -273,7 +273,7 @@ export const en: Translation = {
   },
   hero: {
     title: 'Voice Input, Hands Free',
-    subtitle: 'Offline Whisper Recognition × Global Shortcut × LLM Smart Processing',
+    subtitle: 'Open source offline voice typing, no internet needed, type with your voice in any app',
     description: 'Tired of typing? In a meeting with no free hands? Voconly lets you voice input with a shortcut. Even better — configure different shortcuts for different scenarios: light polish, professional rewrite, meeting summary, translation... Double-tap for instant results. Local processing, zero privacy risk.',
     downloadBtn: 'Download Voconly',
     learnMoreBtn: 'Learn More',
@@ -288,7 +288,7 @@ export const en: Translation = {
     },
   },
   features: {
-    title: 'Core Features',
+    title: 'Offline Voice Typing, Privacy First',
     subtitle: 'Privacy-focused, high-quality speech recognition without internet',
     scenarios: {
       title: 'Scenario Shortcuts',
@@ -307,7 +307,7 @@ export const en: Translation = {
       description: 'Fast local recognition, see text as you speak. Supports Chinese, English, and Chinese-English mixed input.',
     },
     privacy: {
-      title: 'Zero Privacy Risk',
+      title: 'Local Voice Recognition, Data Stays Private',
       description: 'Meeting notes, private journals, business secrets - speak freely. All data processed locally, zero cloud exposure.',
     },
     multiLang: {
