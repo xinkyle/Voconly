@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Languages, ChevronDown, Download, Github, Menu, X, ArrowLeft } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function Navbar() {
   const { lang, setLang, t } = useI18n();
   const pathname = usePathname();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,6 +59,19 @@ export default function Navbar() {
   const getLocalizedLink = (path: string): string => {
     if (path.startsWith('#')) return path;
     return `/${lang}${path}`;
+  };
+
+  // 切换语言并导航到对应路径
+  const switchLanguage = (newLang: 'zh' | 'en') => {
+    setLang(newLang);
+    setLangOpen(false);
+    setMobileMenuOpen(false);
+
+    // 替换 URL 中的语言前缀并导航
+    const currentPath = pathname;
+    const pathWithoutLang = currentPath.replace(/^\/(zh|en)(\/|$)/, '/');
+    const newPath = `/${newLang}${pathWithoutLang === '/' ? '' : pathWithoutLang}`;
+    router.replace(newPath);
   };
 
   // 判断是否为详情页（非首页）
@@ -172,13 +186,13 @@ export default function Navbar() {
                 className="absolute top-full right-0 mt-2 py-1 bg-[var(--color-bg-secondary)] border border-white/10 rounded-lg shadow-xl min-w-[90px]"
               >
                 <button
-                  onClick={() => { setLang('zh'); setLangOpen(false); }}
+                  onClick={() => switchLanguage('zh')}
                   className={`w-full px-4 py-2 text-sm text-left hover:bg-white/5 transition-colors font-body ${lang === 'zh' ? 'text-white' : 'text-white/60'}`}
                 >
                   中文
                 </button>
                 <button
-                  onClick={() => { setLang('en'); setLangOpen(false); }}
+                  onClick={() => switchLanguage('en')}
                   className={`w-full px-4 py-2 text-sm text-left hover:bg-white/5 transition-colors font-body ${lang === 'en' ? 'text-white' : 'text-white/60'}`}
                 >
                   English
@@ -317,7 +331,7 @@ export default function Navbar() {
                 {/* 语言切换 */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setLang('zh')}
+                    onClick={() => switchLanguage('zh')}
                     className={`flex-1 py-2.5 px-4 rounded-lg border font-body text-sm transition-colors ${
                       lang === 'zh'
                         ? 'bg-[var(--color-accent)] text-[var(--color-bg-primary)] border-[var(--color-accent)]'
@@ -327,7 +341,7 @@ export default function Navbar() {
                     中文
                   </button>
                   <button
-                    onClick={() => setLang('en')}
+                    onClick={() => switchLanguage('en')}
                     className={`flex-1 py-2.5 px-4 rounded-lg border font-body text-sm transition-colors ${
                       lang === 'en'
                         ? 'bg-[var(--color-accent)] text-[var(--color-bg-primary)] border-[var(--color-accent)]'
