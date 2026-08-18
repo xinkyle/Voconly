@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const baseUrl = 'https://voconly.com';
+const baseUrl = 'https://www.voconly.com';
 const contentDir = path.join(process.cwd(), 'content/blog');
 
 // 博客文章slug列表

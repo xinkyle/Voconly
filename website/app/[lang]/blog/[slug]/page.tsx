@@ -40,10 +40,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${post.title} - Voconly`,
     description: post.description,
     alternates: {
-      canonical: `https://voconly.com/${lang}/blog/${slug}/`,
+      canonical: `https://www.voconly.com/${lang}/blog/${slug}/`,
       languages: {
-        'zh-CN': `https://voconly.com/zh/blog/${slug}/`,
-        'en': `https://voconly.com/en/blog/${slug}/`,
+        'zh-CN': `https://www.voconly.com/zh/blog/${slug}/`,
+        'en': `https://www.voconly.com/en/blog/${slug}/`,
+        'x-default': 'https://www.voconly.com/',
       },
     },
   };

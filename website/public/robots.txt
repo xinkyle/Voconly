@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://voconly.com/sitemap.xml
+Sitemap: https://www.voconly.com/sitemap.xml

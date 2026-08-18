@@ -6,7 +6,7 @@ interface StructuredDataProps {
 }
 
 export function StructuredData({ lang, path }: StructuredDataProps) {
-  const baseUrl = 'https://voconly.com';
+  const baseUrl = 'https://www.voconly.com';
   const currentUrl = `${baseUrl}/${lang}${path}`;
 
   const organizationData = {

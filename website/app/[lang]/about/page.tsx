@@ -16,6 +16,7 @@ const metadataByLang: Record<Language, Metadata> = {
       languages: {
         'zh-CN': 'https://www.voconly.com/zh/about/',
         'en': 'https://www.voconly.com/en/about/',
+        'x-default': 'https://www.voconly.com/',
       },
     },
     openGraph: {
@@ -33,6 +34,7 @@ const metadataByLang: Record<Language, Metadata> = {
       languages: {
         'zh-CN': 'https://www.voconly.com/zh/about/',
         'en': 'https://www.voconly.com/en/about/',
+        'x-default': 'https://www.voconly.com/',
       },
     },
     openGraph: {
