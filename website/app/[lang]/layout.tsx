@@ -3,6 +3,7 @@ import { DM_Serif_Display, DM_Sans } from 'next/font/google';
 import '../globals.css';
 import { I18nProvider } from '../lib/i18n-context';
 import { StructuredData } from '../components/StructuredData';
+import Navbar from '../components/Navbar';
 import type { Language } from '../lib/locales';
 
 const dmSerif = DM_Serif_Display({
@@ -81,13 +82,11 @@ export default function LangLayout({
   return (
     <html lang={lang} className="dark">
       <head>
-        <link rel="alternate" hrefLang="zh-CN" href="https://www.voconly.com/zh/" />
-        <link rel="alternate" hrefLang="en" href="https://www.voconly.com/en/" />
-        <link rel="alternate" hrefLang="x-default" href="https://www.voconly.com/" />
         <StructuredData lang={lang} path="/" />
       </head>
       <body className={`${dmSerif.variable} ${dmSans.variable} antialiased`}>
         <I18nProvider initialLang={lang}>
+          <Navbar />
           {children}
         </I18nProvider>
       </body>

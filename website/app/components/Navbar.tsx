@@ -86,14 +86,11 @@ export default function Navbar() {
 
   return (
     <>
-      <motion.nav
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 flex items-center px-4 sm:px-6 lg:px-12 transition-all duration-300 ${
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 flex items-center px-4 sm:px-6 lg:px-12 transition-colors duration-300 ${
           isScrolled
-            ? 'bg-[var(--color-bg-primary)]/95 backdrop-blur-xl border-b border-white/5'
-            : 'bg-transparent'
+            ? 'bg-[rgba(10,11,15,0.6)] backdrop-blur-xl'
+            : 'bg-[rgba(10,11,15,0.8)]'
         }`}
       >
         {/* Logo - 左侧 */}
@@ -234,7 +231,7 @@ export default function Navbar() {
         >
           <Menu className="w-5 h-5 text-white/70" />
         </button>
-      </motion.nav>
+      </nav>
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>

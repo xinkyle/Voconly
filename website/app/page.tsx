@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next';
 import { DM_Serif_Display, DM_Sans } from 'next/font/google';
+import './globals.css';
+import { I18nProvider } from './lib/i18n-context';
+import { StructuredData } from './components/StructuredData';
+import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Pricing from './components/Pricing';
 import FaqSection from './components/FaqSection';
 import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
-import Navbar from './components/Navbar';
-import { I18nProvider } from './lib/i18n-context';
-import './globals.css';
 
 const dmSerif = DM_Serif_Display({
   weight: '400',
@@ -61,9 +62,13 @@ export const viewport: Viewport = {
   themeColor: '#0a0a0a',
 };
 
-export default function HomePage() {
+// 根路径直接渲染中文内容（静态导出）
+export default function RootPage() {
   return (
     <html lang="zh" className="dark">
+      <head>
+        <StructuredData lang="zh" path="/" />
+      </head>
       <body className={`${dmSerif.variable} ${dmSans.variable} antialiased`}>
         <I18nProvider initialLang="zh">
           <Navbar />

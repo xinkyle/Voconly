@@ -7,7 +7,7 @@ import Footer from '../components/Footer';
 
 export default function Home() {
   return (
-    <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
+    <main className="min-h-screen pt-16" style={{ background: 'var(--color-bg-primary)' }}>
       <Hero />
       <Features />
       <Pricing />
