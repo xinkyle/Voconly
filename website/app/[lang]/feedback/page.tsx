@@ -1,11 +1,56 @@
-'use client';
-
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { useI18n } from '../../lib/i18n-context';
+import type { Language } from '../../lib/locales';
 
-export default function FeedbackPage() {
-  const { lang } = useI18n();
+interface PageProps {
+  params: Promise<{ lang: Language }>;
+}
+
+const metadataByLang: Record<Language, Metadata> = {
+  zh: {
+    title: '反馈建议 - Voconly',
+    description: '有问题或建议？通过 GitHub Issues 或邮件联系 Voconly 团队，我们重视每一条反馈。',
+    alternates: {
+      canonical: 'https://www.voconly.com/zh/feedback/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/feedback/',
+        'en': 'https://www.voconly.com/en/feedback/',
+      },
+    },
+    openGraph: {
+      title: '反馈建议 - Voconly',
+      description: '有问题或建议？联系我们，我们重视每一条反馈。',
+      type: 'website',
+      locale: 'zh_CN',
+    },
+  },
+  en: {
+    title: 'Feedback - Voconly',
+    description: 'Have questions or suggestions? Contact the Voconly team via GitHub Issues or email. We value every piece of feedback.',
+    alternates: {
+      canonical: 'https://www.voconly.com/en/feedback/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/feedback/',
+        'en': 'https://www.voconly.com/en/feedback/',
+      },
+    },
+    openGraph: {
+      title: 'Feedback - Voconly',
+      description: 'Have questions or suggestions? Contact us, we value every piece of feedback.',
+      type: 'website',
+      locale: 'en_US',
+    },
+  },
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { lang } = await params;
+  return metadataByLang[lang] || metadataByLang.zh;
+}
+
+export default async function FeedbackPage({ params }: PageProps) {
+  const { lang } = await params;
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>

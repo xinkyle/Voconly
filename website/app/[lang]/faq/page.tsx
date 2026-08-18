@@ -1,49 +1,59 @@
-'use client';
-
-import { useState } from 'react';
-import { Search } from 'lucide-react';
-import { faqData, type FaqCategory, type FaqItem } from '../../lib/faq-data';
-import { useI18n } from '../../lib/i18n-context';
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { FaqAccordion } from '../../components/FaqAccordion';
+import { FaqSearch } from '../../components/FaqSearch';
+import { faqData } from '../../lib/faq-data';
+import type { Language } from '../../lib/locales';
 
-interface FaqCategoryProps {
-  category: string;
-  items: FaqItem[];
+interface PageProps {
+  params: Promise<{ lang: Language }>;
 }
 
-function FaqCategorySection({ category, items }: FaqCategoryProps) {
-  return (
-    <section className="mb-10">
-      <h2 className="font-display text-xl text-white mb-4">{category}</h2>
-      <div className="space-y-3">
-        {items.map((item, index) => (
-          <FaqAccordion key={index} item={item} />
-        ))}
-      </div>
-    </section>
-  );
+const metadataByLang: Record<Language, Metadata> = {
+  zh: {
+    title: '常见问题 - Voconly',
+    description: 'Voconly 使用常见问题解答：如何安装、如何使用、支持哪些系统、隐私安全等问题的详细解答。',
+    alternates: {
+      canonical: 'https://www.voconly.com/zh/faq/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/faq/',
+        'en': 'https://www.voconly.com/en/faq/',
+      },
+    },
+    openGraph: {
+      title: '常见问题 - Voconly',
+      description: 'Voconly 使用常见问题解答：安装、使用、系统支持、隐私安全等。',
+      type: 'website',
+      locale: 'zh_CN',
+    },
+  },
+  en: {
+    title: 'FAQ - Voconly',
+    description: 'Frequently asked questions about Voconly: installation, usage, system support, privacy and security, and more.',
+    alternates: {
+      canonical: 'https://www.voconly.com/en/faq/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/faq/',
+        'en': 'https://www.voconly.com/en/faq/',
+      },
+    },
+    openGraph: {
+      title: 'FAQ - Voconly',
+      description: 'Frequently asked questions about Voconly: installation, usage, system support, and more.',
+      type: 'website',
+      locale: 'en_US',
+    },
+  },
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { lang } = await params;
+  return metadataByLang[lang] || metadataByLang.zh;
 }
 
-export default function FaqPage() {
-  const { lang } = useI18n();
-  const [searchQuery, setSearchQuery] = useState('');
+export default async function FaqPage({ params }: PageProps) {
+  const { lang } = await params;
   const faqCategories = faqData[lang];
-
-  // 过滤 FAQ
-  const filteredCategories: FaqCategory[] = searchQuery
-    ? faqCategories
-        .map((cat) => ({
-          ...cat,
-          items: cat.items.filter(
-            (item) =>
-              item.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              item.answer.toLowerCase().includes(searchQuery.toLowerCase())
-          ),
-        }))
-        .filter((cat) => cat.items.length > 0)
-    : faqCategories;
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
@@ -55,41 +65,17 @@ export default function FaqPage() {
           <h1 className="font-display text-4xl sm:text-5xl text-white mb-4">
             {lang === 'zh' ? '常见问题' : 'FAQ'}
           </h1>
-          <p className="font-body text-white/60 text-lg mb-8">
+          <p className="font-body text-white/60 text-lg">
             {lang === 'zh'
               ? '找到关于 Voconly 的所有问题的答案'
               : 'Find answers to all your questions about Voconly'}
           </p>
-
-          {/* Search */}
-          <div className="relative max-w-md mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={lang === 'zh' ? '搜索问题...' : 'Search questions...'}
-              className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg font-body text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-accent)]/50 focus:bg-white/10 transition-all"
-            />
-          </div>
         </div>
       </section>
 
-      {/* FAQ Content */}
+      {/* FAQ Content with Search */}
       <section className="pb-20 px-4">
-        <div className="max-w-3xl mx-auto">
-          {filteredCategories.length > 0 ? (
-            filteredCategories.map((cat, index) => (
-              <FaqCategorySection key={index} category={cat.category} items={cat.items} />
-            ))
-          ) : (
-            <div className="text-center py-12">
-              <p className="font-body text-white/60">
-                {lang === 'zh' ? '没有找到相关问题' : 'No matching questions found'}
-              </p>
-            </div>
-          )}
-        </div>
+        <FaqSearch categories={faqCategories} lang={lang} />
       </section>
 
       {/* Footer CTA */}

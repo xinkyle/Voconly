@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getAllPosts } from '../../lib/blog';
 import Navbar from '../../components/Navbar';
@@ -6,6 +7,48 @@ import type { Language } from '../../lib/locales';
 
 interface PageProps {
   params: Promise<{ lang: Language }>;
+}
+
+const metadataByLang: Record<Language, Metadata> = {
+  zh: {
+    title: '博客 - Voconly',
+    description: 'Voconly 博客：语音识别技术、AI 模型选择、本地部署等深度内容，帮助你更好地使用语音输入工具。',
+    alternates: {
+      canonical: 'https://www.voconly.com/zh/blog/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/blog/',
+        'en': 'https://www.voconly.com/en/blog/',
+      },
+    },
+    openGraph: {
+      title: '博客 - Voconly',
+      description: '语音识别、AI 模型选择、本地部署等深度内容。',
+      type: 'website',
+      locale: 'zh_CN',
+    },
+  },
+  en: {
+    title: 'Blog - Voconly',
+    description: 'Voconly Blog: Deep dives into speech recognition, AI model selection, local deployment, and more to help you make the most of voice typing.',
+    alternates: {
+      canonical: 'https://www.voconly.com/en/blog/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/blog/',
+        'en': 'https://www.voconly.com/en/blog/',
+      },
+    },
+    openGraph: {
+      title: 'Blog - Voconly',
+      description: 'Deep dives into speech recognition, AI model selection, and more.',
+      type: 'website',
+      locale: 'en_US',
+    },
+  },
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { lang } = await params;
+  return metadataByLang[lang] || metadataByLang.zh;
 }
 
 export default async function BlogPage({ params }: PageProps) {

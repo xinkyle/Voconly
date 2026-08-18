@@ -1,11 +1,56 @@
-'use client';
-
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { useI18n } from '../../lib/i18n-context';
+import type { Language } from '../../lib/locales';
 
-export default function AboutPage() {
-  const { lang } = useI18n();
+interface PageProps {
+  params: Promise<{ lang: Language }>;
+}
+
+const metadataByLang: Record<Language, Metadata> = {
+  zh: {
+    title: '关于 Voconly - 开源AI语音输入工具',
+    description: 'Voconly 是一款开源的本地语音转文字工具，所有语音识别在本地完成，无需联网，数据永不上传。由独立开发者老幸.AI 创建。',
+    alternates: {
+      canonical: 'https://www.voconly.com/zh/about/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/about/',
+        'en': 'https://www.voconly.com/en/about/',
+      },
+    },
+    openGraph: {
+      title: '关于 Voconly',
+      description: '开源本地语音转文字工具，隐私安全，永久免费。',
+      type: 'website',
+      locale: 'zh_CN',
+    },
+  },
+  en: {
+    title: 'About Voconly - Open Source AI Voice Typing',
+    description: 'Voconly is an open source local speech-to-text tool. All voice recognition runs locally, no internet needed, your data never leaves your device. Created by indie developer 老幸.AI.',
+    alternates: {
+      canonical: 'https://www.voconly.com/en/about/',
+      languages: {
+        'zh-CN': 'https://www.voconly.com/zh/about/',
+        'en': 'https://www.voconly.com/en/about/',
+      },
+    },
+    openGraph: {
+      title: 'About Voconly',
+      description: 'Open source local speech-to-text tool. Private, secure, free forever.',
+      type: 'website',
+      locale: 'en_US',
+    },
+  },
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { lang } = await params;
+  return metadataByLang[lang] || metadataByLang.zh;
+}
+
+export default async function AboutPage({ params }: PageProps) {
+  const { lang } = await params;
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
