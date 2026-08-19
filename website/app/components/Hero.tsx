@@ -42,7 +42,7 @@ export default function Hero() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* 中心光晕 */}
         <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-35"
+          className="absolute top-[22%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-35"
           style={{
             background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(0, 212, 170, 0.3), transparent 70%)',
           }}
@@ -54,7 +54,7 @@ export default function Hero() {
       <Navbar />
 
       {/* Hero 内容 - 居中对齐 */}
-      <div className="relative z-10 px-6 lg:px-12 pt-32 lg:pt-40 pb-20">
+      <div className="relative z-10 px-6 lg:px-12 pt-20 lg:pt-24 pb-20">
         <div className="max-w-4xl mx-auto text-center">
           {/* 顶部徽章 */}
           <motion.div
