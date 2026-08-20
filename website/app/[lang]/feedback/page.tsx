@@ -25,6 +25,10 @@ const metadataByLang: Record<Language, Metadata> = {
       type: 'website',
       locale: 'zh_CN',
     },
+    robots: {
+      index: true,
+      follow: true,
+    },
   },
   en: {
     title: 'Feedback - Voconly',
@@ -42,6 +46,10 @@ const metadataByLang: Record<Language, Metadata> = {
       description: 'Have questions or suggestions? Contact us, we value every piece of feedback.',
       type: 'website',
       locale: 'en_US',
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   },
 };

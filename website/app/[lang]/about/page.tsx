@@ -25,6 +25,10 @@ const metadataByLang: Record<Language, Metadata> = {
       type: 'website',
       locale: 'zh_CN',
     },
+    robots: {
+      index: true,
+      follow: true,
+    },
   },
   en: {
     title: 'About Voconly - Open Source AI Voice Typing',
@@ -42,6 +46,10 @@ const metadataByLang: Record<Language, Metadata> = {
       description: 'Open source local speech-to-text tool. Private, secure, free forever.',
       type: 'website',
       locale: 'en_US',
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   },
 };

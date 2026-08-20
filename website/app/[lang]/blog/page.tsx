@@ -27,6 +27,10 @@ const metadataByLang: Record<Language, Metadata> = {
       type: 'website',
       locale: 'zh_CN',
     },
+    robots: {
+      index: true,
+      follow: true,
+    },
   },
   en: {
     title: 'Blog - Voconly',
@@ -44,6 +48,10 @@ const metadataByLang: Record<Language, Metadata> = {
       description: 'Deep dives into speech recognition, AI model selection, and more.',
       type: 'website',
       locale: 'en_US',
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   },
 };

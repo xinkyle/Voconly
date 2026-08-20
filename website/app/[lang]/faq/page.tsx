@@ -27,6 +27,10 @@ const metadataByLang: Record<Language, Metadata> = {
       type: 'website',
       locale: 'zh_CN',
     },
+    robots: {
+      index: true,
+      follow: true,
+    },
   },
   en: {
     title: 'FAQ - Voconly',
@@ -44,6 +48,10 @@ const metadataByLang: Record<Language, Metadata> = {
       description: 'Frequently asked questions about Voconly: installation, usage, system support, and more.',
       type: 'website',
       locale: 'en_US',
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   },
 };

@@ -82,6 +82,34 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://www.voconly.com/zh/blog/offline-voice-input-comparison/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://www.voconly.com/zh/blog/offline-voice-input-comparison/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.voconly.com/en/blog/offline-voice-input-comparison/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.voconly.com/en/blog/offline-voice-input-comparison/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://www.voconly.com/zh/blog/offline-voice-input-comparison/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.voconly.com/en/blog/offline-voice-input-comparison/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.voconly.com/zh/blog/vibe-coding-voice-prompt-guide/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://www.voconly.com/zh/blog/vibe-coding-voice-prompt-guide/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.voconly.com/en/blog/vibe-coding-voice-prompt-guide/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.voconly.com/en/blog/vibe-coding-voice-prompt-guide/</loc>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://www.voconly.com/zh/blog/vibe-coding-voice-prompt-guide/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.voconly.com/en/blog/vibe-coding-voice-prompt-guide/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.voconly.com/zh/blog/voconly-usage-guide/</loc>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://www.voconly.com/zh/blog/voconly-usage-guide/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.voconly.com/en/blog/voconly-usage-guide/"/>

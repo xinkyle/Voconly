@@ -47,6 +47,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         'x-default': 'https://www.voconly.com/',
       },
     },
+    openGraph: {
+      title: post.title,
+      description: post.description,
+      type: 'article',
+      locale: lang === 'zh' ? 'zh_CN' : 'en_US',
+      url: `https://www.voconly.com/${lang}/blog/${slug}/`,
+      publishedTime: post.date,
+      authors: ['老幸.AI'],
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
   };
 }
 
