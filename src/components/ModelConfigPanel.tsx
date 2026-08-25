@@ -338,12 +338,24 @@ function AsrModelCard({
 
   return (
     <div
-      onClick={isDownloaded ? onSelect : undefined}
+      onClick={() => {
+        if (hasMultipleQuantVariants) {
+          // 有多个量化版本：点击展开/收起
+          setShowQuantPanel(!showQuantPanel);
+        } else if (isDownloaded) {
+          // 只有一个版本且已下载：选择模型
+          onSelect();
+        }
+      }}
       className={`group relative rounded-xl border transition-all duration-200 ${
+        hasMultipleQuantVariants || isDownloaded
+          ? 'cursor-pointer'
+          : ''
+      } ${
         isSelected
           ? 'border-gray-900 bg-gray-50'
           : isDownloaded
-            ? 'border-gray-200 bg-gray-50 hover:border-gray-300 cursor-pointer'
+            ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
             : 'border-gray-200 bg-white'
       }`}
     >
@@ -411,34 +423,8 @@ function AsrModelCard({
 
           {/* Status/Action */}
           <div className="relative flex-shrink-0 z-10">
-            {isDownloaded ? (
-              // 已下载模型：显示已下载版本状态
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (hasMultipleQuantVariants) {
-                    setShowQuantPanel(!showQuantPanel);
-                  }
-                }}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
-                  hasMultipleQuantVariants ? 'hover:bg-gray-100 cursor-pointer' : ''
-                }`}
-              >
-                {isSelected ? (
-                  <CheckIcon className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <span className="text-gray-500">
-                    {downloadedQuants.length > 0
-                      ? `${t('models.downloaded')} ${downloadedQuants.length}`
-                      : t('models.downloaded')}
-                  </span>
-                )}
-                {hasMultipleQuantVariants && (
-                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
-                )}
-              </button>
-            ) : isDownloading ? (
-              // 下载中：显示进度
+            {isDownloading ? (
+              // 下载中：显示进度（优先检查下载状态）
               <div className="flex flex-col items-end gap-1">
                 <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
                 {onDownloadCancel && (
@@ -451,6 +437,22 @@ function AsrModelCard({
                   >
                     {t('models.cancel')}
                   </button>
+                )}
+              </div>
+            ) : isDownloaded ? (
+              // 已下载模型：显示已下载版本状态
+              <div className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg">
+                {isSelected ? (
+                  <CheckIcon className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <span className="text-gray-500">
+                    {downloadedQuants.length > 0
+                      ? `${t('models.downloaded')} ${downloadedQuants.length}`
+                      : t('models.downloaded')}
+                  </span>
+                )}
+                {hasMultipleQuantVariants && (
+                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
                 )}
               </div>
             ) : (

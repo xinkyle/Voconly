@@ -253,17 +253,24 @@ function ModelSelectModal({
         <div className="space-y-2 flex-1 overflow-y-auto pr-1">
           {sortedModels.map((model) => {
             const isDownloaded = model.downloaded;
-            const isDownloading = downloadStates?.[model.preset.id]?.downloading ?? false;
-            const downloadProgress = downloadStates?.[model.preset.id]?.progress;
-            const isExpanded = expandedModelId === model.preset.id;
-            const showRecommendation = shouldShowRecommendation(model.preset.id);
-            const logoPath = getAsrModelLogo(model.preset.id);
-
-            // Get quant variants and downloaded quants
             const quantVariants = model.quantVariants || [];
             const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
             const activeQuant = model.activeQuant || model.preset.activeQuant;
             const hasMultipleQuantVariants = quantVariants.length > 1;
+
+            // 检查是否有任何量化版本正在下载
+            const isDownloading = quantVariants.some(
+              v => downloadStates?.[`${model.preset.id}-${v.quant}`]?.downloading
+            ) || (downloadStates?.[model.preset.id]?.downloading ?? false);
+
+            // 获取当前下载的进度（如果有）
+            const downloadProgress = quantVariants
+              .map(v => downloadStates?.[`${model.preset.id}-${v.quant}`]?.progress)
+              .find(p => p !== undefined) || downloadStates?.[model.preset.id]?.progress;
+
+            const isExpanded = expandedModelId === model.preset.id;
+            const showRecommendation = shouldShowRecommendation(model.preset.id);
+            const logoPath = getAsrModelLogo(model.preset.id);
 
             // Parse selected quant from selectedId (format: "modelId-quant")
             const isThisModelSelected = selectedId === model.preset.id || selectedId.startsWith(model.preset.id + '-');
@@ -382,7 +389,27 @@ function ModelSelectModal({
 
                     {/* Right side: Status indicator */}
                     <div className="flex-shrink-0">
-                      {isDownloaded ? (
+                      {isDownloading ? (
+                        // Downloading: show progress (优先检查下载状态)
+                        <div className="flex flex-col items-end gap-1" onClick={e => e.stopPropagation()}>
+                          <span className="text-sm font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
+                          {onDownloadCancel && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // 取消所有可能的下载（包括量化版本）
+                                quantVariants.forEach(v => {
+                                  onDownloadCancel(`${model.preset.id}-${v.quant}`);
+                                });
+                                onDownloadCancel(model.preset.id);
+                              }}
+                              className="text-xs text-red-500 hover:text-red-600 underline"
+                            >
+                              {t('models.cancel')}
+                            </button>
+                          )}
+                        </div>
+                      ) : isDownloaded ? (
                         // Downloaded: show status
                         <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
                           {(selectedId === model.preset.id || selectedId.startsWith(model.preset.id + '-')) ? (
@@ -391,27 +418,14 @@ function ModelSelectModal({
                               <span className="text-gray-700">
                                 {selectedQuant ? `${t('sceneList.selected')} ${selectedQuant}` : t('sceneList.selected')}
                               </span>
+                              {hasMultipleQuantVariants && (
+                                <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
+                              )}
                             </>
                           ) : (
                             hasMultipleQuantVariants && (
                               <span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>
                             )
-                          )}
-                        </div>
-                      ) : isDownloading ? (
-                        // Downloading: show progress
-                        <div className="flex flex-col items-end gap-1" onClick={e => e.stopPropagation()}>
-                          <span className="text-sm font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
-                          {onDownloadCancel && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDownloadCancel(model.preset.id);
-                              }}
-                              className="text-xs text-red-500 hover:text-red-600 underline"
-                            >
-                              {t('models.cancel')}
-                            </button>
                           )}
                         </div>
                       ) : (
@@ -486,7 +500,21 @@ function ModelSelectModal({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (onDownload) {
-                                        onDownload(modelForDownload);
+                                        // 构建带量化版本信息的模型对象
+                                        const modelWithQuant: Model = {
+                                          id: `${model.preset.id}-${variant.quant}`,
+                                          name: `${model.preset.name} (${variant.quant})`,
+                                          backend: (model.preset.backend || 'Whisper') as BackendType,
+                                          size: model.preset.size || '',
+                                          downloaded: isDownloaded,
+                                          downloadUrls: model.preset.downloadUrls.map(url => ({
+                                            ...url,
+                                            url: url.url.substring(0, url.url.lastIndexOf('/') + 1) + variant.filename,
+                                          })),
+                                          languages: model.preset.languages || [],
+                                          modelType: 'asr',
+                                        };
+                                        onDownload(modelWithQuant);
                                       }
                                     }}
                                     className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
