@@ -59,7 +59,36 @@ pub struct CatalogFile {
     pub size_bytes: u64,
 }
 
+/// Quantization variant information for UI display
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuantVariant {
+    pub quant: String,
+    pub filename: String,
+    pub size_bytes: u64,
+    pub is_recommended: bool,
+}
+
 impl CatalogModel {
+    /// Get all quantization variants for this model
+    /// Returns a list of (quant, filename, size_bytes) tuples
+    pub fn get_quant_variants(&self) -> Vec<QuantVariant> {
+        self.files
+            .as_ref()
+            .map(|files| {
+                files
+                    .iter()
+                    .map(|f| QuantVariant {
+                        quant: f.quant.clone(),
+                        filename: f.filename.clone(),
+                        size_bytes: f.size_bytes,
+                        is_recommended: self.default_quant.as_ref() == Some(&f.quant),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Parse backend type from catalog model
     fn parse_backend(&self) -> BackendType {
         match self.backend.as_deref() {
@@ -220,9 +249,13 @@ pub static CATALOG: Lazy<Vec<CatalogModel>> = Lazy::new(|| {
     root.models
 });
 
-/// Find a model by ID (exact match only)
+/// Find a model by ID (case-insensitive match)
+///
+/// Note: Uses case-insensitive matching because `get_base_model_id` returns
+/// lowercase IDs, but catalog.json preserves original case (e.g., "Qwen3-ASR-1.7B").
 pub fn find_model(id: &str) -> Option<&CatalogModel> {
-    CATALOG.iter().find(|m| m.id == id)
+    let id_lower = id.to_lowercase();
+    CATALOG.iter().find(|m| m.id.to_lowercase() == id_lower)
 }
 
 #[cfg(test)]
@@ -248,8 +281,12 @@ mod tests {
 
     #[test]
     fn can_find_models() {
+        // Original case
         assert!(find_model("Qwen3-ASR-1.7B").is_some());
         assert!(find_model("cohere-transcribe-03-2026").is_some());
+        // Lowercase (from get_base_model_id)
+        assert!(find_model("qwen3-asr-1.7b").is_some());
+        assert!(find_model("parakeet-unified-en-0.6b").is_some());
     }
 
     #[test]

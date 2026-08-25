@@ -137,6 +137,16 @@ pub struct ModelPreset {
     /// Only used for GGUF models with quantization variants
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quant: Option<String>,
+
+    /// Downloaded quantization versions (from filesystem scan)
+    /// Contains all quant variants found on disk for this model base ID
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub downloaded_quants: Vec<String>,
+
+    /// Currently active quantization version
+    /// Used for switching between downloaded variants
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_quant: Option<String>,
 }
 
 fn default_model_type_asr() -> ModelType {
@@ -179,6 +189,8 @@ impl ModelPreset {
             path: None,
             filename: None,
             quant: None,
+            downloaded_quants: Vec::new(),
+            active_quant: None,
         }
     }
 
@@ -218,6 +230,8 @@ impl ModelPreset {
             path,
             filename: None,
             quant: None,
+            downloaded_quants: Vec::new(),
+            active_quant: None,
         }
     }
 
@@ -259,6 +273,8 @@ impl ModelPreset {
             path,
             filename: Some(filename),
             quant: Some(quant),
+            downloaded_quants: Vec::new(),
+            active_quant: None,
         }
     }
 
@@ -293,6 +309,8 @@ impl ModelPreset {
             path: None,
             filename: None,
             quant: None,
+            downloaded_quants: Vec::new(),
+            active_quant: None,
         }
     }
 
@@ -327,6 +345,8 @@ impl ModelPreset {
             path: None,
             filename: None,
             quant: None,
+            downloaded_quants: Vec::new(),
+            active_quant: None,
         }
     }
 

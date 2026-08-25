@@ -419,6 +419,9 @@ export interface ModelPreset {
   // Quantization info for GGUF models
   filename?: string;  // Actual filename (e.g., "Qwen3-ASR-1.7B-Q5_K_M.gguf")
   quant?: string;     // Quantization version (e.g., "Q5_K_M", "F16")
+  // Downloaded quantization versions
+  downloadedQuants?: string[];  // All downloaded quant versions for this model
+  activeQuant?: string;        // Currently active quant version
 }
 
 /**
@@ -459,6 +462,22 @@ export interface AsrModelWithStatus {
   downloaded: boolean;
   path?: string;
   sizeMb?: number;
+  /** Available quantization variants (from catalog) */
+  quantVariants: QuantVariant[];
+  /** Downloaded quantization versions (from filesystem scan) */
+  downloadedQuants?: string[];
+  /** Currently active quantization version */
+  activeQuant?: string;
+}
+
+/**
+ * Quantization variant information
+ */
+export interface QuantVariant {
+  quant: string;
+  filename: string;
+  sizeBytes: number;
+  isRecommended: boolean;
 }
 
 /**

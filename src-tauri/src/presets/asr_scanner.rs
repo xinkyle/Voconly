@@ -159,42 +159,59 @@ pub fn scan_available_asr_models() -> Vec<ModelPreset> {
 /// Internal helper function that scans one directory and returns found models.
 /// Recursively scans subdirectories up to max_depth levels.
 ///
-/// **多量化版本处理**：按基础 ID 分组，选择最高精度版本
+/// **多量化版本处理**：
+/// - 收集每个基础 ID 的所有量化版本
+/// - 设置 downloaded_quants 为已下载版本列表
+/// - 设置 active_quant 为最高精度版本
 fn scan_single_directory(storage_dir: &Path) -> Vec<ModelPreset> {
     // 第一阶段：扫描所有模型
     let all_models = scan_single_directory_recursive(storage_dir, 0, 2);
 
-    // 第二阶段：按基础 ID 分组，选择最高精度版本
-    let mut grouped: HashMap<String, ModelPreset> = HashMap::new();
+    // 第二阶段：按基础 ID 分组，收集所有量化版本
+    let mut grouped: HashMap<String, Vec<ModelPreset>> = HashMap::new();
 
     for model in all_models {
         let base_id = get_base_model_id(&model.id);
-
-        // 如果已存在，比较量化版本优先级
-        if let Some(existing) = grouped.get_mut(&base_id) {
-            // 只有 GGUF 模型才比较量化版本
-            let should_replace = match (&model.quant, &existing.quant) {
-                (Some(model_quant), Some(existing_quant)) => {
-                    quant_priority(model_quant) > quant_priority(existing_quant)
-                }
-                _ => false,
-            };
-
-            if should_replace {
-                log::debug!(
-                    "[Scanner] 替换为更高精度版本: {} ({} > {})",
-                    base_id,
-                    model.quant.as_ref().unwrap(),
-                    existing.quant.as_ref().unwrap()
-                );
-                *existing = model; // 替换为更高精度版本
-            }
-        } else {
-            grouped.insert(base_id, model);
-        }
+        grouped.entry(base_id).or_default().push(model);
     }
 
-    grouped.into_values().collect()
+    // 第三阶段：为每个基础 ID 创建包含完整版本信息的 preset
+    grouped
+        .into_iter()
+        .map(|(base_id, mut models)| {
+            // 按量化版本优先级排序（最高精度在前）
+            models.sort_by(|a, b| {
+                let prio_a = a.quant.as_ref().map(|q| quant_priority(q)).unwrap_or(0);
+                let prio_b = b.quant.as_ref().map(|q| quant_priority(q)).unwrap_or(0);
+                prio_b.cmp(&prio_a) // 降序：高精度在前
+            });
+
+            // 收集所有已下载的量化版本
+            let downloaded_quants: Vec<String> = models
+                .iter()
+                .filter_map(|m| m.quant.clone())
+                .collect();
+
+            // 取最高精度版本作为基础 preset
+            let mut preset = models.into_iter().next().unwrap();
+
+            // 设置版本信息
+            preset.downloaded_quants = downloaded_quants.clone();
+            // 设置 active_quant 为最高精度版本
+            if !downloaded_quants.is_empty() {
+                preset.active_quant = Some(downloaded_quants[0].clone());
+            }
+
+            log::debug!(
+                "[Scanner] 模型 {} 已下载版本: {:?}, 激活版本: {:?}",
+                base_id,
+                preset.downloaded_quants,
+                preset.active_quant
+            );
+
+            preset
+        })
+        .collect()
 }
 
 /// Recursive helper function for scanning directories

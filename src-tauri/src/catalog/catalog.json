@@ -17,9 +17,28 @@
       "description": "中英文混合录入效果最佳，30种语言+22种中文方言，资源消耗偏大",
       "files": [
         {
+          "filename": "Qwen3-ASR-1.7B-Q4_K_M.gguf",
+          "quant": "Q4_K_M",
+          "size_bytes": 1319830496,
+          "is_recommended": false
+        },
+        {
           "filename": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
           "quant": "Q5_K_M",
-          "size_bytes": 1610612736
+          "size_bytes": 1517290464,
+          "is_recommended": true
+        },
+        {
+          "filename": "Qwen3-ASR-1.7B-Q6_K.gguf",
+          "quant": "Q6_K",
+          "size_bytes": 1692554208,
+          "is_recommended": false
+        },
+        {
+          "filename": "Qwen3-ASR-1.7B-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 2185030624,
+          "is_recommended": false
         }
       ],
       "default_quant": "Q5_K_M",
@@ -54,9 +73,28 @@
       "description": "HuggingFace Open ASR排行榜#1，支持14种语言",
       "files": [
         {
+          "filename": "cohere-transcribe-03-2026-Q4_K_M.gguf",
+          "quant": "Q4_K_M",
+          "size_bytes": 1558162944,
+          "is_recommended": false
+        },
+        {
           "filename": "cohere-transcribe-03-2026-Q5_K_M.gguf",
           "quant": "Q5_K_M",
-          "size_bytes": 1825361100
+          "size_bytes": 1770270208,
+          "is_recommended": true
+        },
+        {
+          "filename": "cohere-transcribe-03-2026-Q6_K.gguf",
+          "quant": "Q6_K",
+          "size_bytes": 1972524544,
+          "is_recommended": false
+        },
+        {
+          "filename": "cohere-transcribe-03-2026-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 2410655232,
+          "is_recommended": false
         }
       ],
       "default_quant": "Q5_K_M",
@@ -91,9 +129,28 @@
       "description": "流式处理，80ms超低延迟，39种语言，纯CPU可运行",
       "files": [
         {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf",
+          "quant": "Q4_K_M",
+          "size_bytes": 495831520,
+          "is_recommended": false
+        },
+        {
           "filename": "nemotron-3.5-asr-streaming-0.6b-Q5_K_M.gguf",
           "quant": "Q5_K_M",
-          "size_bytes": 560988672
+          "size_bytes": 559647200,
+          "is_recommended": true
+        },
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q6_K.gguf",
+          "quant": "Q6_K",
+          "size_bytes": 621356512,
+          "is_recommended": false
+        },
+        {
+          "filename": "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 751094240,
+          "is_recommended": false
         }
       ],
       "default_quant": "Q5_K_M",
@@ -128,9 +185,28 @@
       "description": "英语专项优化，支持流式推理，最低160ms延迟",
       "files": [
         {
+          "filename": "parakeet-unified-en-0.6b-Q4_K_M.gguf",
+          "quant": "Q4_K_M",
+          "size_bytes": 477274496,
+          "is_recommended": false
+        },
+        {
           "filename": "parakeet-unified-en-0.6b-Q5_K_M.gguf",
           "quant": "Q5_K_M",
-          "size_bytes": 541065216
+          "size_bytes": 540795264,
+          "is_recommended": true
+        },
+        {
+          "filename": "parakeet-unified-en-0.6b-Q6_K.gguf",
+          "quant": "Q6_K",
+          "size_bytes": 602191232,
+          "is_recommended": false
+        },
+        {
+          "filename": "parakeet-unified-en-0.6b-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 731357568,
+          "is_recommended": false
         }
       ],
       "default_quant": "Q5_K_M",
@@ -165,9 +241,28 @@
       "description": "99种语言覆盖，内置翻译功能",
       "files": [
         {
+          "filename": "whisper-large-v3-turbo-Q4_K_M.gguf",
+          "quant": "Q4_K_M",
+          "size_bytes": 536069792,
+          "is_recommended": false
+        },
+        {
           "filename": "whisper-large-v3-turbo-Q5_K_M.gguf",
           "quant": "Q5_K_M",
-          "size_bytes": 620756992
+          "size_bytes": 619628192,
+          "is_recommended": true
+        },
+        {
+          "filename": "whisper-large-v3-turbo-Q6_K.gguf",
+          "quant": "Q6_K",
+          "size_bytes": 692536992,
+          "is_recommended": false
+        },
+        {
+          "filename": "whisper-large-v3-turbo-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 886381824,
+          "is_recommended": false
         }
       ],
       "default_quant": "Q5_K_M",

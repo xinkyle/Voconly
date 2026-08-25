@@ -1,3 +1,4 @@
+use crate::catalog::QuantVariant;
 use crate::config::AppServices;
 use crate::llm_models::{scan_available_llm_models, LlmModelPreset};
 use crate::model_manager::LoadedModelInfo;
@@ -42,6 +43,13 @@ pub struct AsrModelWithStatus {
     pub downloaded: bool,
     pub path: Option<String>,
     pub size_mb: Option<u64>,
+    /// Available quantization variants (from catalog)
+    /// Only populated for undownloaded preset models with multiple quant options
+    pub quant_variants: Vec<QuantVariant>,
+    /// Downloaded quantization versions (from filesystem scan)
+    pub downloaded_quants: Vec<String>,
+    /// Currently active quantization version
+    pub active_quant: Option<String>,
 }
 
 /// Load a model into memory
@@ -335,11 +343,19 @@ fn build_model_list_from_presets(
             }
         });
 
+        // 从 catalog 获取量化版本列表（已下载的模型也需要，用于切换版本）
+        let quant_variants = crate::catalog::find_model(&model.id)
+            .map(|m| m.get_quant_variants())
+            .unwrap_or_default();
+
         result.push(AsrModelWithStatus {
             preset: model.clone(),
             downloaded,
             path,
             size_mb,
+            quant_variants,
+            downloaded_quants: model.downloaded_quants.clone(),
+            active_quant: model.active_quant.clone(),
         });
     }
 
@@ -367,11 +383,19 @@ fn build_model_list_from_presets(
 
         // 检查是否已经在结果列表中（精确 ID 匹配）
         if !result.iter().any(|m| m.preset.id == preset.id) {
+            // 从 catalog 获取量化版本列表
+            let quant_variants = crate::catalog::find_model(&preset.id)
+                .map(|m| m.get_quant_variants())
+                .unwrap_or_default();
+
             result.push(AsrModelWithStatus {
                 preset,
                 downloaded: false,
                 path: None,
                 size_mb: None,
+                quant_variants,
+                downloaded_quants: Vec::new(),
+                active_quant: None,
             });
         }
     }

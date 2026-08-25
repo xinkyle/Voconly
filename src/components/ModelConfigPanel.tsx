@@ -7,6 +7,7 @@ import type {
   LlmModelWithStatus,
   ModelPreset,
   LlmModelPreset,
+  QuantVariant,
 } from '../services/config';
 import type { Model, ProviderWithConfig, LlmProviderInstance } from '../types';
 import {
@@ -261,6 +262,17 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   </svg>
 );
 
+// Helper function to format bytes
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
+  } else if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(0)}MB`;
+  } else {
+    return `${(bytes / 1024).toFixed(0)}KB`;
+  }
+};
+
 // ASR Model Card Component
 interface AsrModelCardProps {
   model: AsrModelWithStatus;
@@ -272,6 +284,9 @@ interface AsrModelCardProps {
   onDownloadCancel?: () => void;
   t: (key: string) => string;
   currentLanguage: string;  // 当前系统语言
+  quantVariants?: QuantVariant[];  // 可用的量化版本列表（从 catalog 获取）
+  onDownloadWithQuant?: (variant: QuantVariant) => void;  // 选择量化版本后下载
+  onSwitchQuant?: (quant: string) => void;  // 切换激活版本
 }
 
 function AsrModelCard({
@@ -284,11 +299,25 @@ function AsrModelCard({
   onDownloadCancel,
   t,
   currentLanguage,
+  quantVariants,
+  onDownloadWithQuant,
+  onSwitchQuant,
 }: AsrModelCardProps) {
   const isDownloaded = model.downloaded;
   const knownModel = DEFAULT_ASR_MODELS.find((m) => m.id === model.preset.id);
   const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
   const logoPath = getAsrModelLogo(model.preset.id);
+
+  // 获取已下载版本和当前激活版本
+  const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
+  const activeQuant = model.activeQuant || model.preset.activeQuant;
+
+  // 合并版本信息：已下载的 + catalog 中的
+  const hasMultipleQuantVariants = quantVariants && quantVariants.length > 1;
+
+  // 量化版本面板展开状态
+  // 默认收起，由用户手动点击展开
+  const [showQuantPanel, setShowQuantPanel] = useState(false);
 
   // 根据当前语言决定是否显示推荐徽章
   const shouldShowRecommendation = (): boolean => {
@@ -301,10 +330,16 @@ function AsrModelCard({
   };
   const showRecommendation = shouldShowRecommendation();
 
+  // 计算已下载版本的总大小
+  const totalDownloadedSize = downloadedQuants.reduce((sum, quant) => {
+    const variant = quantVariants?.find(v => v.quant === quant);
+    return sum + (variant?.sizeBytes || 0);
+  }, 0);
+
   return (
     <div
       onClick={isDownloaded ? onSelect : undefined}
-      className={`group relative rounded-xl border transition-all duration-200 overflow-hidden ${
+      className={`group relative rounded-xl border transition-all duration-200 ${
         isSelected
           ? 'border-gray-900 bg-gray-50'
           : isDownloaded
@@ -323,13 +358,6 @@ function AsrModelCard({
         </div>
       )}
 
-      {/* Downloaded badge - top right corner for downloaded but not selected */}
-      {isDownloaded && !isSelected && (
-        <div className="absolute top-2 right-2 z-10">
-          <CheckIcon className="w-4 h-4 text-emerald-600" />
-        </div>
-      )}
-
       <div className="relative px-3 py-2 z-10">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
@@ -345,7 +373,7 @@ function AsrModelCard({
               {/* Model Name with recommendation badge */}
               <div className={`flex items-center gap-2 ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
                 <h3 className="font-semibold text-sm truncate">
-                  {model.preset.name}{model.preset.quant && ` (${model.preset.quant})`}
+                  {model.preset.name}
                   {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
                 </h3>
                 {/* Recommendation badge */}
@@ -361,13 +389,17 @@ function AsrModelCard({
               {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined || model.preset.supportsStreaming) && (
                 <div className="flex items-center gap-3 mt-2">
                   {model.preset.accuracyScore !== undefined && (
-                    <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
+                    <div className="flex-shrink-0">
+                      <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
+                    </div>
                   )}
                   {model.preset.speedScore !== undefined && (
-                    <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
+                    <div className="flex-shrink-0">
+                      <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
+                    </div>
                   )}
                   {model.preset.supportsStreaming && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200 flex-shrink-0">
                       <AudioLines className="w-3 h-3" />
                       {t('models.streaming')}
                     </span>
@@ -380,10 +412,33 @@ function AsrModelCard({
           {/* Status/Action */}
           <div className="relative flex-shrink-0 z-10">
             {isDownloaded ? (
-              isSelected ? (
-                <CheckIcon className="w-4 h-4 text-emerald-600" />
-              ) : null
+              // 已下载模型：显示已下载版本状态
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasMultipleQuantVariants) {
+                    setShowQuantPanel(!showQuantPanel);
+                  }
+                }}
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                  hasMultipleQuantVariants ? 'hover:bg-gray-100 cursor-pointer' : ''
+                }`}
+              >
+                {isSelected ? (
+                  <CheckIcon className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <span className="text-gray-500">
+                    {downloadedQuants.length > 0
+                      ? `${t('models.downloaded')} ${downloadedQuants.length}`
+                      : t('models.downloaded')}
+                  </span>
+                )}
+                {hasMultipleQuantVariants && (
+                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
+                )}
+              </button>
             ) : isDownloading ? (
+              // 下载中：显示进度
               <div className="flex flex-col items-end gap-1">
                 <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
                 {onDownloadCancel && (
@@ -399,19 +454,116 @@ function AsrModelCard({
                 )}
               </div>
             ) : (
+              // 未下载：显示下载按钮
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDownload();
+                  if (hasMultipleQuantVariants) {
+                    // 有多个版本：展开/收起量化面板
+                    setShowQuantPanel(!showQuantPanel);
+                  } else {
+                    // 只有一个版本：直接下载
+                    onDownload();
+                  }
                 }}
-                className="flex items-center justify-center w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors hover:bg-gray-100 ${
+                  hasMultipleQuantVariants ? 'text-blue-600' : 'text-gray-400'
+                }`}
               >
                 <DownloadIcon className="w-4 h-4" />
+                <span>{t('models.download')}</span>
+                {hasMultipleQuantVariants && (
+                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
+                )}
               </button>
             )}
           </div>
         </div>
-      </div>
+
+        {/* 量化版本面板 - 有多个量化版本的模型，点击下载按钮后展开 */}
+        {showQuantPanel && hasMultipleQuantVariants && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="text-xs text-gray-500 mb-2">{t('models.quantVersions')}:</div>
+            <div className="space-y-1.5">
+              {quantVariants?.map((variant) => {
+                const isDownloadedVariant = downloadedQuants.includes(variant.quant);
+                const isActiveVariant = activeQuant === variant.quant;
+
+                return (
+                  <div
+                    key={variant.quant}
+                    onClick={isDownloadedVariant ? (e) => {
+                      e.stopPropagation();
+                      if (onSwitchQuant && !isActiveVariant) {
+                        onSwitchQuant(variant.quant);
+                      }
+                    } : undefined}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                      isDownloadedVariant
+                        ? isActiveVariant
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {/* 单选按钮样式 */}
+                      <span className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
+                        isActiveVariant
+                          ? 'border-blue-500 bg-blue-500'
+                          : isDownloadedVariant
+                            ? 'border-gray-300'
+                            : 'border-gray-200'
+                      }`}>
+                        {isActiveVariant && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </span>
+                      <span className="font-medium text-gray-700">{variant.quant}</span>
+                      {variant.isRecommended && (
+                        <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
+                          {t('models.recommended')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">{formatBytes(variant.sizeBytes)}</span>
+                      {isDownloadedVariant ? (
+                        isActiveVariant ? (
+                          <span className="text-blue-600 font-medium">{t('models.currentUse')}</span>
+                        ) : (
+                          <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
+                        )
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowQuantPanel(false); // 收起面板
+                            if (onDownloadWithQuant) {
+                              onDownloadWithQuant(variant);
+                            }
+                          }}
+                          className="px-2 py-0.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        >
+                          {t('models.download')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* 已下载版本统计 */}
+            {downloadedQuants.length > 0 && (
+              <div className="mt-2 text-xs text-gray-400">
+                {t('models.downloadedCount')}: {downloadedQuants.length},
+                {t('models.totalSize')}: {formatBytes(totalDownloadedSize)}
+              </div>
+            )}
+          </div>
+        )}
+
+              </div>
 
       {/* Selected indicator bar */}
       {isSelected && (
@@ -857,7 +1009,7 @@ export default function ModelConfigPanel({
       </div>
 
       {/* Section 1: ASR Models - Voice to Text */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-visible">
         <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -935,20 +1087,68 @@ export default function ModelConfigPanel({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {asrModels.map((model) => (
+            {asrModels.map((model) => {
+              // 检查是否有任何量化版本正在下载
+              // 需要检查所有可能的量化版本 ID，因为下载状态的 key 是带量化后缀的
+              const quantVariants = model.quantVariants || [];
+              const isDownloading = quantVariants.some(
+                v => downloadStates[`${model.preset.id}-${v.quant}`]?.downloading
+              ) || (downloadStates[model.preset.id]?.downloading ?? false);
+
+              // 获取当前下载的进度（如果有）
+              const downloadProgress = quantVariants
+                .map(v => downloadStates[`${model.preset.id}-${v.quant}`]?.progress)
+                .find(p => p !== undefined) || downloadStates[model.preset.id]?.progress;
+
+              return (
               <AsrModelCard
                 key={model.preset.id}
                 model={model}
                 isSelected={selectedAsrModelId === model.preset.id}
-                isDownloading={downloadStates[model.preset.id]?.downloading ?? false}
-                downloadProgress={downloadStates[model.preset.id]?.progress}
+                isDownloading={isDownloading}
+                downloadProgress={downloadProgress}
                 onSelect={() => handleAsrModelSelect(model.preset.id)}
                 onDownload={() => handleAsrDownload(model)}
-                onDownloadCancel={() => handleDownloadCancel(model.preset.id)}
+                onDownloadCancel={() => {
+                  // 取消所有可能的下载
+                  quantVariants.forEach(v => {
+                    handleDownloadCancel(`${model.preset.id}-${v.quant}`);
+                  });
+                  handleDownloadCancel(model.preset.id);
+                }}
                 t={t}
                 currentLanguage={currentLanguage}
+                quantVariants={quantVariants}
+                onDownloadWithQuant={(variant) => {
+                  // 根据选择的量化版本更新下载 URL
+                  const modelObj: Model = {
+                    id: `${model.preset.id}-${variant.quant}`,
+                    name: `${model.preset.name} (${variant.quant})`,
+                    backend: model.preset.backend || 'Whisper',
+                    size: model.preset.size,
+                    downloaded: model.downloaded,
+                    downloadUrls: model.preset.downloadUrls.map(url => ({
+                      ...url,
+                      url: url.url.substring(0, url.url.lastIndexOf('/') + 1) + variant.filename,
+                    })),
+                    languages: model.preset.languages || [],
+                    description: model.preset.description,
+                    modelType: 'asr',
+                  };
+                  onDownload?.(modelObj);
+                }}
+                onSwitchQuant={(quant) => {
+                  // 切换激活的量化版本
+                  // 简化实现：更新场景配置中的模型 ID
+                  const modelWithQuant = `${model.preset.id}-${quant}`;
+                  log.info(`切换模型量化版本: ${model.preset.id} -> ${modelWithQuant}`);
+                  // TODO: 调用后端切换版本的命令
+                  // 暂时只更新当前选择的模型 ID
+                  handleAsrModelSelect(modelWithQuant);
+                }}
               />
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
