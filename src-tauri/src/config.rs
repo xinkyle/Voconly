@@ -11,6 +11,48 @@ use crate::model_manager::ModelManager;
 use crate::paths::{config_file_path, models_dir};
 use std::collections::HashMap;
 
+/// 模型引用，用于唯一标识一个模型实例
+///
+/// 将模型基础 ID 和量化版本分离存储，避免解析复杂度。
+/// - `model_id`: 模型基础ID，如 `qwen3-asr-1.7b`
+/// - `quantization`: 量化版本，如 `Q5_K_M`（可选）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelRef {
+    /// 模型基础ID（如 qwen3-asr-1.7b）
+    pub model_id: String,
+    /// 量化版本（如 Q5_K_M），可选
+    /// 为空时使用默认行为（最高精度或已下载版本）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantization: Option<String>,
+}
+
+impl ModelRef {
+    /// 创建新的模型引用
+    pub fn new(model_id: String) -> Self {
+        Self { model_id, quantization: None }
+    }
+
+    /// 带量化版本
+    pub fn with_quantization(model_id: String, quantization: String) -> Self {
+        Self { model_id, quantization: Some(quantization) }
+    }
+
+    /// 获取完整ID（用于日志、显示等）
+    pub fn full_id(&self) -> String {
+        match &self.quantization {
+            Some(q) => format!("{}-{}", self.model_id, q),
+            None => self.model_id.clone(),
+        }
+    }
+}
+
+impl Default for ModelRef {
+    fn default() -> Self {
+        Self { model_id: String::new(), quantization: None }
+    }
+}
+
 /// GGUF model configuration for transcribe-cpp backend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -244,7 +286,13 @@ pub struct Scene {
     pub id: String,
     pub name: String,
     pub shortcut: String,
-    pub model_id: String,
+    /// 模型引用（新格式：包含 model_id 和 quantization）
+    #[serde(default)]
+    pub model: ModelRef,
+    /// DEPRECATED: 旧的模型ID字段，仅用于向后兼容旧配置文件
+    /// 读取时会自动迁移到 `model` 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
     pub enabled: bool,
     /// 模型加载策略
     #[serde(default)]
@@ -379,7 +427,8 @@ impl Default for AppConfig {
                     id: "1".to_string(),
                     name: "轻度润色".to_string(),
                     shortcut: "[".to_string(),
-                    model_id: "".to_string(), // 空字符串，提示用户先下载模型
+                    model: ModelRef::new(String::new()), // 空 model_id，提示用户先下载模型
+                    model_id: None,
                     enabled: true,
                     load_strategy: LoadStrategy::Always,
                     auto_type: true,
@@ -388,7 +437,8 @@ impl Default for AppConfig {
                     id: "2".to_string(),
                     name: "专业润色".to_string(),
                     shortcut: "]".to_string(),
-                    model_id: "".to_string(), // 空字符串，提示用户先下载模型
+                    model: ModelRef::new(String::new()), // 空 model_id，提示用户先下载模型
+                    model_id: None,
                     enabled: true,
                     load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
                     auto_type: true,
@@ -449,6 +499,9 @@ pub fn load_config() -> Result<AppConfig, String> {
     let mut config: AppConfig = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse config file: {}", e))?;
 
+    // 数据迁移：将旧的 model_id 字段迁移到新的 model 字段
+    migrate_scene_model_refs(&mut config);
+
     // Restore default scenes if scenes array is empty
     if config.scenes.is_empty() {
         let default_config = AppConfig::default();
@@ -460,6 +513,44 @@ pub fn load_config() -> Result<AppConfig, String> {
 
     log::info!("[Config] Loaded config with {} scenes", config.scenes.len());
     Ok(config)
+}
+
+/// 迁移场景的模型引用数据
+///
+/// 将旧的 `model_id` 字段（可能包含量化后缀）迁移到新的 `model` 字段。
+/// 迁移规则：
+/// - 如果 `model.model_id` 为空但 `model_id` 存在，解析 `model_id` 并迁移
+/// - 解析时尝试提取量化后缀（如 Q5_K_M）
+/// - 迁移后清空 `model_id` 字段
+fn migrate_scene_model_refs(config: &mut AppConfig) {
+    for scene in &mut config.scenes {
+        // 如果 model.model_id 为空但有旧的 model_id 字段，进行迁移
+        if scene.model.model_id.is_empty() {
+            if let Some(old_model_id) = &scene.model_id {
+                if !old_model_id.is_empty() {
+                    // 解析旧的 model_id，提取基础 ID 和量化后缀
+                    let base_id = crate::utils::get_base_model_id(old_model_id);
+                    let quant = crate::utils::extract_quant_suffix(old_model_id);
+
+                    scene.model = ModelRef {
+                        model_id: base_id,
+                        quantization: quant,
+                    };
+
+                    log::info!(
+                        "[Config] Migrated scene '{}': model_id '{}' -> model {{ model_id: '{}', quantization: {:?} }}",
+                        scene.id, old_model_id, scene.model.model_id, scene.model.quantization
+                    );
+
+                    // 清空旧字段
+                    scene.model_id = None;
+                }
+            }
+        } else {
+            // 新字段已有值，清空旧字段
+            scene.model_id = None;
+        }
+    }
 }
 
 /// Save configuration to file (internal helper function)

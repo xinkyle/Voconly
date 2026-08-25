@@ -12,6 +12,7 @@ mod llm;
 
 use crate::backends::BackendType;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub use asr::get_asr_presets;
 pub use asr_scanner::scan_available_asr_models;
@@ -147,6 +148,12 @@ pub struct ModelPreset {
     /// Used for switching between downloaded variants
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_quant: Option<String>,
+
+    /// Mapping from quantization version to file path
+    /// key: quantization version (e.g., "Q8_0")
+    /// value: model file path
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub quant_paths: HashMap<String, String>,
 }
 
 fn default_model_type_asr() -> ModelType {
@@ -191,6 +198,7 @@ impl ModelPreset {
             quant: None,
             downloaded_quants: Vec::new(),
             active_quant: None,
+            quant_paths: HashMap::new(),
         }
     }
 
@@ -232,6 +240,7 @@ impl ModelPreset {
             quant: None,
             downloaded_quants: Vec::new(),
             active_quant: None,
+            quant_paths: HashMap::new(),
         }
     }
 
@@ -275,6 +284,7 @@ impl ModelPreset {
             quant: Some(quant),
             downloaded_quants: Vec::new(),
             active_quant: None,
+            quant_paths: HashMap::new(),
         }
     }
 
@@ -311,6 +321,7 @@ impl ModelPreset {
             quant: None,
             downloaded_quants: Vec::new(),
             active_quant: None,
+            quant_paths: HashMap::new(),
         }
     }
 
@@ -347,6 +358,7 @@ impl ModelPreset {
             quant: None,
             downloaded_quants: Vec::new(),
             active_quant: None,
+            quant_paths: HashMap::new(),
         }
     }
 

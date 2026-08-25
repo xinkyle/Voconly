@@ -65,6 +65,52 @@ pub fn is_valid_quant(quant: &str) -> bool {
     )
 }
 
+/// Extract quantization suffix from a model ID.
+///
+/// Returns the quantization suffix if present, otherwise None.
+///
+/// # Examples
+/// ```
+/// assert_eq!(extract_quant_suffix("parakeet-unified-en-0.6b-Q8_0"), Some("Q8_0".to_string()));
+/// assert_eq!(extract_quant_suffix("parakeet-unified-en-0.6b"), None);
+/// assert_eq!(extract_quant_suffix("qwen3-asr-1.7b-q5_k_m"), Some("Q5_K_M".to_string()));
+/// ```
+pub fn extract_quant_suffix(model_id: &str) -> Option<String> {
+    // Remove file extension first if present
+    let name = model_id
+        .strip_suffix(".gguf")
+        .or_else(|| model_id.strip_suffix(".bin"))
+        .or_else(|| model_id.strip_suffix(".onnx"))
+        .unwrap_or(model_id);
+
+    let name_lower = name.to_lowercase();
+
+    // Find all separator positions and check from right to left
+    let mut pos = name_lower.len();
+    while pos > 0 {
+        // Find the next separator from right
+        let next_sep = name_lower[..pos]
+            .chars()
+            .rev()
+            .position(|c| c == '-' || c == '_')
+            .map(|i| pos - i - 1);
+
+        match next_sep {
+            Some(sep_pos) => {
+                let potential_quant = &name_lower[sep_pos + 1..];
+                if is_valid_quant(potential_quant) {
+                    // Return uppercase version for consistency
+                    return Some(potential_quant.to_uppercase());
+                }
+                pos = sep_pos;
+            }
+            None => break,
+        }
+    }
+
+    None
+}
+
 /// Extract quantization version from a filename.
 ///
 /// Only supports standard format: `<model-name>-<quant>.gguf`
@@ -137,5 +183,32 @@ mod tests {
         );
         assert_eq!(extract_quant_from_filename("model.gguf"), None); // No quantization
         assert_eq!(extract_quant_from_filename("my-model-v1.gguf"), None); // Unknown quantization
+    }
+
+    #[test]
+    fn test_extract_quant_suffix() {
+        // 带量化后缀
+        assert_eq!(
+            extract_quant_suffix("parakeet-unified-en-0.6b-Q8_0"),
+            Some("Q8_0".to_string())
+        );
+        assert_eq!(
+            extract_quant_suffix("qwen3-asr-1.7b-q5_k_m"),
+            Some("Q5_K_M".to_string())
+        );
+        assert_eq!(
+            extract_quant_suffix("sensevoice-small-F16"),
+            Some("F16".to_string())
+        );
+
+        // 不带量化后缀
+        assert_eq!(extract_quant_suffix("parakeet-unified-en-0.6b"), None);
+        assert_eq!(extract_quant_suffix("sensevoice-small"), None);
+
+        // 带文件扩展名
+        assert_eq!(
+            extract_quant_suffix("parakeet-unified-en-0.6b-Q8_0.gguf"),
+            Some("Q8_0".to_string())
+        );
     }
 }

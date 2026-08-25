@@ -25,6 +25,37 @@ export interface DownloadSource {
   priority: number;
 }
 
+// ============== 模型引用 ==============
+/**
+ * 模型引用，唯一标识一个模型实例
+ *
+ * 将模型基础 ID 和量化版本分离存储，避免解析复杂度。
+ * - modelId: 模型基础ID，如 `qwen3-asr-1.7b`
+ * - quantization: 量化版本，如 `Q5_K_M`（可选）
+ */
+export interface ModelRef {
+  /** 模型基础ID（如 qwen3-asr-1.7b） */
+  modelId: string;
+  /** 量化版本（如 Q5_K_M），可选 */
+  quantization?: string;
+}
+
+/**
+ * 创建模型引用的辅助函数
+ */
+export function createModelRef(modelId: string, quantization?: string): ModelRef {
+  return { modelId, quantization };
+}
+
+/**
+ * 获取完整ID（用于显示或日志）
+ */
+export function getFullModelId(ref: ModelRef): string {
+  return ref.quantization
+    ? `${ref.modelId}-${ref.quantization}`
+    : ref.modelId;
+}
+
 // 模型定义
 export interface Model {
   id: string;
@@ -49,7 +80,10 @@ export interface Scene {
   id: string;
   name: string;
   shortcut: string;
-  modelId: string;
+  /** 模型引用（新格式：包含 modelId 和 quantization） */
+  model: ModelRef;
+  /** DEPRECATED: 旧的模型ID字段，仅用于向后兼容旧配置文件 */
+  modelId?: string;
   autoType?: boolean;
   enabled: boolean;
 }

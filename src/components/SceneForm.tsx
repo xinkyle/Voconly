@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Scene, Model } from '../types';
+import { getFullModelId } from '../types';
+import { parseModelId } from '../services/config';
 
 interface SceneFormProps {
   scene?: Scene | null;
@@ -24,7 +26,7 @@ export default function SceneForm({
   const { t } = useTranslation();
   const [name, setName] = useState(scene?.name || '');
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
-  const [modelId, setModelId] = useState(scene?.modelId || ''); // 空字符串，让用户手动选择
+  const [modelId, setModelId] = useState(scene?.model?.modelId ? getFullModelId(scene.model) : ''); // 空字符串，让用户手动选择
   const [enabled, setEnabled] = useState(scene?.enabled ?? true);
   const [errors, setErrors] = useState<{ name?: string; shortcut?: string; conflict?: string }>({});
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function SceneForm({
     if (scene) {
       setName(scene.name);
       setShortcut(scene.shortcut);
-      setModelId(scene.modelId);
+      setModelId(scene.model?.modelId ? getFullModelId(scene.model) : '');
       setEnabled(scene.enabled);
     }
   }, [scene]);
@@ -90,11 +92,17 @@ export default function SceneForm({
       return;
     }
 
+    // 解析 modelId（可能包含量化后缀）
+    const { baseId, quant } = parseModelId(modelId);
+
     const sceneData: Scene = {
       id: scene?.id || Date.now().toString(),
       name: name.trim(),
       shortcut: shortcut.trim(),
-      modelId,
+      model: {
+        modelId: baseId,
+        quantization: quant,
+      },
       enabled,
     };
 

@@ -192,6 +192,14 @@ fn scan_single_directory(storage_dir: &Path) -> Vec<ModelPreset> {
                 .filter_map(|m| m.quant.clone())
                 .collect();
 
+            // 收集每个量化版本的路径
+            let mut quant_paths: HashMap<String, String> = HashMap::new();
+            for model in &models {
+                if let (Some(quant), Some(path)) = (&model.quant, &model.path) {
+                    quant_paths.insert(quant.clone(), path.clone());
+                }
+            }
+
             // 取最高精度版本作为基础 preset
             let mut preset = models.into_iter().next().unwrap();
 
@@ -201,12 +209,15 @@ fn scan_single_directory(storage_dir: &Path) -> Vec<ModelPreset> {
             if !downloaded_quants.is_empty() {
                 preset.active_quant = Some(downloaded_quants[0].clone());
             }
+            // 设置量化版本路径映射
+            preset.quant_paths = quant_paths;
 
             log::debug!(
-                "[Scanner] 模型 {} 已下载版本: {:?}, 激活版本: {:?}",
+                "[Scanner] 模型 {} 已下载版本: {:?}, 激活版本: {:?}, 路径映射: {:?}",
                 base_id,
                 preset.downloaded_quants,
-                preset.active_quant
+                preset.active_quant,
+                preset.quant_paths
             );
 
             preset

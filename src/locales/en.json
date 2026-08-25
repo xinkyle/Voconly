@@ -428,6 +428,8 @@
     "noScenes": "No scenes configured",
     "noScenesHint": "Click \"Add Scene\" to create a voice input scene",
     "selectModel": "Select Model",
+    "select": "Select",
+    "selected": "Selected",
     "ready": "Ready",
     "notDownloaded": "Not downloaded",
     "clickToEdit": "Click to edit scene",
@@ -441,7 +443,12 @@
     "on": "On",
     "off": "Off",
     "invalidModelId": "Invalid Model ID",
-    "invalidModelIdDesc": "Model ID contains invalid characters"
+    "invalidModelIdDesc": "Model ID contains invalid characters",
+    "currentVersion": "Current",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "downloadComplete": "{{name}} download complete",
+    "switchTo": "Switch"
   },
   "memoryStatus": {
     "title": "Resident Models in Memory",

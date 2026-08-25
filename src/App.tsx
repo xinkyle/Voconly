@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { emitTo, listen } from './utils/tauri';
+import type { AppConfig, Scene, FloatPanelState, HistoryRecord, LlmProfile, Model, LlmErrorPayload } from './types';
+import { getFullModelId } from './types';
 import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
 import HomePanel from './components/HomePanel';
@@ -10,7 +12,7 @@ import { SettingsShortcut, SettingsSystem, SettingsAbout, SettingsDictionary } f
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
 import { loadConfig, saveConfig } from './services/config';
-import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, type DownloadProgress } from './services/downloader';
+import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, cancelModelDownload, type DownloadProgress } from './services/downloader';
   import { updateTrayMenu } from './services/tray';
 import { useSceneShortcuts } from './hooks/useShortcut';
 import { useRecorder } from './hooks/useRecorder';
@@ -37,7 +39,6 @@ import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
-import type { AppConfig, Scene, FloatPanelState, HistoryRecord, LlmProfile, Model, LlmErrorPayload } from './types';
 import type { RemoteVersionInfo } from './types/updater';
 import { eventManager } from './services/eventManager';
 
@@ -662,8 +663,9 @@ function App() {
       console.log(`${'─'.repeat(60)}`);
 
       // Step 1: Show "识别中" with spinner and progress info
+      const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
       await showFloatPanelStatus('transcribing', sceneName, undefined, {
-        modelId: scene.modelId,
+        modelId: fullModelId,
         device,
         audioDuration: audioDuration,
         isTranscribing: true,
@@ -689,13 +691,13 @@ function App() {
 
       // 收集 ASR 性能数据（用于综合日志）
       const asrStats = getAllStats();
-      const asrKey = `${scene.modelId}_${device}`;
+      const asrKey = `${fullModelId}_${device}`;
       const asrEntry = asrStats[asrKey];
-      const asrEstimate = estimateTranscribeTime(scene.modelId, device, audioDuration);
+      const asrEstimate = estimateTranscribeTime(fullModelId, device, audioDuration);
 
       // ASR 性能数据
       const performanceData = {
-        asrModelId: scene.modelId,
+        asrModelId: fullModelId,
         asrDevice: device,
         asrEstimatedTime: asrEstimate.estimatedTime,
         asrActualTime: transcribeTime,
@@ -705,7 +707,7 @@ function App() {
 
       // 记录性能数据（更新缓存）
       if (audioDuration > 0 && transcribeTime > 0) {
-        recordPerformance(scene.modelId, device, audioDuration, transcribeTime);
+        recordPerformance(fullModelId, device, audioDuration, transcribeTime);
       }
 
       if (!recognizedText || recognizedText.trim() === '') {
@@ -723,7 +725,7 @@ function App() {
         const actualTextLen = recognizedText.length;
         log.debug(`[ASR Complete] Sending updated text_len=${actualTextLen} to FloatPanel for LLM time re-estimation`);
         await showFloatPanelStatus('transcribing', sceneName, undefined, {
-          modelId: scene.modelId,
+          modelId: fullModelId,
           device,
           audioDuration: audioDuration,
           isTranscribing: true,
@@ -967,8 +969,8 @@ function App() {
       if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
         const scene = currentSceneRef.current;
         if (scene) {
-          const model = config?.models?.find(m => m.id === scene.modelId);
-          const modelName = model?.name || scene.modelId;
+          const model = config?.models?.find(m => m.id === scene.model?.modelId);
+          const modelName = model?.name || scene.model?.modelId || '';
           const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
           const requiredMemory = memoryMatch?.[1] || '未知';
           const availableMemory = memoryMatch?.[2] || '未知';
@@ -1018,25 +1020,25 @@ function App() {
       return;
     }
 
-    const model = config?.models?.find(m => m.id === scene.modelId);
+    const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
+    const model = config?.models?.find(m => m.id === scene.model?.modelId);
 
     // Check if model is currently downloading
-    if (downloadStates[scene.modelId]?.downloading) {
+    if (downloadStates[fullModelId]?.downloading) {
       showToast({
         type: 'info',
-        title: t('toast.modelDownloading', { name: model?.name || scene.modelId }),
+        title: t('toast.modelDownloading', { name: model?.name || scene.model?.modelId }),
       });
       isProcessingShortcutRef.current = false;
       return;
     }
 
     // Check if model is downloaded
-    const modelDownloaded = await checkModelExists(scene.modelId);
+    const modelDownloaded = await checkModelExists(fullModelId);
     if (!modelDownloaded) {
       // Show dialog asking user if they want to download
-      const model = config?.models?.find(m => m.id === scene.modelId);
-      setPendingModelId(scene.modelId);
-      setPendingModelName(model?.name || scene.modelId);
+      setPendingModelId(scene.model?.modelId ?? '');
+      setPendingModelName(model?.name || scene.model?.modelId || '');
       setShowModelDialog(true);
       isProcessingShortcutRef.current = false;
       return;
@@ -1063,7 +1065,7 @@ function App() {
       // 1. Immediately show "transcribing" UI (Optimistic UI)
       // 传入基本的 progressInfo 确保进度条能正确初始化，后续 workflow 会更新精确预估
       showFloatPanelStatus('transcribing', translateSceneName(scene.name, t), undefined, {
-        modelId: scene.modelId,
+        modelId: fullModelId,
         device: 'GPU',
         audioDuration: 0,
         isTranscribing: true,
@@ -1404,6 +1406,17 @@ function App() {
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
+                downloadStates={downloadStates}
+                onDownload={handleDownload}
+                onDownloadCancel={(modelId) => {
+                  log.info(`Cancel download: ${modelId}`);
+                  cancelModelDownload(modelId);
+                  setDownloadStates(prev => {
+                    const next = { ...prev };
+                    delete next[modelId];
+                    return next;
+                  });
+                }}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'system' && config && (
@@ -1548,7 +1561,7 @@ function App() {
         }}
         onSelectOther={() => {
           // Find the scene that uses this model and trigger model selection dialog
-          const scene = config?.scenes?.find(s => s.modelId === downloadErrorInfo?.modelId);
+          const scene = config?.scenes?.find(s => s.model?.modelId === downloadErrorInfo?.modelId);
           if (scene) {
             // Switch to home tab first, then trigger model selection
             setActiveNav('home');

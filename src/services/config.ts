@@ -30,11 +30,20 @@ interface RustModel {
 // Rust LoadStrategy: 所有模型均为常驻内存模式
 type RustLoadStrategy = { type: 'Always' };
 
+// Rust ModelRef 类型（与后端完全匹配）
+interface RustModelRef {
+  modelId: string;
+  quantization?: string;
+}
+
 interface RustScene {
   id: string;
   name: string;
   shortcut: string;
-  modelId: string;
+  /** 模型引用（新格式） */
+  model: RustModelRef;
+  /** DEPRECATED: 旧的模型ID字段，仅用于向后兼容 */
+  modelId?: string;
   loadStrategy: RustLoadStrategy;
   autoType: boolean;
   enabled: boolean;
@@ -160,7 +169,11 @@ function convertSceneFromRust(rust: RustScene): Scene {
     id: rust.id,
     name: rust.name,
     shortcut: rust.shortcut,
-    modelId: rust.modelId,
+    model: {
+      modelId: rust.model?.modelId ?? '',
+      quantization: rust.model?.quantization,
+    },
+    modelId: rust.modelId, // 保留旧字段用于向后兼容
     autoType: rust.autoType ?? true,
     enabled: rust.enabled,
   };
@@ -195,7 +208,11 @@ function convertSceneToRust(scene: Scene): RustScene {
     id: scene.id,
     name: scene.name,
     shortcut: scene.shortcut,
-    modelId: scene.modelId,
+    model: {
+      modelId: scene.model?.modelId ?? '',
+      quantization: scene.model?.quantization,
+    },
+    modelId: scene.modelId, // 保留旧字段用于向后兼容
     loadStrategy: { type: 'Always' },
     autoType: scene.autoType ?? true,
     enabled: scene.enabled,
@@ -504,6 +521,80 @@ export async function getAsrModelList(): Promise<AsrModelWithStatus[]> {
  */
 export async function getLlmModelList(): Promise<LlmModelWithStatus[]> {
   return invoke<LlmModelWithStatus[]>('get_llm_model_list');
+}
+
+/**
+ * Valid quantization suffixes (synced with backend: src-tauri/src/utils/quant.rs)
+ * DO NOT modify this list without updating the backend is_valid_quant() function.
+ */
+const VALID_QUANTS = [
+  'Q8_0', 'Q6_K', 'Q5_K_M', 'Q5_K_S', 'Q5_0',
+  'Q4_K_M', 'Q4_K_S', 'Q4_0',
+  'Q3_K_M', 'Q3_K_L', 'Q3_K_S', 'Q2_K',
+  'F32', 'F16', 'BF16'
+];
+
+/**
+ * Parse model ID with optional quantization suffix
+ * Examples:
+ * - "qwen3-asr-1.7b" → { baseId: "qwen3-asr-1.7b" }
+ * - "qwen3-asr-1.7b-Q8_0" → { baseId: "qwen3-asr-1.7b", quant: "Q8_0" }
+ * - "nemotron-3.5-asr-streaming-0.6b-Q5_K_M" → { baseId: "nemotron-3.5-asr-streaming-0.6b", quant: "Q5_K_M" }
+ */
+export function parseModelId(fullModelId: string): { baseId: string; quant?: string } {
+  if (!fullModelId) {
+    return { baseId: '' };
+  }
+
+  // Check for known quantization suffix (case-insensitive)
+  for (const quant of VALID_QUANTS) {
+    const suffix = '-' + quant;
+    if (fullModelId.toLowerCase().endsWith(suffix.toLowerCase())) {
+      return {
+        baseId: fullModelId.slice(0, -suffix.length),
+        quant: quant
+      };
+    }
+  }
+
+  return { baseId: fullModelId };
+}
+
+/**
+ * Check if a model with the given full ID is downloaded
+ * Uses asrModels data (must be loaded first) for fast synchronous check
+ * For async backend check, use checkModelExists from downloader.ts
+ * @param fullModelId The full model ID (may include quantization suffix)
+ * @param asrModels List of ASR models with download status
+ * @returns true if the model (and specific quantization if specified) is downloaded
+ */
+export function isModelDownloaded(
+  fullModelId: string,
+  asrModels: AsrModelWithStatus[]
+): boolean {
+  if (!fullModelId || asrModels.length === 0) {
+    return false;
+  }
+
+  const { baseId, quant } = parseModelId(fullModelId);
+
+  // Find the model by base ID (case-insensitive)
+  const model = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
+  if (!model) {
+    return false;
+  }
+
+  // If no quantization specified, check if any version is downloaded
+  if (!quant) {
+    const downloadedQuants = model.downloadedQuants || [];
+    return downloadedQuants.length > 0;
+  }
+
+  // Check if the specific quantization version is downloaded (case-insensitive)
+  const normalizedQuant = quant.toUpperCase();
+  const downloadedQuants = model.downloadedQuants || [];
+
+  return downloadedQuants.some(q => q.toUpperCase() === normalizedQuant);
 }
 
 /**

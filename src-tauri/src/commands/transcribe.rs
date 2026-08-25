@@ -355,7 +355,7 @@ pub async fn transcribe_audio(
 
         // 查找场景配置
         let scene = config.scenes.iter().find(|s| s.id == request.scene_id);
-        let model_id = scene.map(|s| s.model_id.clone()).unwrap_or_default();
+        let model_id = scene.map(|s| s.model.model_id.clone()).unwrap_or_default();
 
         // 直接使用用户偏好，前端已在选择模型时设置
         config
@@ -445,23 +445,24 @@ pub fn transcribe_samples_internal(
 
     // 确定语言：直接使用用户偏好（前端已设置好推荐值）
     // 语言选择逻辑由前端负责，后端只读取配置
+    // 使用基础模型 ID 查找语言偏好
     let language = config
         .model_language_prefs
-        .get(&scene.model_id)
+        .get(&scene.model.model_id)
         .cloned()
         .unwrap_or_else(|| {
             // 兜底：如果前端没有设置偏好，使用 auto
             // 正常情况前端会在选择模型时自动设置推荐语言
             info!(
                 "[Transcribe] 模型 {} 没有语言偏好，使用 auto",
-                scene.model_id
+                scene.model.model_id
             );
             "auto".to_string()
         });
 
     info!(
         "[Transcribe] 使用语言: {} for model {}",
-        language, scene.model_id
+        language, scene.model.model_id
     );
 
     let mut params = TranscribeParams::default();

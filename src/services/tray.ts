@@ -1,5 +1,6 @@
 import { invoke } from '../utils/tauri';
 import type { Scene } from '../types';
+import { getFullModelId } from '../types';
 import i18n from '../i18n';
 import { translateSceneName } from '../utils/i18n';
 
@@ -25,7 +26,7 @@ export async function updateTrayMenu(scenes: Scene[]): Promise<void> {
     id: scene.id,
     name: translateSceneName(scene.name, i18n.t.bind(i18n)),
     shortcut: scene.shortcut,
-    modelId: scene.modelId,
+    modelId: scene.model?.modelId ? getFullModelId(scene.model) : '',
     enabled: scene.enabled,
   }));
 

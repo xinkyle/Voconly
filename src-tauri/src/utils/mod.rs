@@ -5,7 +5,7 @@ pub mod hf_cache;
 pub mod quant;
 
 pub use quant::{
-    extract_quant_from_filename, higher_quant, is_valid_quant, quant_priority,
+    extract_quant_from_filename, extract_quant_suffix, higher_quant, is_valid_quant, quant_priority,
 };
 
 /// Extract base model ID by removing quantization suffix.

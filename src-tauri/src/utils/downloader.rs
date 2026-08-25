@@ -441,8 +441,29 @@ pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
     }
 
     // GGUF models: use scanner (already selected highest precision version, supports multi-quantization)
+    // 需要处理带量化后缀的模型 ID，如 "parakeet-unified-en-0.6b-Q8_0"
     let scanned = scan_available_asr_models();
-    scanned.iter().any(|p| p.id == model_id)
+
+    // 提取基础 ID 和量化后缀
+    let base_id = crate::utils::get_base_model_id(model_id);
+    let quant_suffix = crate::utils::extract_quant_suffix(model_id);
+
+    // 找到基础模型
+    let model = scanned.iter().find(|p| p.id == base_id);
+    match model {
+        Some(m) => {
+            if let Some(q) = quant_suffix {
+                // 指定了量化版本：检查 downloaded_quants
+                m.downloaded_quants
+                    .iter()
+                    .any(|dq| dq.eq_ignore_ascii_case(&q))
+            } else {
+                // 没有指定量化版本：检查是否有任何版本已下载
+                !m.downloaded_quants.is_empty()
+            }
+        }
+        None => false,
+    }
 }
 
 /// Helper: Get backend type as string

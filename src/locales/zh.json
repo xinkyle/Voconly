@@ -428,6 +428,8 @@
     "noScenes": "暂无场景配置",
     "noScenesHint": "点击「添加场景」创建语音输入场景",
     "selectModel": "选择模型",
+    "select": "选择",
+    "selected": "已选择",
     "ready": "已就绪",
     "notDownloaded": "未下载",
     "clickToEdit": "点击编辑场景",
@@ -441,7 +443,12 @@
     "on": "开启",
     "off": "关闭",
     "invalidModelId": "无效的模型 ID",
-    "invalidModelIdDesc": "模型 ID 包含非法字符"
+    "invalidModelIdDesc": "模型 ID 包含非法字符",
+    "currentVersion": "当前",
+    "expand": "展开",
+    "collapse": "收起",
+    "downloadComplete": "{{name}} 下载完成",
+    "switchTo": "切换"
   },
   "memoryStatus": {
     "title": "当前驻留内存的模型",

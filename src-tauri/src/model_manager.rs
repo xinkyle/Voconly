@@ -7,8 +7,9 @@ use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
 use crate::config::{AppConfig, DownloadSource, Model};
-use crate::presets::{scan_available_asr_models, ModelPreset};
+use crate::presets::{scan_available_asr_models, get_base_model_id, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
+use crate::utils::extract_quant_suffix;
 use log::{info, warn};
 use sysinfo::System;
 
@@ -171,7 +172,10 @@ fn calc_dir_size(path: &Path) -> u64 {
 ///
 /// **优先使用 preset.filename 字段**（GGUF 模型），
 /// 如果没有 filename，再使用 get_model_path 查找。
-fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
+///
+/// **量化版本路径查找**：
+/// 如果指定了 `quant_override`，优先从 `preset.quant_paths` 查找路径。
+fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option<Model> {
     // 仅 ASR 模型可转换为 Model (ModelManager 只处理 ASR)
     if !preset.is_asr() {
         log::debug!("[preset_to_model] 非ASR模型，跳过: {}", preset.id);
@@ -181,27 +185,26 @@ fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
     let backend = preset.backend?;
     let backend_str = backend.to_string();
 
-    log::debug!("[preset_to_model] 开始查找模型: id={}, backend={}", preset.id, backend_str);
+    log::debug!("[preset_to_model] 开始查找模型: id={}, backend={}, quant_override={:?}", preset.id, backend_str, quant_override);
 
-    // 优先使用 preset.path（扫描器设置的完整路径，包括自定义目录）
-    // 其次使用 preset.filename（GGUF 文件名，在默认目录查找）
-    // 最后 fallback 到 get_model_path
-    let model_path = if let Some(ref path_str) = preset.path {
-        // 扫描器已设置完整路径（自定义目录中的模型）- 最高优先级
-        let path = std::path::PathBuf::from(path_str);
-        log::debug!("[preset_to_model] 使用 preset.path: {}", path.display());
-        path
-    } else if let Some(ref filename) = preset.filename {
-        // GGUF 模型：使用 filename 字段（在默认目录查找）
-        let storage_dir = get_model_storage_dir().ok()?;
-        let path = storage_dir.join(filename);
-        log::debug!("[preset_to_model] 使用 preset.filename: {}", path.display());
-        path
+    // 路径查找优先级：
+    // 1. 如果指定了量化版本，从 quant_paths 查找
+    // 2. preset.path（扫描器设置的完整路径）
+    // 3. preset.filename（GGUF 文件名，在默认目录查找）
+    // 4. get_model_path 查找
+    let model_path = if let Some(quant) = quant_override {
+        // 从 quant_paths 查找指定量化版本的路径
+        if let Some(path_str) = preset.quant_paths.get(quant) {
+            let path = std::path::PathBuf::from(path_str);
+            log::debug!("[preset_to_model] 使用 quant_paths[{}]: {}", quant, path.display());
+            path
+        } else {
+            log::warn!("[preset_to_model] 量化版本 {} 不在 quant_paths 中，尝试其他方式", quant);
+            // 回退到其他查找方式
+            find_model_path_fallback(preset, &backend_str)?
+        }
     } else {
-        // 默认：使用 get_model_path 查找
-        let model_path_result = get_model_path(&preset.id, &backend_str);
-        log::debug!("[preset_to_model] get_model_path 返回: {:?}", model_path_result);
-        model_path_result.ok()?
+        find_model_path_fallback(preset, &backend_str)?
     };
 
     // 验证文件/目录存在
@@ -258,6 +261,30 @@ fn preset_to_model(preset: &ModelPreset) -> Option<Model> {
     })
 }
 
+/// 回退路径查找逻辑
+fn find_model_path_fallback(preset: &ModelPreset, backend_str: &str) -> Option<std::path::PathBuf> {
+    // 优先使用 preset.path（扫描器设置的完整路径，包括自定义目录）
+    // 其次使用 preset.filename（GGUF 文件名，在默认目录查找）
+    // 最后 fallback 到 get_model_path
+    if let Some(ref path_str) = preset.path {
+        // 扫描器已设置完整路径（自定义目录中的模型）- 最高优先级
+        let path = std::path::PathBuf::from(path_str);
+        log::debug!("[find_model_path_fallback] 使用 preset.path: {}", path.display());
+        Some(path)
+    } else if let Some(ref filename) = preset.filename {
+        // GGUF 模型：使用 filename 字段（在默认目录查找）
+        let storage_dir = get_model_storage_dir().ok()?;
+        let path = storage_dir.join(filename);
+        log::debug!("[find_model_path_fallback] 使用 preset.filename: {}", path.display());
+        Some(path)
+    } else {
+        // 默认：使用 get_model_path 查找
+        let model_path_result = get_model_path(&preset.id, backend_str);
+        log::debug!("[find_model_path_fallback] get_model_path 返回: {:?}", model_path_result);
+        model_path_result.ok()
+    }
+}
+
 /// 模型管理器
 pub struct ModelManager {
     /// 已加载的模型实例（Arc 包装，支持共享所有权）
@@ -286,7 +313,8 @@ impl ModelManager {
             .iter()
             .find(|s| s.id == scene_id)
             .ok_or_else(|| format!("Scene not found: {}", scene_id))?;
-        Ok(scene.model_id.clone())
+        // 返回完整的模型 ID（基础 ID + 量化后缀）
+        Ok(scene.model.full_id())
     }
 
     /// 获取场景对应的模型文件路径
@@ -316,10 +344,22 @@ impl ModelManager {
     ///
     /// 注意：不再回退到 config.models（已废弃）
     pub fn get_model_config(&self, model_id: &str) -> Result<Model, String> {
+        // 提取基础 ID 和量化版本
+        let base_id = get_base_model_id(model_id);
+        let quant = extract_quant_suffix(model_id);
+
+        info!(
+            "[ModelManager] get_model_config: model_id={}, base_id={}, quant={:?}",
+            model_id, base_id, quant
+        );
+
         // Step 1: Check scanned ASR models first (file-first strategy)
+        // 使用基础 ID 匹配（不区分大小写）
         let scanned_models = scan_available_asr_models();
-        if let Some(preset) = scanned_models.iter().find(|p| p.id == model_id) {
-            if let Some(model) = preset_to_model(preset) {
+        if let Some(preset) = scanned_models.iter().find(|p| {
+            p.id.to_lowercase() == base_id.to_lowercase()
+        }) {
+            if let Some(model) = preset_to_model(preset, quant.as_deref()) {
                 info!(
                     "[ModelManager] 从扫描结果找到模型: {} (路径: {:?})",
                     model_id, model.path
@@ -329,9 +369,12 @@ impl ModelManager {
         }
 
         // Step 2: Get from presets (for download info)
+        // 使用基础 ID 匹配（不区分大小写）
         let presets = crate::presets::get_asr_presets();
-        if let Some(preset) = presets.iter().find(|p| p.id == model_id) {
-            if let Some(model) = preset_to_model(preset) {
+        if let Some(preset) = presets.iter().find(|p| {
+            p.id.to_lowercase() == base_id.to_lowercase()
+        }) {
+            if let Some(model) = preset_to_model(preset, quant.as_deref()) {
                 info!(
                     "[ModelManager] 从预设找到模型: {} (未下载)",
                     model_id
@@ -368,7 +411,7 @@ impl ModelManager {
         };
         // 查找使用此模型的场景，返回其加载策略
         for scene in &config.scenes {
-            if scene.model_id == model_id {
+            if scene.model.full_id() == model_id {
                 return scene.load_strategy.clone();
             }
         }
@@ -385,7 +428,7 @@ impl ModelManager {
             .scenes
             .iter()
             .filter(|s| s.enabled) // 只统计启用的场景
-            .map(|s| s.model_id.clone())
+            .map(|s| s.model.full_id())
             .collect()
     }
 
@@ -727,7 +770,7 @@ impl ModelManager {
                 .scenes
                 .iter()
                 .filter(|scene| scene.load_strategy.is_always())
-                .map(|scene| (scene.id.clone(), scene.model_id.clone()))
+                .map(|scene| (scene.id.clone(), scene.model.full_id()))
                 .collect()
         }; // config lock is dropped here
 
@@ -1215,7 +1258,7 @@ mod tests {
 
         // 如果有扫描到的模型，验证它们可以转换为 Model
         for preset in scanned {
-            if let Some(model) = preset_to_model(&preset) {
+            if let Some(model) = preset_to_model(&preset, None) {
                 assert_eq!(model.id, preset.id);
                 assert!(model.downloaded);
                 assert!(model.path.is_some());

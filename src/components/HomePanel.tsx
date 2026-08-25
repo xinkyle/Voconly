@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Scene, Model, LlmProfile } from '../types';
+import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
 import { translateSceneName } from '../utils/i18n';
 import { unloadModel, loadModel } from '../services/whisper';
-import { getAsrModelList, type AsrModelWithStatus, loadConfig, saveConfig } from '../services/config';
+import { getAsrModelList, type AsrModelWithStatus, loadConfig, saveConfig, isModelDownloaded, parseModelId } from '../services/config';
 import { saveLlmProfile, getLlmPromptPresets } from '../services/llm';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { useToast } from './ui/Toast';
@@ -106,24 +107,32 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
 // Get model name by ID
 // First searches in asrModels (scanned models from directory), then falls back to models (predefined list)
 function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[]): string {
-  // First, try to find in asrModels (scanned models from disk)
+  // Parse model ID to handle quantization suffix (e.g., "qwen3-asr-1.7b-Q8_0")
+  const { baseId, quant } = parseModelId(modelId);
+
+  // First, try to find in asrModels (scanned models from disk) - case-insensitive
   if (asrModels) {
-    const asrModel = asrModels.find(m => m.preset.id === modelId);
+    const asrModel = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
     if (asrModel) {
       const name = asrModel.preset.name;
-      // Add quantization version if available
-      if (asrModel.preset.quant) {
-        return `${name} (${asrModel.preset.quant})`;
+      // Add quantization version if available from modelId or preset
+      const displayQuant = quant || asrModel.preset.quant;
+      if (displayQuant) {
+        return `${name} (${displayQuant})`;
       }
       return name;
     }
   }
 
   // Fallback to predefined models list
-  const model = models.find(m => m.id === modelId);
+  const model = models.find(m => m.id.toLowerCase() === baseId.toLowerCase());
   if (!model) {
     // Don't log error for custom models, just return the ID as name
     return modelId;
+  }
+  // Add quantization version if available
+  if (quant) {
+    return `${model.name} (${quant})`;
   }
   return model.name;
 }
@@ -131,10 +140,25 @@ function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWith
 // Get model size by ID (formatted: GB for >= 1GB, MB for < 1GB)
 // First searches in asrModels (scanned models from directory), then falls back to models (predefined list)
 function getModelSize(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[]): string {
-  // First, try to find in asrModels (scanned models from disk)
+  // Parse model ID to handle quantization suffix
+  const { baseId, quant } = parseModelId(modelId);
+
+  // First, try to find in asrModels (scanned models from disk) - case-insensitive
   if (asrModels) {
-    const asrModel = asrModels.find(m => m.preset.id === modelId);
+    const asrModel = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
     if (asrModel) {
+      // If quantization specified, try to find size from quantVariants
+      if (quant && asrModel.quantVariants) {
+        const quantVariant = asrModel.quantVariants.find(v => v.quant.toUpperCase() === quant.toUpperCase());
+        if (quantVariant) {
+          const mb = quantVariant.sizeBytes / (1024 * 1024);
+          if (mb >= 1024) {
+            return `${(mb / 1024).toFixed(1)}GB`;
+          }
+          return `${Math.round(mb)}MB`;
+        }
+      }
+
       // Use actual size from disk if available
       if (asrModel.sizeMb) {
         const mb = asrModel.sizeMb;
@@ -153,8 +177,8 @@ function getModelSize(modelId: string, models: Model[], asrModels?: AsrModelWith
     }
   }
 
-  // Fallback to predefined models list
-  const model = models.find(m => m.id === modelId);
+  // Fallback to predefined models list - case-insensitive
+  const model = models.find(m => m.id.toLowerCase() === baseId.toLowerCase());
   if (!model || !model.size) return '';
 
   const sizeStr = model.size.toUpperCase();
@@ -603,27 +627,25 @@ function SceneCard({
             {/* Check model status: no model selected, downloading, not downloaded, or downloaded */}
             {(() => {
               // Check if modelId is empty (new user needs to select/download model)
-              const hasNoModelSelected = !scene.modelId || scene.modelId === '';
+              const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
+              const hasNoModelSelected = !scene.model?.modelId || scene.model.modelId === '';
 
-              // Use asrModels for accurate download status (it's reloaded when opening selection dialog)
-              const asrModel = asrModels.find(m => m.preset.id === scene.modelId);
-              const selectedModel = models.find(m => m.id === scene.modelId);
-              // Prefer asrModels for download status, fallback to models prop
-              const isModelDownloaded = asrModel?.downloaded ?? selectedModel?.downloaded ?? false;
-              const selectedModelDownloadState = downloadStates[scene.modelId];
+              // Use isModelDownloaded utility to handle quantization suffix (case-insensitive)
+              const isDownloaded = isModelDownloaded(fullModelId, asrModels) || (models.find(m => m.id === scene.model?.modelId)?.downloaded ?? false);
+              const selectedModelDownloadState = downloadStates[fullModelId];
               const isDownloading = selectedModelDownloadState?.downloading ?? false;
               const downloadProgress = selectedModelDownloadState?.progress;
 
               if (scene.enabled) {
                 return (
-                  <Tooltip text={hasNoModelSelected ? t('home.selectModelFirst') : isDownloading ? '' : isModelDownloaded ? t('home.clickToSwitchModel') : t('home.clickToSelect')}>
+                  <Tooltip text={hasNoModelSelected ? t('home.selectModelFirst') : isDownloading ? '' : isDownloaded ? t('home.clickToSwitchModel') : t('home.clickToSelect')}>
                     <button
                       onClick={() => {
                         if (isDownloading) return;
                         if (hasNoModelSelected) {
                           // Open model selection dialog
                           onModelClick();
-                        } else if (!isModelDownloaded && !isDownloading) {
+                        } else if (!isDownloaded && !isDownloading) {
                           // Model is not available and not downloading → clear selection and open dialog
                           onModelSelect('');
                         } else {
@@ -636,7 +658,7 @@ function SceneCard({
                           ? 'border-blue-200 bg-gray-50 cursor-default'
                           : hasNoModelSelected
                             ? 'border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
-                            : isModelDownloaded
+                            : isDownloaded
                               ? 'border-gray-100 bg-gray-50 hover:border-gray-200 hover:bg-gray-100 cursor-pointer'
                               : 'border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:bg-amber-50 cursor-pointer'
                       }`}
@@ -666,11 +688,11 @@ function SceneCard({
                         ) : (
                           <>
                             <div className="flex items-center gap-1.5">
-                              <span className={`font-medium text-sm ${isDownloading ? 'text-blue-600' : isModelDownloaded ? 'text-gray-900' : 'text-amber-700'}`}>
-                                {getModelName(scene.modelId, models, asrModels)}
+                              <span className={`font-medium text-sm ${isDownloading ? 'text-blue-600' : isDownloaded ? 'text-gray-900' : 'text-amber-700'}`}>
+                                {getModelName(scene.model?.modelId ?? '', models, asrModels)}
                               </span>
                               {/* Not downloaded badge */}
-                              {!isModelDownloaded && !isDownloading && (
+                              {!isDownloaded && !isDownloading && (
                                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-600 rounded">
                                   {t('models.notDownloaded')}
                                 </span>
@@ -686,8 +708,8 @@ function SceneCard({
                                   {t('models.downloading')}
                                 </span>
                               )
-                            ) : isModelDownloaded ? (
-                              <span className="text-xs text-gray-400 mt-0">({getModelSize(scene.modelId, models, asrModels)})</span>
+                            ) : isDownloaded ? (
+                              <span className="text-xs text-gray-400 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
                             ) : (
                               <span className="text-xs text-amber-500 mt-0.5">
                                 {t('home.clickToSelect')}
@@ -706,8 +728,8 @@ function SceneCard({
                       <span className="font-medium text-sm text-gray-400">{t('home.noModelSelected')}</span>
                     ) : (
                       <>
-                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.modelId, models, asrModels)}</span>
-                        <span className="text-xs text-gray-300 mt-0">({getModelSize(scene.modelId, models, asrModels)})</span>
+                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ?? '', models, asrModels)}</span>
+                        <span className="text-xs text-gray-300 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
                       </>
                     )}
                   </div>
@@ -735,10 +757,10 @@ function SceneCard({
           </div>
 
           {/* 语言选择器 - 仅在有选中模型且场景启用时显示 */}
-          {scene.enabled && scene.modelId && (() => {
+          {scene.enabled && scene.model?.modelId && (() => {
             // 获取当前选中模型的语言信息
-            const selectedModel = models.find(m => m.id === scene.modelId);
-            const asrModel = asrModels.find(m => m.preset.id === scene.modelId);
+            const selectedModel = models.find(m => m.id === scene.model?.modelId);
+            const asrModel = asrModels.find(m => m.preset.id === scene.model?.modelId);
 
             // 从 models 或 asrModels 获取语言列表
             const modelLanguages = selectedModel?.languages || asrModel?.preset.languages || [];
@@ -758,7 +780,7 @@ function SceneCard({
               : modelLanguages;
 
             // 使用统一的智能语言推荐逻辑
-            const currentLanguage = getRecommendedLanguage(scene.modelId, modelLanguages, supportsAutoDetect);
+            const currentLanguage = getRecommendedLanguage(scene.model?.modelId ?? '', modelLanguages, supportsAutoDetect);
 
             return (
               <div className="flex items-center gap-2">
@@ -780,7 +802,7 @@ function SceneCard({
       {isSelectingModel && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={() => onModelSelect(scene.modelId)}
+          onClick={() => onModelSelect(scene.model?.modelId ? getFullModelId(scene.model) : '')}
         >
           <div
             className="bg-white rounded-xl p-5 w-[900px] max-h-[80vh] overflow-hidden shadow-2xl animate-fade-in"
@@ -796,7 +818,7 @@ function SceneCard({
                 <h4 className="font-semibold text-gray-900 text-base">{t('home.selectModel')}</h4>
               </div>
               <button
-                onClick={() => onModelSelect(scene.modelId)}
+                onClick={() => onModelSelect(scene.model?.modelId ? getFullModelId(scene.model) : '')}
                 className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -807,7 +829,7 @@ function SceneCard({
             {/* Two-column grid layout for model cards */}
             <div className="grid grid-cols-2 gap-3 max-h-[32rem] overflow-y-auto p-1">
               {modelList.map((m) => {
-                const isSelected = scene.modelId === m.id;
+                const isSelected = scene.model?.modelId === m.id;
                 const isDownloaded = m.downloaded;
                 const isDownloading = m.downloading;
                 const canDownload = !isDownloaded && !isDownloading && m.downloadUrls && m.downloadUrls.length > 0 && onDownload;
@@ -1056,15 +1078,17 @@ export default function HomePanel({
         setAsrModels(result);
         log.info(`Loaded ${result.length} ASR models`);
 
-        // Check if any scene has selected a model that no longer exists
-        const availableModelIds = new Set(result.filter(m => m.downloaded).map(m => m.preset.id));
-        const scenesToClear = localScenes.filter(s => s.modelId && !availableModelIds.has(s.modelId));
+        // Check if any scene has selected a model that no longer exists or is not downloaded
+        const scenesToClear = localScenes.filter(s => {
+          if (!s.model?.modelId) return false;
+          return !isModelDownloaded(s.model.modelId, result);
+        });
 
         if (scenesToClear.length > 0) {
           log.info(`Clearing model selection for ${scenesToClear.length} scenes due to unavailable models`);
           const updatedScenes = localScenes.map(s => {
-            if (s.modelId && !availableModelIds.has(s.modelId)) {
-              return { ...s, modelId: '' };
+            if (s.model?.modelId && !isModelDownloaded(s.model.modelId, result)) {
+              return { ...s, model: { modelId: '', quantization: undefined } };
             }
             return s;
           });
@@ -1186,13 +1210,22 @@ export default function HomePanel({
   const handleModelSelect = useCallback(async (sceneId: string, modelId: string) => {
     log.debug(`handleModelSelect called: sceneId=${sceneId}, modelId=${modelId}`);
     const scene = localScenes.find(s => s.id === sceneId);
-    if (!scene || scene.modelId === modelId) {
+    const currentFullModelId = scene?.model?.modelId ? getFullModelId(scene.model) : '';
+    if (!scene || currentFullModelId === modelId) {
       log.debug('No change or scene found');
       setSelectingSceneId(null);
       return;
     }
 
-    const updatedScene = { ...scene, modelId };
+    // 解析模型 ID（可能包含量化后缀）
+    const { baseId, quant } = parseModelId(modelId);
+    const updatedScene = {
+      ...scene,
+      model: {
+        modelId: baseId,
+        quantization: quant,
+      },
+    };
     const newScenes = localScenes.map(s => (s.id === sceneId ? updatedScene : s));
     log.debug(`New scenes: ${JSON.stringify(newScenes)}`);
     setLocalScenes(newScenes);
@@ -1200,8 +1233,8 @@ export default function HomePanel({
 
     // 自动设置默认语言偏好（如果还没有设置）
     // 使用与 UI 显示相同的推荐逻辑
-    const asrModel = asrModels.find(m => m.preset.id === modelId);
-    if (asrModel && !modelLanguagePrefs[modelId]) {
+    const asrModel = asrModels.find(m => m.preset.id === baseId);
+    if (asrModel && !modelLanguagePrefs[baseId]) {
       const languages = asrModel.preset.languages || [];
       const supportsAutoDetect = asrModel.preset.supportsAutoDetect ?? (languages.length > 10);
 
@@ -1220,7 +1253,7 @@ export default function HomePanel({
             return languages[0] || 'auto';
           })();
 
-      log.info(`[ModelSelect] 自动设置默认语言: ${recommendedLanguage} for model ${modelId}`);
+      log.info(`[ModelSelect] 自动设置默认语言: ${recommendedLanguage} for model ${baseId}`);
 
       // 内联保存语言偏好逻辑
       try {
@@ -1282,16 +1315,16 @@ export default function HomePanel({
     }
 
     // 获取模型信息
-    const model = models.find(m => m.id === scene.modelId);
-    const modelName = model?.name || scene.modelId;
+    const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
+    const model = models.find(m => m.id === scene.model?.modelId);
+    const modelName = model?.name || scene.model?.modelId || '';
     const modelSize = model?.size || '';
-    const modelId = scene.modelId;
 
     if (newEnabled) {
       // 启用场景：加载模型到内存
-      log.debug(`启用场景，加载模型 ${modelId}`);
+      log.debug(`启用场景，加载模型 ${fullModelId}`);
       try {
-        const result = await loadModel(modelId);
+        const result = await loadModel(fullModelId);
         if (result.success) {
           showToast({
             type: 'info',
@@ -1319,7 +1352,7 @@ export default function HomePanel({
       // 检查其他启用的场景是否也在使用同一模型
       const otherScenesUsingModel = newScenes.filter(s =>
         s.id !== sceneId &&
-        s.modelId === modelId &&
+        getFullModelId(s.model) === fullModelId &&
         s.enabled
       );
 
@@ -1332,9 +1365,9 @@ export default function HomePanel({
         });
       } else {
         // 卸载模型
-        log.debug(`禁用场景，卸载模型 ${modelId}`);
+        log.debug(`禁用场景，卸载模型 ${fullModelId}`);
         try {
-          const result = await unloadModel(modelId);
+          const result = await unloadModel(fullModelId);
           if (result.success) {
             showToast({
               type: 'info',
@@ -1542,10 +1575,10 @@ export default function HomePanel({
   // Handle language change for a scene's selected model
   const handleLanguageChange = useCallback(async (sceneId: string, language: string) => {
     const scene = localScenes.find(s => s.id === sceneId);
-    if (!scene || !scene.modelId) return;
+    if (!scene || !scene.model?.modelId) return;
 
     // Call the model language change handler
-    await handleModelLanguageChange(scene.modelId, language);
+    await handleModelLanguageChange(scene.model.modelId, language);
   }, [localScenes]);
 
   // Handle language change for a model (independent of scene)
@@ -1665,7 +1698,7 @@ export default function HomePanel({
               key={scene.id}
               sceneIndex={index}
               scene={scene}
-              model={models.find(m => m.id === scene.modelId)}
+              model={models.find(m => m.id === scene.model?.modelId)}
               models={models}
               asrModels={asrModels}
               modelLanguagePrefs={modelLanguagePrefs}

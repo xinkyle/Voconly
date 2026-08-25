@@ -1,36 +1,113 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Scene, Model, BackendType, LlmProfile } from '../types';
+import { getFullModelId } from '../types';
 import SceneForm from './SceneForm';
 import LlmConfigModal from './LlmConfigModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
 import { extractShortcutFromEvent } from '../utils/keyboard';
 import { translateSceneName } from '../utils/i18n';
-import { scanAsrModels, type ModelPreset } from '../services/config';
+import { scanAsrModels, getAsrModelList, type ModelPreset, type AsrModelWithStatus, parseModelId } from '../services/config';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
 import { loadModel, unloadModel } from '../services/whisper';
+import type { DownloadProgress } from '../services/downloader';
+import { AudioLines } from 'lucide-react';
 
 // 创建日志记录器
 const log = createLogger('SceneList');
 
-// Backend labels (same as ModelList.tsx for consistency)
-const BACKEND_LABELS: Record<BackendType, { label: string; color: string }> = {
-  Whisper: { label: 'Whisper', color: 'bg-orange-50 text-orange-600 border-orange-200' },
-  Onnx: { label: 'ONNX', color: 'bg-purple-50 text-purple-600 border-purple-200' },
+// 推荐模型配置（根据语言场景推荐）
+const ZH_RECOMMENDED_MODELS: Set<string> = new Set([
+  'Qwen3-ASR-1.7B',
+  'qwen3-asr-1.7b',
+  'sensevoice-small',
+  'SenseVoice-Small',
+]);
+const EN_RECOMMENDED_MODELS: Set<string> = new Set([
+  'parakeet-unified-en-0.6b',
+  'Parakeet-Unified-EN-0.6B',
+  'cohere-transcribe-03-2026',
+  'Cohere-Transcribe-03-2026',
+]);
+
+// ASR model logo mapping
+const ASR_MODEL_LOGO_MAP: Record<string, string> = {
+  'whisper': 'openai.png',
+  'ggml-': 'openai.png',
+  'qwen': 'qwen.png',
+  'nemotron': 'nvidia.svg',
+  'parakeet': 'nvidia.svg',
+  'sensevoice': 'qwen.png',
+  'moonshine': 'custom.png',
+  'cohere': 'cohere-logo.svg',
 };
 
-// Default available models with description keys for i18n
-const DEFAULT_AVAILABLE_MODELS: (Model & { descriptionKey: string })[] = [
-  { id: 'whisper-tiny', name: 'Whisper Tiny', backend: 'Whisper', size: '75MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperTiny' },
-  { id: 'whisper-base', name: 'Whisper Base', backend: 'Whisper', size: '142MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperBase' },
-  { id: 'whisper-small', name: 'Whisper Small', backend: 'Whisper', size: '244MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperSmall' },
-  { id: 'whisper-medium', name: 'Whisper Medium', backend: 'Whisper', size: '1.5GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperMedium' },
-  { id: 'whisper-large', name: 'Whisper Large', backend: 'Whisper', size: '2.9GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperLarge' },
-  { id: 'whisper-turbo', name: 'Whisper Turbo', backend: 'Whisper', size: '1.6GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.whisperTurbo' },
-  { id: 'sensevoice-small', name: 'SenseVoice Small', backend: 'Onnx', size: '229MB', downloaded: false, downloadUrls: [], languages: ['zh', 'zh-yue', 'en', 'ja', 'ko'], descriptionKey: 'models.descriptions.sensevoiceSmall' },
-  { id: 'parakeet-v3', name: 'Parakeet V3', backend: 'Onnx', size: '640MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], descriptionKey: 'models.descriptions.parakeetV3' },
-];
+// Get ASR model logo path based on model id
+const getAsrModelLogo = (modelId: string): string => {
+  const lowerModelId = modelId.toLowerCase();
+  for (const [prefix, logoFile] of Object.entries(ASR_MODEL_LOGO_MAP)) {
+    if (lowerModelId.startsWith(prefix.toLowerCase())) {
+      return `/icons/${logoFile}`;
+    }
+  }
+  return '/icons/custom.png';
+};
+
+// Helper function to format bytes
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
+  } else if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(0)}MB`;
+  } else {
+    return `${(bytes / 1024).toFixed(0)}KB`;
+  }
+};
+
+// Get model size (formatted: GB for >= 1GB, MB for < 1GB)
+function getModelSize(model: AsrModelWithStatus): string {
+  if (model.sizeMb) {
+    const mb = model.sizeMb;
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(1)}GB`;
+    }
+    return `${mb}MB`;
+  }
+  if (model.preset.size) {
+    const sizeStr = model.preset.size.toUpperCase();
+    if (sizeStr.includes('GB') || sizeStr.includes('MB')) {
+      return model.preset.size;
+    }
+  }
+  return '';
+}
+
+// Score bar component for model quality metrics
+const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
+  <div className="flex items-center gap-1.5">
+    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0">{label}</span>
+    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
+      <div
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        style={{ width: `${(score || 0) * 100}%` }}
+      />
+    </div>
+  </div>
+);
+
+// Icons
+const DownloadIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 interface SceneListProps {
   scenes?: Scene[];
@@ -42,6 +119,10 @@ interface SceneListProps {
   onSave?: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
+  // Download related props
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
+  onDownload?: (model: Model) => void;
+  onDownloadCancel?: (modelId: string) => void;
 }
 
 // Get model name by ID
@@ -101,33 +182,52 @@ function ToggleSwitch({
   );
 }
 
-// Model Select Modal
+// Model Select Modal - Enhanced with download and quant version selection
 function ModelSelectModal({
-  scannedModels,
+  allModels,
   selectedId,
   onSelect,
   onCancel,
+  onDownload,
+  onDownloadCancel,
+  downloadStates,
   t,
+  currentLanguage,
 }: {
-  scannedModels: ModelPreset[];
+  allModels: AsrModelWithStatus[];
   selectedId: string;
   onSelect: (modelId: string) => void;
   onCancel: () => void;
+  onDownload?: (model: Model) => void;
+  onDownloadCancel?: (modelId: string) => void;
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
   t: (key: string, options?: Record<string, unknown>) => string;
+  currentLanguage: string;
 }) {
-  // Build model list from scanned models (same logic as ModelList.tsx)
-  const modelList = scannedModels.map(scanned => {
-    const knownModel = DEFAULT_AVAILABLE_MODELS.find(m => m.id === scanned.id);
-    const descriptionKey = knownModel?.descriptionKey;
-    return {
-      id: scanned.id,
-      name: scanned.name,
-      backend: scanned.backend || 'Whisper',
-      size: scanned.size,
-      downloaded: true,
-      description: scanned.description,
-      descriptionKey,
-    };
+  // State for expanded quant panel - only one at a time
+  const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
+
+  // Toggle quant panel expansion
+  const toggleExpand = (modelId: string) => {
+    setExpandedModelId(prev => prev === modelId ? null : modelId);
+  };
+
+  // Get recommendation badge based on language
+  const shouldShowRecommendation = (modelId: string): boolean => {
+    const isZhLanguage = currentLanguage.startsWith('zh');
+    if (isZhLanguage) {
+      return ZH_RECOMMENDED_MODELS.has(modelId);
+    } else {
+      return EN_RECOMMENDED_MODELS.has(modelId);
+    }
+  };
+
+  // Build model list: downloaded models first, then not downloaded
+  const sortedModels = [...allModels].sort((a, b) => {
+    // Downloaded models first
+    if (a.downloaded && !b.downloaded) return -1;
+    if (!a.downloaded && b.downloaded) return 1;
+    return 0;
   });
 
   return (
@@ -136,10 +236,10 @@ function ModelSelectModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-2xl p-10 w-[680px] max-h-[80vh] overflow-hidden shadow-2xl animate-fade-in"
+        className="bg-white rounded-2xl p-6 w-[720px] h-[85vh] overflow-hidden shadow-2xl animate-fade-in flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <h4 className="font-semibold text-gray-900 text-lg">{t('sceneList.selectModel')}</h4>
           <button
             onClick={onCancel}
@@ -150,42 +250,267 @@ function ModelSelectModal({
             </svg>
           </button>
         </div>
-        <div className="space-y-3 max-h-[28rem] overflow-y-auto">
-          {modelList.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => onSelect(m.id)}
-              className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
-                selectedId === m.id
-                  ? 'border-amber-400 bg-amber-50'
-                  : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex-1 text-left">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-gray-900">{m.name}</span>
-                  <span className="text-xs text-gray-400">({m.size})</span>
-                  {/* Backend type label */}
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${BACKEND_LABELS[m.backend as BackendType].color}`}>
-                    {BACKEND_LABELS[m.backend as BackendType].label}
-                  </span>
-                  {/* Ready badge */}
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200">
-                    {t('sceneList.ready')}
-                  </span>
-                </div>
-                {/* Model description */}
-                <div className="mt-1 text-sm text-gray-500">
-                  {m.descriptionKey ? t(m.descriptionKey) : m.description || ''}
+        <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+          {sortedModels.map((model) => {
+            const isDownloaded = model.downloaded;
+            const isDownloading = downloadStates?.[model.preset.id]?.downloading ?? false;
+            const downloadProgress = downloadStates?.[model.preset.id]?.progress;
+            const isExpanded = expandedModelId === model.preset.id;
+            const showRecommendation = shouldShowRecommendation(model.preset.id);
+            const logoPath = getAsrModelLogo(model.preset.id);
+
+            // Get quant variants and downloaded quants
+            const quantVariants = model.quantVariants || [];
+            const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
+            const activeQuant = model.activeQuant || model.preset.activeQuant;
+            const hasMultipleQuantVariants = quantVariants.length > 1;
+
+            // Parse selected quant from selectedId (format: "modelId-quant")
+            const isThisModelSelected = selectedId === model.preset.id || selectedId.startsWith(model.preset.id + '-');
+            let selectedQuant: string | undefined;
+            if (isThisModelSelected && selectedId.startsWith(model.preset.id + '-')) {
+              selectedQuant = selectedId.slice(model.preset.id.length + 1);
+            }
+
+            // Build download URL for the model
+            const downloadUrls = model.preset.downloadUrls || [];
+            const modelForDownload: Model = {
+              id: model.preset.id,
+              name: model.preset.name,
+              backend: (model.preset.backend || 'Whisper') as BackendType,
+              size: model.preset.size || '',
+              downloaded: isDownloaded,
+              downloadUrls: downloadUrls,
+              languages: model.preset.languages || [],
+              modelType: 'asr',
+            };
+
+            // Handle click on the entire card
+            const handleCardClick = () => {
+              if (hasMultipleQuantVariants) {
+                toggleExpand(model.preset.id);
+              } else if (isDownloaded) {
+                // Single version: directly select
+                const selectId = activeQuant
+                  ? `${model.preset.id}-${activeQuant}`
+                  : model.preset.id;
+                onSelect(selectId);
+              } else if (!isDownloading && onDownload) {
+                // Not downloaded: download
+                onDownload(modelForDownload);
+              }
+            };
+
+            return (
+              <div
+                key={model.preset.id}
+                onClick={handleCardClick}
+                className={`relative rounded-xl border transition-all duration-200 cursor-pointer ${
+                  selectedId === model.preset.id || selectedId.startsWith(model.preset.id + '-')
+                    ? 'border-gray-900 bg-gray-50'
+                    : isDownloaded
+                      ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                      : 'border-gray-200 bg-white hover:border-gray-200'
+                }`}
+              >
+                {/* Progress background */}
+                {isDownloading && (
+                  <div className="absolute inset-0 overflow-hidden rounded-xl">
+                    <div
+                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
+                      style={{ width: `${downloadProgress?.percentage ?? 0}%` }}
+                    />
+                    <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                  </div>
+                )}
+
+                <div className="relative px-4 py-3 z-10">
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Left side: Model info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Logo */}
+                      {logoPath && (
+                        <img
+                          src={logoPath}
+                          alt={model.preset.name}
+                          className="w-6 h-6 object-contain flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {/* Name and badges */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-900 text-sm">
+                            {model.preset.name}
+                          </span>
+                          {getModelSize(model) && (
+                            <span className="text-xs text-gray-400">({getModelSize(model)})</span>
+                          )}
+                          {/* Recommendation badge */}
+                          {showRecommendation && (
+                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white">
+                              {t('models.recommended')}
+                            </span>
+                          )}
+                        </div>
+                        {/* Description */}
+                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                          {model.preset.description || ''}
+                        </p>
+                        {/* Accuracy, Speed Scores and Streaming Badge */}
+                        {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined || model.preset.supportsStreaming) && (
+                          <div className="flex items-center gap-3 mt-2">
+                            {model.preset.accuracyScore !== undefined && (
+                              <div className="flex-shrink-0">
+                                <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
+                              </div>
+                            )}
+                            {model.preset.speedScore !== undefined && (
+                              <div className="flex-shrink-0">
+                                <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
+                              </div>
+                            )}
+                            {model.preset.supportsStreaming && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200 flex-shrink-0">
+                                <AudioLines className="w-3 h-3" />
+                                {t('models.streaming')}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right side: Status indicator */}
+                    <div className="flex-shrink-0">
+                      {isDownloaded ? (
+                        // Downloaded: show status
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
+                          {(selectedId === model.preset.id || selectedId.startsWith(model.preset.id + '-')) ? (
+                            <>
+                              <CheckIcon className="w-4 h-4 text-emerald-600" />
+                              <span className="text-gray-700">
+                                {selectedQuant ? `${t('sceneList.selected')} ${selectedQuant}` : t('sceneList.selected')}
+                              </span>
+                            </>
+                          ) : (
+                            hasMultipleQuantVariants && (
+                              <span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+                            )
+                          )}
+                        </div>
+                      ) : isDownloading ? (
+                        // Downloading: show progress
+                        <div className="flex flex-col items-end gap-1" onClick={e => e.stopPropagation()}>
+                          <span className="text-sm font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
+                          {onDownloadCancel && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDownloadCancel(model.preset.id);
+                              }}
+                              className="text-xs text-red-500 hover:text-red-600 underline"
+                            >
+                              {t('models.cancel')}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        // Not downloaded: show download indicator
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
+                          <DownloadIcon className="w-4 h-4 text-gray-500" />
+                          <span className="text-gray-600">{t('models.download')}</span>
+                          {hasMultipleQuantVariants && (
+                            <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quant version panel - Show for both downloaded and not downloaded models */}
+                  {isExpanded && hasMultipleQuantVariants && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="text-xs text-gray-500 mb-2">{t('models.quantVersions')}:</div>
+                      <div className="space-y-1.5">
+                        {quantVariants.map((variant) => {
+                          const isDownloadedVariant = downloadedQuants.includes(variant.quant);
+                          // Use selectedQuant for UI display (user's selection)
+                          const isSelectedVariant = selectedQuant === variant.quant;
+
+                          return (
+                            <div
+                              key={variant.quant}
+                              className={`relative flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                isDownloadedVariant
+                                  ? isSelectedVariant
+                                    ? 'bg-blue-50 border border-blue-200'
+                                    : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
+                                  : 'hover:bg-gray-50'
+                              }`}
+                              onClick={isDownloadedVariant && !isSelectedVariant ? (e) => {
+                                e.stopPropagation();
+                                const selectId = `${model.preset.id}-${variant.quant}`;
+                                onSelect(selectId);
+                              } : undefined}
+                            >
+                              <div className="relative flex items-center gap-2 z-10">
+                                {/* Radio button style */}
+                                <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                  isSelectedVariant
+                                    ? 'border-blue-500 bg-blue-500'
+                                    : isDownloadedVariant
+                                      ? 'border-gray-300'
+                                      : 'border-gray-200'
+                                }`}>
+                                  {isSelectedVariant && (
+                                    <span className="w-2 h-2 rounded-full bg-white" />
+                                  )}
+                                </span>
+                                <span className="font-medium text-gray-700">{variant.quant}</span>
+                                {variant.isRecommended && (
+                                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
+                                    {t('models.recommended')}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="relative flex items-center gap-3 z-10">
+                                <span className="text-gray-400">{formatBytes(variant.sizeBytes)}</span>
+                                {isDownloadedVariant ? (
+                                  isSelectedVariant ? (
+                                    <span className="text-blue-600 font-medium text-xs">{t('models.currentUse')}</span>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">{t('models.downloaded')}</span>
+                                  )
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (onDownload) {
+                                        onDownload(modelForDownload);
+                                      }
+                                    }}
+                                    className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  >
+                                    {t('models.download')}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Downloaded versions statistics */}
+                      {downloadedQuants.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-400">
+                          {t('models.downloadedCount')}: {downloadedQuants.length}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-              {selectedId === m.id && (
-                <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -202,12 +527,16 @@ export default function SceneList({
   onSave,
   checkConflict,
   tryRegisterShortcut,
+  downloadStates,
+  onDownload,
+  onDownloadCancel,
 }: SceneListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
   const [showForm, setShowForm] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
   const [scannedModels, setScannedModels] = useState<ModelPreset[]>([]);
+  const [allModels, setAllModels] = useState<AsrModelWithStatus[]>([]);
   const { showToast } = useToast();
 
   // For inline editing
@@ -225,18 +554,24 @@ export default function SceneList({
   // Ref for the listening timeout
   const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load scanned models on mount (same as ModelList.tsx)
+  // Load scanned models and all models on mount
   useEffect(() => {
-    const loadScannedModels = async () => {
+    const loadModels = async () => {
       try {
-        const result = await scanAsrModels();
-        setScannedModels(result);
-        log.info(`Scanned ${result.length} ASR models`);
+        // Load scanned models (for backward compatibility)
+        const scanned = await scanAsrModels();
+        setScannedModels(scanned);
+        log.info(`Scanned ${scanned.length} ASR models`);
+
+        // Load full model list with status
+        const fullList = await getAsrModelList();
+        setAllModels(fullList);
+        log.info(`Loaded ${fullList.length} models with status`);
       } catch (err) {
-        log.error(`Failed to scan ASR models: ${err}`);
+        log.error(`Failed to load models: ${err}`);
       }
     };
-    loadScannedModels();
+    loadModels();
   }, []);
 
   // Update local scenes when prop changes
@@ -286,17 +621,17 @@ export default function SceneList({
       onSave(newScenes);
     }
 
-    // 获取模型信息
-    const model = models.find(m => m.id === scene.modelId);
-    const modelName = model?.name || scene.modelId;
+    // 获取模型信息（使用完整模型 ID）
+    const fullModelId = getFullModelId(scene.model);
+    const model = models.find(m => m.id === scene.model.modelId);
+    const modelName = model?.name || scene.model.modelId;
     const modelSize = model?.size || '';
-    const modelId = scene.modelId;
 
     if (newEnabled) {
       // 启用场景：加载模型到内存
-      log.debug(`启用场景，加载模型 ${modelId}`);
+      log.debug(`启用场景，加载模型 ${fullModelId}`);
       try {
-        const result = await loadModel(modelId);
+        const result = await loadModel(fullModelId);
         if (result.success) {
           showToast({
             type: 'info',
@@ -349,7 +684,7 @@ export default function SceneList({
       // 禁用场景：检查是否需要卸载模型
       const otherScenesUsingModel = newScenes.filter(s =>
         s.id !== sceneId &&
-        s.modelId === modelId &&
+        getFullModelId(s.model) === fullModelId &&
         s.enabled
       );
 
@@ -361,9 +696,9 @@ export default function SceneList({
           description: `${modelName} 仍被「${otherSceneNames}」使用，保持在内存中`,
         });
       } else {
-        log.debug(`禁用场景，卸载模型 ${modelId}`);
+        log.debug(`禁用场景，卸载模型 ${fullModelId}`);
         try {
-          const result = await unloadModel(modelId);
+          const result = await unloadModel(fullModelId);
           if (result.success) {
             showToast({
               type: 'info',
@@ -536,7 +871,15 @@ export default function SceneList({
       return;
     }
 
-    const updatedScene = { ...selectingModel, modelId };
+    // 解析模型 ID（可能包含量化后缀）
+    const { baseId, quant } = parseModelId(modelId);
+    const updatedScene = {
+      ...selectingModel,
+      model: {
+        modelId: baseId,
+        quantization: quant,
+      },
+    };
     log.debug(`Updated scene: ${JSON.stringify(updatedScene)}`);
 
     // Calculate new scenes first
@@ -647,19 +990,19 @@ export default function SceneList({
                     <button
                       onClick={() => handleModelClick(scene)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      title={!scene.modelId ? t('home.selectModelFirst') : t('sceneList.clickToSwitchModel')}
+                      title={!scene.model?.modelId ? t('home.selectModelFirst') : t('sceneList.clickToSwitchModel')}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      {scene.modelId ? getModelName(scene.modelId, models, scannedModels) : t('home.clickToSelect')}
+                      {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.clickToSelect')}
                     </button>
                   ) : (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-gray-100/50 text-gray-400 cursor-not-allowed">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      {scene.modelId ? getModelName(scene.modelId, models, scannedModels) : t('home.noModelSelected')}
+                      {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.noModelSelected')}
                     </div>
                   )}
                 </div>
@@ -729,11 +1072,15 @@ export default function SceneList({
       {/* Model Select Modal */}
       {selectingModel && (
         <ModelSelectModal
-          scannedModels={scannedModels}
-          selectedId={selectingModel.modelId}
+          allModels={allModels}
+          selectedId={getFullModelId(selectingModel.model)}
           onSelect={handleModelSelect}
           onCancel={() => setSelectingModel(null)}
+          onDownload={onDownload}
+          onDownloadCancel={onDownloadCancel}
+          downloadStates={downloadStates}
           t={t}
+          currentLanguage={i18n.language}
         />
       )}
 
