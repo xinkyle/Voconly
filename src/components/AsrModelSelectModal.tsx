@@ -196,7 +196,7 @@ export interface AsrModelSelectModalProps {
   /** User's quantization preferences for each model */
   modelQuantPrefs?: Record<string, string>;
   /** Callback when user selects a quantization version */
-  onQuantPrefChange?: (modelId: string, quant: string) => void;
+  onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
 }
 
 /**
@@ -289,7 +289,7 @@ function AsrModelSelectModal({
   };
 
   // Handle card click (select model)
-  const handleCardClick = (model: AsrModelWithStatus) => {
+  const handleCardClick = async (model: AsrModelWithStatus) => {
     const isSelected = isModelSelected(model);
 
     // If already selected, just close the modal
@@ -305,7 +305,7 @@ function AsrModelSelectModal({
     if (defaultQuantInfo?.isDownloaded) {
       // Save quantization preference before selecting
       if (defaultQuantInfo.quant && onQuantPrefChange) {
-        onQuantPrefChange(model.preset.id, defaultQuantInfo.quant);
+        await onQuantPrefChange(model.preset.id, defaultQuantInfo.quant);
       }
       // Select the model
       const selectId = defaultQuantInfo.quant
@@ -314,7 +314,10 @@ function AsrModelSelectModal({
       onSelect(selectId);
       onClose();
     } else {
-      // Start downloading directly
+      // Start downloading directly and save preference
+      if (defaultQuantInfo?.quant && onQuantPrefChange) {
+        await onQuantPrefChange(model.preset.id, defaultQuantInfo.quant);
+      }
       startDownload(model, defaultQuantInfo?.quant || '');
     }
   };
@@ -329,11 +332,11 @@ function AsrModelSelectModal({
   };
 
   // Handle selecting a quantization variant
-  const handleQuantSelect = (model: AsrModelWithStatus, quant: string, isDownloaded: boolean) => {
+  const handleQuantSelect = async (model: AsrModelWithStatus, quant: string, isDownloaded: boolean) => {
     if (isDownloaded) {
       // Save quantization preference before selecting
       if (onQuantPrefChange) {
-        onQuantPrefChange(model.preset.id, quant);
+        await onQuantPrefChange(model.preset.id, quant);
       }
       // Select and close
       const selectId = `${model.preset.id}-${quant}`;
@@ -342,7 +345,7 @@ function AsrModelSelectModal({
     } else {
       // Save quantization preference for future use
       if (onQuantPrefChange) {
-        onQuantPrefChange(model.preset.id, quant);
+        await onQuantPrefChange(model.preset.id, quant);
       }
       // Start downloading directly and collapse the panel
       startDownload(model, quant);
