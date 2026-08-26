@@ -71,7 +71,7 @@ export default function SettingsAbout({ onUpdateAvailable }: SettingsAboutProps)
       <div className="flex items-center gap-4 mb-8">
         <LogoIcon className="w-12 h-12" />
         <div>
-          <h1 className="text-base font-semibold text-gray-900">{APP_NAME}</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{APP_NAME}</h1>
           <p className="text-sm text-gray-500 mt-1">{t('settings.about.subtitle')}</p>
         </div>
       </div>

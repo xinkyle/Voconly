@@ -86,7 +86,7 @@ export default function ShortcutErrorModal({
           <button
             onClick={onClose}
             autoFocus
-            className="px-5 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-xl transition-all duration-200 active:scale-95"
+            className="px-5 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-all duration-200 active:scale-95"
           >
             {t('common.confirm')}
           </button>

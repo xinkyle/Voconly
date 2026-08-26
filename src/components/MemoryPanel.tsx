@@ -188,7 +188,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-900">{t('memory.title')}</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('memory.title')}</h2>
         <button
           onClick={() => records.length > 0 && setShowClearConfirm(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -387,13 +387,13 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
                   {t('memory.cancel')}
                 </button>
                 <button
                   onClick={handleClear}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                 >
                   {t('memory.confirm')}
                 </button>

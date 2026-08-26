@@ -484,7 +484,7 @@ function SceneCard({
         : 'bg-gray-50 border-gray-200'
     }`}>
       {/* Card Header with Scene Name */}
-      <div className={`px-4 py-2.5 border-b ${
+      <div className={`px-4 py-2.5 border-b rounded-t-2xl ${
         scene.enabled
           ? 'bg-gradient-to-r from-gray-50/80 to-white border-gray-100'
           : 'bg-gray-100/50 border-gray-200'
@@ -528,10 +528,10 @@ function SceneCard({
               <button
                 onClick={scene.enabled && onPromptTypeClick ? onPromptTypeClick : undefined}
                 disabled={!scene.enabled}
-                className={`px-1.5 py-0.5 text-xs font-medium rounded transition-all duration-200 ${
+                className={`px-1.5 py-0.5 text-xs font-semibold rounded transition-all duration-200 ${
                   !scene.enabled
                     ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-gray-500 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 cursor-pointer'
+                    : 'text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-gray-700 cursor-pointer'
                 }`}
                 title={t('home.clickToSwitchPrompt')}
               >
@@ -549,7 +549,7 @@ function SceneCard({
           {/* Shortcut */}
           <div id="shortcut-area" className="flex-1 space-y-1.5">
             <label className={`text-xs font-medium uppercase tracking-wider flex items-center gap-1 ${
-              scene.enabled ? 'text-gray-400' : 'text-gray-400'
+              scene.enabled ? 'text-gray-500' : 'text-gray-400'
             }`}>
               <KeyboardIcon />
               {t('home.shortcut')}
@@ -589,7 +589,7 @@ function SceneCard({
           {/* Model */}
           <div id="voice-model-area" className="flex-1 space-y-1.5">
             <label className={`text-xs font-medium uppercase tracking-wider flex items-center gap-1 ${
-              scene.enabled ? 'text-gray-400' : 'text-gray-400'
+              scene.enabled ? 'text-gray-500' : 'text-gray-400'
             }`}>
               <AIModelIcon />
               {t('home.voiceModel')}

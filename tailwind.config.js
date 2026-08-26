@@ -6,6 +6,40 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // 标题字体：Inter - 现代几何风格
+        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+
+        // 正文字体：IBM Plex Sans - 专业、易读
+        body: ['IBM Plex Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+
+        // 中文专用字体
+        chinese: ['PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', 'sans-serif'],
+
+        // 等宽字体：JetBrains Mono - 现代编程字体
+        mono: ['JetBrains Mono', 'SF Mono', 'Monaco', 'Consolas', 'monospace'],
+
+        // 保留 sans 作为默认字体
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'PingFang SC',
+          'Microsoft YaHei',
+          'sans-serif',
+        ],
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.01em' }],
+        'sm': ['0.875rem', { lineHeight: '1.375rem', letterSpacing: '0.005em' }],
+        'base': ['1rem', { lineHeight: '1.5rem', letterSpacing: '0' }],
+        'lg': ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '-0.005em' }],
+        'xl': ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.015em' }],
+      },
       colors: {
         primary: {
           DEFAULT: '#3B82F6',

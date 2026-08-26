@@ -4,11 +4,29 @@
 
 @layer base {
   html {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    /* 正文使用 IBM Plex Sans，中文使用苹方/思源黑体 */
+    font-family: 'IBM Plex Sans', 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 标题使用 Inter 字体 */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.02em; /* 标题字间距收紧，更现代 */
+  }
+
+  /* 快捷键显示使用等宽字体 */
+  .font-mono, code, kbd {
+    font-family: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+    letter-spacing: 0.05em;
   }
 
   body {
-    @apply bg-[#F5F5F7] text-gray-900 antialiased;
+    @apply bg-neutral-100 text-gray-900 antialiased;
+    /* 渐变背景增加深度 */
+    background: linear-gradient(180deg, #F5F5F7 0%, #FAFAFA 50%, #F5F5F7 100%);
   }
 
   /* Hide scrollbar for all elements */
@@ -49,6 +67,38 @@
 
   .label {
     @apply block text-sm font-medium text-gray-700 mb-2;
+  }
+
+  /* 标题层次 */
+  .heading-1 {
+    @apply text-2xl font-semibold tracking-tight text-gray-900;
+  }
+
+  .heading-2 {
+    @apply text-xl font-semibold tracking-tight text-gray-900;
+  }
+
+  .heading-3 {
+    @apply text-lg font-semibold text-gray-900;
+  }
+
+  /* 正文层次 */
+  .body-base {
+    @apply text-base leading-relaxed text-gray-700;
+  }
+
+  .body-sm {
+    @apply text-sm leading-relaxed text-gray-600;
+  }
+
+  /* 辅助文字 */
+  .text-muted {
+    @apply text-sm text-gray-500;
+  }
+
+  /* 标签文字 */
+  .label-text {
+    @apply text-xs font-medium uppercase tracking-wide text-gray-500;
   }
 }
 

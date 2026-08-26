@@ -224,13 +224,13 @@ export default function SceneForm({
             <button
               type="button"
               onClick={onCancel}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200 active:scale-95"
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 active:scale-95"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-xl transition-all duration-200 active:scale-95"
+              className="px-5 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-all duration-200 active:scale-95"
             >
               {t('common.save')}
             </button>

@@ -143,7 +143,7 @@ export default function SettingsDictionary() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-gray-900">{t('dictionary.title')}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('dictionary.title')}</h2>
           <span className="px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
             {t('dictionary.comingSoon')}
           </span>
