@@ -1164,6 +1164,18 @@ function App() {
     }
   };
 
+  const handleDownloadCancel = async (modelId: string) => {
+    log.debug(`Cancel download for model: ${modelId}`);
+    const { cancelModelDownload } = await import('./services/downloader');
+    await cancelModelDownload(modelId);
+    // Clear download state immediately
+    setDownloadStates(prev => {
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
+    });
+  };
+
   const handleSaveScenes = async (scenes: Scene[]) => {
     // 先重新加载配置，确保 user_dictionary 等独立保存的数据是最新的
     const latestConfig = await loadConfig();
@@ -1445,6 +1457,7 @@ function App() {
                 modelLanguagePrefs={config?.modelLanguagePrefs || {}}
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
+                onDownloadCancel={handleDownloadCancel}
                 onSave={handleSaveScenes}
                 onModelsChange={handleModelsChange}
                 onModelLanguagePrefsChange={(prefs) => {

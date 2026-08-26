@@ -131,7 +131,11 @@
     },
     "recommended": "推荐",
     "configured": "已配置",
-    "setup": "配置"
+    "setup": "配置",
+    "downloadModel": "下载模型",
+    "willDownload": "将下载",
+    "precision": "精度",
+    "size": "大小"
   },
   "home": {
     "title": "场景配置",

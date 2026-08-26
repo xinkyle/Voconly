@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Model, BackendType } from '../types';
-import type { AsrModelWithStatus, QuantVariant, getQuantLabel } from '../services/config';
+import type { AsrModelWithStatus, QuantVariant } from '../services/config';
 import type { DownloadProgress } from '../services/downloader';
 import { AudioLines } from 'lucide-react';
 import { QUANT_LABELS } from '../services/config';
@@ -126,6 +126,44 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   </svg>
 );
 
+/**
+ * Get the default quantization for a model
+ * Priority:
+ * 1. Recommended quantization (isRecommended: true)
+ * 2. First downloaded quantization
+ * 3. First quantization in the list
+ */
+function getDefaultQuant(
+  model: AsrModelWithStatus
+): { quant: string; isDownloaded: boolean } | null {
+  const quantVariants = model.quantVariants || [];
+  const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
+
+  if (quantVariants.length === 0) {
+    // No quantization variants (e.g., ONNX models)
+    return { quant: '', isDownloaded: model.downloaded };
+  }
+
+  // 1. Check for recommended quantization
+  const recommended = quantVariants.find(v => v.isRecommended);
+  if (recommended) {
+    const isDownloaded = downloadedQuants.includes(recommended.quant);
+    return { quant: recommended.quant, isDownloaded };
+  }
+
+  // 2. Check for first downloaded quantization
+  for (const downloadedQuant of downloadedQuants) {
+    const variant = quantVariants.find(v => v.quant === downloadedQuant);
+    if (variant) {
+      return { quant: variant.quant, isDownloaded: true };
+    }
+  }
+
+  // 3. Fall back to first quantization
+  const first = quantVariants[0];
+  return { quant: first.quant, isDownloaded: false };
+}
+
 export interface AsrModelSelectModalProps {
   /** ASR model list with status */
   models: AsrModelWithStatus[];
@@ -190,6 +228,98 @@ function AsrModelSelectModal({
   // Sort models: downloaded first, recommended first, then alphabetically
   const sortedModels = sortAsrModels(models, activeLanguage);
 
+  // Check if a model is the currently selected one
+  const isModelSelected = (model: AsrModelWithStatus): boolean => {
+    const modelId = model.preset.id;
+    return selectedModelId === modelId || selectedModelId.startsWith(modelId + '-');
+  };
+
+  // Get the selected quantization from selectedModelId
+  const getSelectedQuant = (model: AsrModelWithStatus): string | undefined => {
+    if (!isModelSelected(model)) return undefined;
+    if (selectedModelId.startsWith(model.preset.id + '-')) {
+      return selectedModelId.slice(model.preset.id.length + 1);
+    }
+    return undefined;
+  };
+
+  // Helper function to start downloading a model variant
+  const startDownload = (model: AsrModelWithStatus, quant?: string) => {
+    if (!onDownload) return;
+
+    const quantVariants = model.quantVariants || [];
+    const variant = quant ? quantVariants.find(v => v.quant === quant) : undefined;
+
+    // Build model object for download
+    const modelForDownload: Model = {
+      id: quant ? `${model.preset.id}-${quant}` : model.preset.id,
+      name: model.preset.name,
+      backend: (model.preset.backend || 'Whisper') as BackendType,
+      size: model.preset.size || '',
+      downloaded: model.downloaded,
+      downloadUrls: variant
+        ? model.preset.downloadUrls.map(url => ({
+            ...url,
+            url: url.url.substring(0, url.url.lastIndexOf('/') + 1) + variant.filename,
+          }))
+        : model.preset.downloadUrls,
+      languages: model.preset.languages || [],
+      modelType: 'asr',
+    };
+
+    onDownload(modelForDownload);
+  };
+
+  // Handle card click (select model)
+  const handleCardClick = (model: AsrModelWithStatus) => {
+    const isSelected = isModelSelected(model);
+
+    // If already selected, just close the modal
+    if (isSelected) {
+      onClose();
+      return;
+    }
+
+    // Get default quantization
+    const defaultQuantInfo = getDefaultQuant(model);
+
+    // Check if default quant is downloaded
+    if (defaultQuantInfo?.isDownloaded) {
+      // Select the model
+      const selectId = defaultQuantInfo.quant
+        ? `${model.preset.id}-${defaultQuantInfo.quant}`
+        : model.preset.id;
+      onSelect(selectId);
+      onClose();
+    } else {
+      // Start downloading directly
+      startDownload(model, defaultQuantInfo?.quant || '');
+    }
+  };
+
+  // Handle clicking the right side tag (expand/collapse)
+  const handleTagClick = (e: React.MouseEvent, model: AsrModelWithStatus) => {
+    e.stopPropagation();
+    const quantVariants = model.quantVariants || [];
+    if (quantVariants.length > 1) {
+      toggleExpand(model.preset.id);
+    }
+  };
+
+  // Handle selecting a quantization variant
+  const handleQuantSelect = (model: AsrModelWithStatus, quant: string, isDownloaded: boolean) => {
+    if (isDownloaded) {
+      // Select and close
+      const selectId = `${model.preset.id}-${quant}`;
+      onSelect(selectId);
+      onClose();
+    } else {
+      // Start downloading directly and collapse the panel
+      startDownload(model, quant);
+      setExpandedModelId(null);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
@@ -212,10 +342,8 @@ function AsrModelSelectModal({
         </div>
         <div className="space-y-2 flex-1 overflow-y-auto pr-1">
           {sortedModels.map((model) => {
-            const isDownloaded = model.downloaded;
             const quantVariants = model.quantVariants || [];
             const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
-            const activeQuant = model.activeQuant || model.preset.activeQuant;
             const hasMultipleQuantVariants = quantVariants.length > 1;
 
             // Check if any quantization version is downloading
@@ -232,50 +360,27 @@ function AsrModelSelectModal({
             const showRecommendation = shouldShowRecommendation(model.preset.id);
             const logoPath = getAsrModelLogo(model.preset.id);
 
-            // Parse selected quant from selectedModelId (format: "modelId-quant")
-            const isThisModelSelected = selectedModelId === model.preset.id || selectedModelId.startsWith(model.preset.id + '-');
-            let selectedQuant: string | undefined;
-            if (isThisModelSelected && selectedModelId.startsWith(model.preset.id + '-')) {
-              selectedQuant = selectedModelId.slice(model.preset.id.length + 1);
-            }
+            // Check if this model is selected
+            const isSelected = isModelSelected(model);
+            const selectedQuant = getSelectedQuant(model);
 
-            // Build download URL for the model
-            const downloadUrls = model.preset.downloadUrls || [];
-            const modelForDownload: Model = {
-              id: model.preset.id,
-              name: model.preset.name,
-              backend: (model.preset.backend || 'Whisper') as BackendType,
-              size: model.preset.size || '',
-              downloaded: isDownloaded,
-              downloadUrls: downloadUrls,
-              languages: model.preset.languages || [],
-              modelType: 'asr',
-            };
+            // Get default quantization
+            const defaultQuantInfo = getDefaultQuant(model);
+            const defaultQuantLabel = defaultQuantInfo?.quant && QUANT_LABELS[defaultQuantInfo.quant]
+              ? t(`models.quantLabels.${QUANT_LABELS[defaultQuantInfo.quant]}`)
+              : defaultQuantInfo?.quant || '';
 
-            // Handle click on the entire card
-            const handleCardClick = () => {
-              if (hasMultipleQuantVariants) {
-                toggleExpand(model.preset.id);
-              } else if (isDownloaded) {
-                // Single version: directly select
-                const selectId = activeQuant
-                  ? `${model.preset.id}-${activeQuant}`
-                  : model.preset.id;
-                onSelect(selectId);
-              } else if (!isDownloading && onDownload) {
-                // Not downloaded: download
-                onDownload(modelForDownload);
-              }
-            };
+            // Download status indicator: green dot = downloaded, gray dot = not downloaded
+            const isDefaultQuantDownloaded = defaultQuantInfo?.isDownloaded ?? model.downloaded;
 
             return (
               <div
                 key={model.preset.id}
-                onClick={handleCardClick}
+                onClick={() => handleCardClick(model)}
                 className={`relative rounded-xl border transition-all duration-200 cursor-pointer ${
-                  selectedModelId === model.preset.id || selectedModelId.startsWith(model.preset.id + '-')
+                  isSelected
                     ? 'border-gray-900 bg-gray-50'
-                    : isDownloaded
+                    : isDefaultQuantDownloaded
                       ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
                       : 'border-gray-200 bg-white hover:border-gray-200'
                 }`}
@@ -323,7 +428,7 @@ function AsrModelSelectModal({
                         <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
                           {model.preset.description || ''}
                         </p>
-                        {/* Accuracy, Speed Scores and Streaming Badge */}
+                        {/* Accuracy, Speed Scores and Streaming Badges */}
                         {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined || model.preset.supportsStreaming) && (
                           <div className="flex items-center gap-3 mt-2">
                             {model.preset.accuracyScore !== undefined && (
@@ -348,10 +453,10 @@ function AsrModelSelectModal({
                     </div>
 
                     {/* Right side: Status indicator */}
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0" onClick={(e) => handleTagClick(e, model)}>
                       {isDownloading ? (
-                        // Downloading: show progress
-                        <div className="flex flex-col items-end gap-1" onClick={e => e.stopPropagation()}>
+                        // Downloading: show progress and cancel button
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                           <span className="text-sm font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
                           {onDownloadCancel && (
                             <button
@@ -363,44 +468,44 @@ function AsrModelSelectModal({
                                 });
                                 onDownloadCancel(model.preset.id);
                               }}
-                              className="text-xs text-red-500 hover:text-red-600 underline"
+                              className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
                             >
                               {t('models.cancel')}
                             </button>
                           )}
                         </div>
-                      ) : isDownloaded ? (
-                        // Downloaded: show status
+                      ) : isSelected ? (
+                        // Selected: show "已选中"
                         <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
-                          {(selectedModelId === model.preset.id || selectedModelId.startsWith(model.preset.id + '-')) ? (
-                            <>
-                              <CheckIcon className="w-4 h-4 text-emerald-600" />
-                              <span className="text-gray-700">
-                                {selectedQuant
-                                  ? `${t('sceneList.selected')} ${QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}`
-                                  : t('sceneList.selected')}
-                              </span>
-                              {hasMultipleQuantVariants && (
-                                <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-gray-500">{t('models.downloaded')}</span>
-                              {hasMultipleQuantVariants && (
-                                <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        // Not downloaded: show download indicator
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
-                          <DownloadIcon className="w-4 h-4 text-gray-500" />
-                          <span className="text-gray-600">{t('models.download')}</span>
+                          <CheckIcon className="w-4 h-4 text-emerald-600" />
+                          <span className="text-gray-700">
+                            {selectedQuant
+                              ? `${t('sceneList.selected')} ${QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}`
+                              : t('sceneList.selected')}
+                          </span>
                           {hasMultipleQuantVariants && (
                             <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
                           )}
+                        </div>
+                      ) : hasMultipleQuantVariants ? (
+                        // Multiple quant variants: show default quant label + expand arrow
+                        <div className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
+                          {/* Download status dot */}
+                          <span className={`w-2 h-2 rounded-full ${isDefaultQuantDownloaded ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                          <span className="text-gray-700">{defaultQuantLabel}</span>
+                          <span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                      ) : isDefaultQuantDownloaded ? (
+                        // Single quant, downloaded: show default quant label
+                        <div className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span className="text-gray-700">{defaultQuantLabel || t('models.downloaded')}</span>
+                        </div>
+                      ) : (
+                        // Single quant, not downloaded: show download indicator
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100">
+                          <DownloadIcon className="w-4 h-4 text-gray-500" />
+                          <span className="text-gray-600">{t('models.download')}</span>
                         </div>
                       )}
                     </div>
@@ -408,12 +513,11 @@ function AsrModelSelectModal({
 
                   {/* Quant version panel - Show for both downloaded and not downloaded models */}
                   {isExpanded && hasMultipleQuantVariants && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="mt-3 pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
                       <div className="text-xs text-gray-500 mb-2">{t('models.quantVersions')}:</div>
                       <div className="space-y-1.5">
                         {quantVariants.map((variant: QuantVariant) => {
                           const isDownloadedVariant = downloadedQuants.includes(variant.quant);
-                          // Use selectedQuant for UI display (user's selection)
                           const isSelectedVariant = selectedQuant === variant.quant;
 
                           return (
@@ -426,10 +530,10 @@ function AsrModelSelectModal({
                                     : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
                                   : 'hover:bg-gray-50'
                               }`}
-                              onClick={isDownloadedVariant && !isSelectedVariant ? (e) => {
-                                e.stopPropagation();
-                                const selectId = `${model.preset.id}-${variant.quant}`;
-                                onSelect(selectId);
+                              onClick={isDownloadedVariant && !isSelectedVariant ? () => {
+                                handleQuantSelect(model, variant.quant, true);
+                              } : !isDownloadedVariant ? () => {
+                                handleQuantSelect(model, variant.quant, false);
                               } : undefined}
                             >
                               <div className="relative flex items-center gap-2 z-10">
@@ -469,23 +573,7 @@ function AsrModelSelectModal({
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (onDownload) {
-                                        // Build model object with quantization version info
-                                        const modelWithQuant: Model = {
-                                          id: `${model.preset.id}-${variant.quant}`,
-                                          name: `${model.preset.name} (${variant.quant})`,
-                                          backend: (model.preset.backend || 'Whisper') as BackendType,
-                                          size: model.preset.size || '',
-                                          downloaded: isDownloaded,
-                                          downloadUrls: model.preset.downloadUrls.map(url => ({
-                                            ...url,
-                                            url: url.url.substring(0, url.url.lastIndexOf('/') + 1) + variant.filename,
-                                          })),
-                                          languages: model.preset.languages || [],
-                                          modelType: 'asr',
-                                        };
-                                        onDownload(modelWithQuant);
-                                      }
+                                      handleQuantSelect(model, variant.quant, false);
                                     }}
                                     className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                   >

@@ -46,6 +46,7 @@ interface HomePanelProps {
   modelLanguagePrefs?: Record<string, string>;
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
   onDownload?: (model: Model) => void;
+  onDownloadCancel?: (modelId: string) => void;
   onSave?: (scenes: Scene[]) => void;
   onModelsChange?: (models: Model[]) => void;  // Callback to update models state in parent
   onModelLanguagePrefsChange?: (prefs: Record<string, string>) => void;  // Callback to update language prefs
@@ -849,6 +850,7 @@ export default function HomePanel({
   modelLanguagePrefs = {},
   downloadStates = {},
   onDownload,
+  onDownloadCancel,
   onSave,
   // onModelsChange - DEPRECATED: 不再需要，models 不再持久化
   onModelLanguagePrefsChange,
@@ -1627,6 +1629,7 @@ export default function HomePanel({
             onClose={() => setSelectingSceneId(null)}
             downloadStates={downloadStates}
             onDownload={onDownload}
+            onDownloadCancel={onDownloadCancel}
             currentLanguage={i18n.language}
           />
         );

@@ -131,7 +131,11 @@
     },
     "recommended": "Recommended",
     "configured": "Configured",
-    "setup": "Setup"
+    "setup": "Setup",
+    "downloadModel": "Download Model",
+    "willDownload": "Will download",
+    "precision": "Precision",
+    "size": "Size"
   },
   "home": {
     "title": "Scene Configuration",
