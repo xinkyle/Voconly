@@ -18,7 +18,6 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const { t, i18n } = useTranslation();
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart || false);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
-  const [segmentTranscribe, setSegmentTranscribe] = useState<boolean>(config.segmentTranscribe ?? true);
   const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'medium');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,10 +42,9 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   useEffect(() => {
     setAutostartEnabled(config.autoStart || false);
     setCheckUpdates(config.checkUpdates ?? false);
-    setSegmentTranscribe(config.segmentTranscribe ?? true);
     setPreviewHeight(config.previewHeight ?? 'medium');
     setSelectedMic(config.defaultMicrophone || '');
-  }, [config.autoStart, config.checkUpdates, config.segmentTranscribe, config.previewHeight, config.defaultMicrophone]);
+  }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone]);
 
   const loadAutostartStatus = async () => {
     setLoading(true);
@@ -123,12 +121,6 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const handleCheckUpdatesToggle = (enabled: boolean) => {
     setCheckUpdates(enabled);
     const newConfig = { ...config, checkUpdates: enabled };
-    onSave(newConfig);
-  };
-
-  const handleSegmentTranscribeToggle = (enabled: boolean) => {
-    setSegmentTranscribe(enabled);
-    const newConfig = { ...config, segmentTranscribe: enabled };
     onSave(newConfig);
   };
 
@@ -259,35 +251,6 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                 checkUpdates ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Segment transcribe setting */}
-        <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
-          segmentTranscribe ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
-        }`}>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className={`w-4 h-4 ${segmentTranscribe ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-semibold text-sm text-gray-900">{t('settings.system.segmentTranscribe')}</p>
-              <p className="text-xs text-gray-500">{t('settings.system.segmentTranscribeDesc')}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => handleSegmentTranscribeToggle(!segmentTranscribe)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 ${
-              segmentTranscribe ? 'bg-gray-900' : 'bg-gray-200'
-            } cursor-pointer`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                segmentTranscribe ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
           </button>

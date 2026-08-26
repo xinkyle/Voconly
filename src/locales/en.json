@@ -30,8 +30,6 @@
       "autostartDesc": "Automatically run the application when system starts",
       "checkUpdates": "Auto-check updates",
       "checkUpdatesDesc": "Automatically check for updates on startup",
-      "segmentTranscribe": "Segment Transcription",
-      "segmentTranscribeDesc": "Transcribe and display text during recording. Off: transcribe all after recording stops",
       "previewHeight": "Preview Window Height",
       "previewHeightDesc": "Adjust the height of the transcription preview window",
       "previewHeightHigh": "High",

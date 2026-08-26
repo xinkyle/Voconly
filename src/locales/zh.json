@@ -30,8 +30,6 @@
       "autostartDesc": "系统启动时自动运行应用程序",
       "checkUpdates": "自动检查更新",
       "checkUpdatesDesc": "启动时自动检查应用程序更新",
-      "segmentTranscribe": "分段转录",
-      "segmentTranscribeDesc": "录音期间实时转录并显示文字，关闭则录音结束后一次性转录",
       "previewHeight": "预览窗口高度",
       "previewHeightDesc": "调整转录预览窗口的高度",
       "previewHeightHigh": "高",
