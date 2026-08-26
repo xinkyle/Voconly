@@ -1216,6 +1216,21 @@ function App() {
     setConfig(newConfig);
   };
 
+  // Handle quantization preference change
+  const handleQuantPrefChange = useCallback(async (modelId: string, quant: string) => {
+    if (!config) return;
+
+    const updatedPrefs = {
+      ...(config.modelQuantPrefs || {}),
+      [modelId]: quant,
+    };
+
+    const newConfig = { ...config, modelQuantPrefs: updatedPrefs };
+    setConfig(newConfig);
+    await saveConfig(newConfig);
+    log.debug(`Quant preference saved: ${modelId} -> ${quant}`);
+  }, [config]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex">
@@ -1455,6 +1470,7 @@ function App() {
                 models={config?.models || []}
                 llmProfiles={config?.llmProfiles || []}
                 modelLanguagePrefs={config?.modelLanguagePrefs || {}}
+                modelQuantPrefs={config?.modelQuantPrefs || {}}
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
                 onDownloadCancel={handleDownloadCancel}
@@ -1471,6 +1487,7 @@ function App() {
                     })
                     .catch((err) => log.error(`Failed to reload config: ${err}`));
                 }}
+                onModelQuantPrefsChange={handleQuantPrefChange}
                 onLlmProfileSave={handleLlmProfileSave}
                 tutorialCompleted={config?.tutorialCompleted}
                 onTutorialComplete={async () => {

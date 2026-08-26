@@ -44,12 +44,15 @@ interface HomePanelProps {
   llmProfiles?: LlmProfile[];
   /// 用户对每个 ASR 模型的默认语言偏好
   modelLanguagePrefs?: Record<string, string>;
+  /// 用户对每个 ASR 模型的精度版本偏好
+  modelQuantPrefs?: Record<string, string>;
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
   onDownload?: (model: Model) => void;
   onDownloadCancel?: (modelId: string) => void;
   onSave?: (scenes: Scene[]) => void;
   onModelsChange?: (models: Model[]) => void;  // Callback to update models state in parent
   onModelLanguagePrefsChange?: (prefs: Record<string, string>) => void;  // Callback to update language prefs
+  onModelQuantPrefsChange?: (modelId: string, quant: string) => void;  // Callback when user selects a quantization
   onLlmProfileSave?: (profile: LlmProfile) => void;
   tutorialCompleted?: boolean;
   onTutorialComplete?: () => void;
@@ -848,12 +851,14 @@ export default function HomePanel({
   models = [],
   llmProfiles = [],
   modelLanguagePrefs = {},
+  modelQuantPrefs = {},
   downloadStates = {},
   onDownload,
   onDownloadCancel,
   onSave,
   // onModelsChange - DEPRECATED: 不再需要，models 不再持久化
   onModelLanguagePrefsChange,
+  onModelQuantPrefsChange,
   onLlmProfileSave,
   tutorialCompleted,
   onTutorialComplete,
@@ -1631,6 +1636,8 @@ export default function HomePanel({
             onDownload={onDownload}
             onDownloadCancel={onDownloadCancel}
             currentLanguage={i18n.language}
+            modelQuantPrefs={modelQuantPrefs}
+            onQuantPrefChange={onModelQuantPrefsChange}
           />
         );
       })()}

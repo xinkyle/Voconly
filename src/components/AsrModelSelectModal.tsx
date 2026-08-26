@@ -129,12 +129,14 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 /**
  * Get the default quantization for a model
  * Priority:
- * 1. Recommended quantization (isRecommended: true)
- * 2. First downloaded quantization
- * 3. First quantization in the list
+ * 1. User's preferred quantization (if downloaded)
+ * 2. Recommended quantization (isRecommended: true)
+ * 3. First downloaded quantization
+ * 4. First quantization in the list
  */
 function getDefaultQuant(
-  model: AsrModelWithStatus
+  model: AsrModelWithStatus,
+  modelQuantPrefs?: Record<string, string>
 ): { quant: string; isDownloaded: boolean } | null {
   const quantVariants = model.quantVariants || [];
   const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
@@ -144,14 +146,24 @@ function getDefaultQuant(
     return { quant: '', isDownloaded: model.downloaded };
   }
 
-  // 1. Check for recommended quantization
+  // 1. Check for user's preferred quantization (if downloaded)
+  const modelId = model.preset.id;
+  const userPrefQuant = modelQuantPrefs?.[modelId];
+  if (userPrefQuant) {
+    const isDownloaded = downloadedQuants.includes(userPrefQuant);
+    if (isDownloaded) {
+      return { quant: userPrefQuant, isDownloaded: true };
+    }
+  }
+
+  // 2. Check for recommended quantization
   const recommended = quantVariants.find(v => v.isRecommended);
   if (recommended) {
     const isDownloaded = downloadedQuants.includes(recommended.quant);
     return { quant: recommended.quant, isDownloaded };
   }
 
-  // 2. Check for first downloaded quantization
+  // 3. Check for first downloaded quantization
   for (const downloadedQuant of downloadedQuants) {
     const variant = quantVariants.find(v => v.quant === downloadedQuant);
     if (variant) {
@@ -159,7 +171,7 @@ function getDefaultQuant(
     }
   }
 
-  // 3. Fall back to first quantization
+  // 4. Fall back to first quantization
   const first = quantVariants[0];
   return { quant: first.quant, isDownloaded: false };
 }
@@ -181,6 +193,10 @@ export interface AsrModelSelectModalProps {
   onDownloadCancel?: (modelId: string) => void;
   /** Current language for recommendation (defaults to i18n.language) */
   currentLanguage?: string;
+  /** User's quantization preferences for each model */
+  modelQuantPrefs?: Record<string, string>;
+  /** Callback when user selects a quantization version */
+  onQuantPrefChange?: (modelId: string, quant: string) => void;
 }
 
 /**
@@ -201,6 +217,8 @@ function AsrModelSelectModal({
   onDownload,
   onDownloadCancel,
   currentLanguage,
+  modelQuantPrefs,
+  onQuantPrefChange,
 }: AsrModelSelectModalProps) {
   const { t, i18n } = useTranslation();
 
@@ -280,11 +298,15 @@ function AsrModelSelectModal({
       return;
     }
 
-    // Get default quantization
-    const defaultQuantInfo = getDefaultQuant(model);
+    // Get default quantization (respecting user preference)
+    const defaultQuantInfo = getDefaultQuant(model, modelQuantPrefs);
 
     // Check if default quant is downloaded
     if (defaultQuantInfo?.isDownloaded) {
+      // Save quantization preference before selecting
+      if (defaultQuantInfo.quant && onQuantPrefChange) {
+        onQuantPrefChange(model.preset.id, defaultQuantInfo.quant);
+      }
       // Select the model
       const selectId = defaultQuantInfo.quant
         ? `${model.preset.id}-${defaultQuantInfo.quant}`
@@ -309,11 +331,19 @@ function AsrModelSelectModal({
   // Handle selecting a quantization variant
   const handleQuantSelect = (model: AsrModelWithStatus, quant: string, isDownloaded: boolean) => {
     if (isDownloaded) {
+      // Save quantization preference before selecting
+      if (onQuantPrefChange) {
+        onQuantPrefChange(model.preset.id, quant);
+      }
       // Select and close
       const selectId = `${model.preset.id}-${quant}`;
       onSelect(selectId);
       onClose();
     } else {
+      // Save quantization preference for future use
+      if (onQuantPrefChange) {
+        onQuantPrefChange(model.preset.id, quant);
+      }
       // Start downloading directly and collapse the panel
       startDownload(model, quant);
       setExpandedModelId(null);
@@ -364,8 +394,8 @@ function AsrModelSelectModal({
             const isSelected = isModelSelected(model);
             const selectedQuant = getSelectedQuant(model);
 
-            // Get default quantization
-            const defaultQuantInfo = getDefaultQuant(model);
+            // Get default quantization (respecting user preference)
+            const defaultQuantInfo = getDefaultQuant(model, modelQuantPrefs);
             const defaultQuantLabel = defaultQuantInfo?.quant && QUANT_LABELS[defaultQuantInfo.quant]
               ? t(`models.quantLabels.${QUANT_LABELS[defaultQuantInfo.quant]}`)
               : defaultQuantInfo?.quant || '';

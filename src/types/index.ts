@@ -104,6 +104,11 @@ export interface AppConfig {
   /// value: 语言代码 (如 "zh", "en", "auto")
   modelLanguagePrefs?: Record<string, string>;
 
+  /// 用户对每个 ASR 模型的精度版本偏好
+  /// key: 模型 ID (如 "Qwen3-ASR-1.7B")
+  /// value: 精度版本 (如 "Q5_K_M", "Q8_0")
+  modelQuantPrefs?: Record<string, string>;
+
   scenes: Scene[];
   llm?: LlmConfig;  // LLM 后处理配置
   llmProvider?: LlmProviderConfig;  // LLM 全局 Provider 配置
