@@ -250,6 +250,7 @@ export default function FloatPanelApp() {
   }, [previewCollapsed]);
 
   // 更新显示文本（从 segments Map 合并）
+  // 注意：这个函数用于 Final 事件更新，Partial 事件有自己的展开逻辑
   const updateDisplayText = useCallback(() => {
     const segments = segmentsRef.current;
     const sortedIndexes = Array.from(segments.keys()).sort((a, b) => a - b);
@@ -853,7 +854,51 @@ export default function FloatPanelApp() {
           text: event.payload.text,
           isFinal: false
         });
-        updateDisplayText();
+
+        // 【关键修复】第一个 Partial 结果到达时，立即展开药丸
+        const segments = segmentsRef.current;
+        const sortedIndexes = Array.from(segments.keys()).sort((a, b) => a - b);
+        const texts = sortedIndexes.map(idx => segments.get(idx)?.text || '').filter(t => t);
+        const displayText = texts.join(' ');
+
+        if (displayText.length > 0) {
+          // 首次收到文字时，自动展开窗口（如果用户未手动折叠）
+          if (!hasAutoExpandedRef.current) {
+            hasAutoExpandedRef.current = true;
+            const userCollapsed = localStorage.getItem('voconly-preview-collapsed') === 'true';
+            if (!userCollapsed) {
+              log.debug(`[Streaming] 首次 Partial 结果，立即展开药丸: ${displayText.length} chars`);
+              setIsExpandingWindow(true);
+              setShouldShowPreviewText(false);
+              pendingTextRef.current = displayText;
+
+              // 延迟调窗口（等 React 渲染完成，两帧确保 DOM 更新）
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
+                    .then(() => {
+                      log.debug(`[Streaming] 窗口已变大，现在填充文字`);
+                      const pendingText = pendingTextRef.current;
+                      if (pendingText) {
+                        setPreviewText(pendingText);
+                        setPreviewVisible(true);
+                        pendingTextRef.current = '';
+                      }
+                      setIsExpandingWindow(false);
+                      setShouldShowPreviewText(true);
+                    })
+                    .catch((e) => {
+                      log.error(`[Streaming] 自动展开失败: ${e}`);
+                    });
+                });
+              });
+            }
+          } else {
+            // 药丸已展开，直接更新文字
+            setPreviewText(displayText);
+            setPreviewVisible(true);
+          }
+        }
       }).catch((e) => {
         log.error(`Failed to listen streaming-partial-update: ${e}`);
         return () => {};
