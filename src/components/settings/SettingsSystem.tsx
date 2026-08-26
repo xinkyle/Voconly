@@ -183,18 +183,18 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
       {/* Settings list */}
       <div className="space-y-2">
         {/* Auto-start setting */}
-        <div className={`flex items-center justify-between p-4 rounded-xl border border-gray-100 transition-all duration-200 ${
+        <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
           autostartEnabled ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
         }`}>
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className={`w-5 h-5 ${autostartEnabled ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className={`w-4 h-4 ${autostartEnabled ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.autostart')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.autostartDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.autostart')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.autostartDesc')}</p>
             </div>
           </div>
           <button
@@ -213,22 +213,22 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
         </div>
 
         {/* Language setting */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.language')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.languageDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.language')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.languageDesc')}</p>
             </div>
           </div>
           <select
             value={i18n.language}
             onChange={(e) => i18n.changeLanguage(e.target.value)}
-            className="px-4 py-2 bg-gray-100 border-0 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
+            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
           >
             <option value="zh">{t('settings.system.languageZh')}</option>
             <option value="en">{t('settings.system.languageEn')}</option>
@@ -236,18 +236,18 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
         </div>
 
         {/* Check updates setting */}
-        <div className={`flex items-center justify-between p-4 rounded-xl border border-gray-100 transition-all duration-200 ${
+        <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
           checkUpdates ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
         }`}>
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className={`w-5 h-5 ${checkUpdates ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className={`w-4 h-4 ${checkUpdates ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.checkUpdates')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.checkUpdatesDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.checkUpdates')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.checkUpdatesDesc')}</p>
             </div>
           </div>
           <button
@@ -265,18 +265,18 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
         </div>
 
         {/* Segment transcribe setting */}
-        <div className={`flex items-center justify-between p-4 rounded-xl border border-gray-100 transition-all duration-200 ${
+        <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
           segmentTranscribe ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
         }`}>
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className={`w-5 h-5 ${segmentTranscribe ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className={`w-4 h-4 ${segmentTranscribe ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.segmentTranscribe')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.segmentTranscribeDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.segmentTranscribe')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.segmentTranscribeDesc')}</p>
             </div>
           </div>
           <button
@@ -294,22 +294,22 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
         </div>
 
         {/* Preview height setting */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.previewHeight')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.previewHeightDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.previewHeight')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.previewHeightDesc')}</p>
             </div>
           </div>
           <select
             value={previewHeight}
             onChange={(e) => handlePreviewHeightChange(e.target.value as PreviewHeight)}
-            className="px-4 py-2 bg-gray-100 border-0 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
+            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
           >
             <option value="high">{t('settings.system.previewHeightHigh')}</option>
             <option value="medium">{t('settings.system.previewHeightMedium')}</option>
@@ -318,23 +318,23 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
         </div>
 
         {/* Microphone setting */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.defaultMic')}</p>
-              <p className="text-sm text-gray-500">{t('settings.system.defaultMicDesc')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.defaultMic')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.defaultMicDesc')}</p>
             </div>
           </div>
           <select
             value={selectedMic}
             onChange={(e) => handleMicrophoneChange(e.target.value)}
             disabled={micLoading}
-            className="px-4 py-2 bg-gray-100 border-0 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer w-auto min-w-[140px] max-w-[420px]"
+            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer w-auto min-w-[140px] max-w-[420px]"
           >
             <option value="">{t('settings.system.autoMic')}</option>
             {microphones.map((mic) => (
@@ -345,23 +345,23 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
           </select>
         </div>
 
-        
+
         {/* Open log directory */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{t('settings.system.logDirectory')}</p>
-              <p className="text-sm text-gray-500 truncate max-w-[280px]" title={logDir}>{logDir || t('common.loading')}</p>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.logDirectory')}</p>
+              <p className="text-xs text-gray-500 truncate max-w-[280px]" title={logDir}>{logDir || t('common.loading')}</p>
             </div>
           </div>
           <button
             onClick={handleOpenLogDir}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border-0 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer transition-colors"
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer transition-colors"
           >
             {t('settings.system.openDirectory')}
           </button>

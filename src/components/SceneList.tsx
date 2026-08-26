@@ -346,7 +346,7 @@ function ModelSelectModal({
                       <div className="flex-1 min-w-0">
                         {/* Name and badges */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-gray-900 text-sm">
+                          <span className="font-semibold text-gray-900 text-sm">
                             {model.preset.name}
                           </span>
                           {getModelSize(model) && (
@@ -958,18 +958,18 @@ export default function SceneList({
             return (
               <div
                 key={scene.id}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
                   scene.enabled
                     ? 'bg-white border-gray-100'
                     : 'bg-gray-50/50 border-gray-100'
                 } ${isListening ? 'ring-2 ring-amber-400 ring-offset-2' : ''}`}
               >
                 {/* Scene Info */}
-                <div className="flex-1 flex items-center gap-6">
+                <div className="flex-1 flex items-center gap-4">
                   {/* Scene Name - Click to edit */}
                   <button
                     onClick={() => handleEditName(scene)}
-                    className={`font-medium text-left hover:underline transition-colors ${
+                    className={`font-semibold text-sm text-left hover:underline transition-colors ${
                       scene.enabled ? 'text-gray-900' : 'text-gray-500'
                     }`}
                     title={t('sceneList.clickToEdit')}
@@ -981,7 +981,7 @@ export default function SceneList({
                   {scene.enabled ? (
                     <button
                       onClick={() => !isListening && handleShortcutClick(scene)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono transition-all duration-200 min-w-[80px] justify-center ${
+                      className={`flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-mono transition-all duration-200 min-w-[72px] justify-center ${
                         isListening
                           ? 'bg-amber-100 text-amber-700 animate-pulse'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -990,14 +990,14 @@ export default function SceneList({
                     >
                       {isListening ? (
                         <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
                           </svg>
                           {t('sceneList.pressKey')}
                         </>
                       ) : (
                         <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                           </svg>
                           {scene.shortcut}
@@ -1005,8 +1005,8 @@ export default function SceneList({
                       )}
                     </button>
                   ) : (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono bg-gray-100/50 text-gray-400 min-w-[80px] justify-center cursor-not-allowed">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-mono bg-gray-100/50 text-gray-400 min-w-[72px] justify-center cursor-not-allowed">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                       </svg>
                       {scene.shortcut}
@@ -1017,17 +1017,17 @@ export default function SceneList({
                   {scene.enabled ? (
                     <button
                       onClick={() => handleModelClick(scene)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200"
                       title={!scene.model?.modelId ? t('home.selectModelFirst') : t('sceneList.clickToSwitchModel')}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.clickToSelect')}
                     </button>
                   ) : (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-gray-100/50 text-gray-400 cursor-not-allowed">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium bg-gray-100/50 text-gray-400 cursor-not-allowed">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.noModelSelected')}
@@ -1036,18 +1036,18 @@ export default function SceneList({
                 </div>
 
                 {/* Right side: Delete and Toggles */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   {/* LLM Config Button */}
                   <button
                     onClick={() => setLlmConfigScene(scene)}
-                    className={`p-2 rounded-lg transition-all duration-200 ${
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${
                       llmEnabled
                         ? 'text-white bg-emerald-600 hover:bg-emerald-700'
                         : 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
                     }`}
                     title={llmEnabled ? t('home.llmEnabled') : t('sceneList.llmConfig')}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </button>
@@ -1055,17 +1055,17 @@ export default function SceneList({
                   {/* Delete Button */}
                   <button
                     onClick={() => handleDelete(scene.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
                     title={t('sceneList.deleteScene')}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
 
                   {/* Enable/Disable Toggle */}
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm ${scene.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                    <span className={`text-xs ${scene.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
                       {scene.enabled ? t('sceneList.on') : t('sceneList.off')}
                     </span>
                     <ToggleSwitch

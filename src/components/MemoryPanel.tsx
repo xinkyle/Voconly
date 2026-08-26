@@ -203,9 +203,9 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Duration */}
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-gray-600 mb-2">
             <ClockIcon />
-            <span className="text-xs font-medium">{t('memory.totalDuration')}</span>
+            <span className="text-sm font-semibold">{t('memory.totalDuration')}</span>
           </div>
           <div className="text-xl font-semibold text-gray-900">
             {formatDuration(fullStats.totalDuration)}
@@ -217,9 +217,9 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
 
         {/* Total Words */}
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-gray-600 mb-2">
             <TextIcon />
-            <span className="text-xs font-medium">{t('memory.totalWords')}</span>
+            <span className="text-sm font-semibold">{t('memory.totalWords')}</span>
           </div>
           <div className="text-xl font-semibold text-gray-900">
             {(fullStats.totalWords ?? 0).toLocaleString()}
@@ -231,9 +231,9 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
 
         {/* Total Records */}
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-gray-600 mb-2">
             <MicIcon />
-            <span className="text-xs font-medium">{t('memory.totalCount')}</span>
+            <span className="text-sm font-semibold">{t('memory.totalCount')}</span>
           </div>
           <div className="text-xl font-semibold text-gray-900">
             {fullStats.totalCount}
@@ -245,9 +245,9 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
 
         {/* Today's Records */}
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-gray-600 mb-2">
             <CalendarIcon />
-            <span className="text-xs font-medium">{t('memory.todayCount')}</span>
+            <span className="text-sm font-semibold">{t('memory.todayCount')}</span>
           </div>
           <div className="text-xl font-semibold text-gray-900">
             {fullStats.todayCount}
@@ -257,7 +257,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
       </div>
 
       {/* History List */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {Object.entries(groupedRecords).length === 0 ? (
           <div className="text-center py-16 bg-gray-50 rounded-xl">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -271,7 +271,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
         ) : (
           <>
             {Object.entries(groupedRecords).map(([date, dateRecords]) => (
-              <div key={date} className="space-y-3">
+              <div key={date} className="space-y-2">
                 {/* Date Header */}
                 <h3 className="text-sm font-semibold text-gray-500 px-1">{date}</h3>
 
@@ -280,7 +280,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                   {dateRecords.map((record, index) => (
                     <div
                       key={record.id}
-                      className="group bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer"
+                      className="group bg-white rounded-xl p-3 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex items-start gap-3">
