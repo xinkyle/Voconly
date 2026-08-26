@@ -1,6 +1,6 @@
 # Voconly - Local AI Voice Input Assistant
 
-Voconly is a local-first AI voice input assistant (voice-to-text tool). Speak, let AI organize it into text. Your voice data stays local, works offline. Supports Whisper, SenseVoice, Parakeet ,Qwen-asr speech recognition models, with LLM post-processing for polishing, translation, meeting notes. Perfect for content creation, email drafting, meeting records, quick note-taking.
+Voconly is a free, opensource, local-first AI voice input assistant (voice-to-text tool). Speak, let AI organize it into text. Your voice data stays local, works offline. Supports Whisper, SenseVoice, Parakeet ,Qwen-asr speech recognition models, with LLM post-processing for polishing, translation, meeting notes. Perfect for content creation, email drafting, meeting records, quick note-taking.
 
 ![Voconly Demo](demo_en.gif)
 
