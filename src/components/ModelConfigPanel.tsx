@@ -8,7 +8,6 @@ import type {
   ModelPreset,
   LlmModelPreset,
   QuantVariant,
-  QUANT_LABELS,
 } from '../services/config';
 import type { Model, ProviderWithConfig, LlmProviderInstance } from '../types';
 import {
@@ -247,8 +246,6 @@ interface ModelConfigPanelProps {
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
   onDownload?: (model: Model) => void;
   onDownloadCancel?: (modelId: string) => void;
-  onAsrModelSelect?: (modelId: string) => void;
-  selectedAsrModelId?: string;
   onConfigUpdate?: () => void; // 通知父组件重新加载配置
 }
 
@@ -279,47 +276,37 @@ const formatBytes = (bytes: number): string => {
 // ASR Model Card Component
 interface AsrModelCardProps {
   model: AsrModelWithStatus;
-  isSelected: boolean;
-  isDownloading: boolean;
-  downloadProgress?: DownloadProgress;
-  onSelect: () => void;
   onDownload: () => void;
-  onDownloadCancel?: () => void;
+  onCancelDownload: (quant?: string) => void;  // 取消下载，可选指定量化版本
   t: (key: string) => string;
   currentLanguage: string;  // 当前系统语言
   quantVariants?: QuantVariant[];  // 可用的量化版本列表（从 catalog 获取）
   onDownloadWithQuant?: (variant: QuantVariant) => void;  // 选择量化版本后下载
-  onSwitchQuant?: (quant: string) => void;  // 切换激活版本
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>; // 各版本的下载状态
 }
 
 function AsrModelCard({
   model,
-  isSelected,
-  isDownloading,
-  downloadProgress,
-  onSelect,
   onDownload,
-  onDownloadCancel,
+  onCancelDownload,
   t,
   currentLanguage,
   quantVariants,
   onDownloadWithQuant,
-  onSwitchQuant,
+  downloadStates,
 }: AsrModelCardProps) {
   const isDownloaded = model.downloaded;
   const knownModel = DEFAULT_ASR_MODELS.find((m) => m.id === model.preset.id);
   const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
   const logoPath = getAsrModelLogo(model.preset.id);
 
-  // 获取已下载版本和当前激活版本
+  // 获取已下载版本
   const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
-  const activeQuant = model.activeQuant || model.preset.activeQuant;
 
   // 合并版本信息：已下载的 + catalog 中的
   const hasMultipleQuantVariants = quantVariants && quantVariants.length > 1;
 
-  // 量化版本面板展开状态
-  // 默认收起，由用户手动点击展开
+  // 量化版本面板展开状态（默认收起）
   const [showQuantPanel, setShowQuantPanel] = useState(false);
 
   // 根据当前语言决定是否显示推荐徽章
@@ -342,12 +329,9 @@ function AsrModelCard({
   return (
     <div
       onClick={() => {
-        if (hasMultipleQuantVariants) {
-          // 有多个量化版本：点击展开/收起
+        if (hasMultipleQuantVariants || isDownloaded) {
+          // 有多个量化版本或已下载：展开/收起量化面板
           setShowQuantPanel(!showQuantPanel);
-        } else if (isDownloaded) {
-          // 只有一个版本且已下载：选择模型
-          onSelect();
         }
       }}
       className={`group relative rounded-xl border transition-all duration-200 ${
@@ -355,24 +339,11 @@ function AsrModelCard({
           ? 'cursor-pointer'
           : ''
       } ${
-        isSelected
-          ? 'border-gray-900 bg-gray-50'
-          : isDownloaded
-            ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
-            : 'border-gray-200 bg-white'
+        isDownloaded
+          ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
+          : 'border-gray-200 bg-white'
       }`}
     >
-      {/* Full-card progress background */}
-      {isDownloading && (
-        <div className="absolute inset-0 overflow-hidden rounded-xl">
-          <div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
-            style={{ width: `${downloadProgress?.percentage ?? 0}%` }}
-          />
-          <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-        </div>
-      )}
-
       <div className="relative px-3 py-2 z-10">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
@@ -386,7 +357,7 @@ function AsrModelCard({
             )}
             <div className="flex-1 min-w-0">
               {/* Model Name with recommendation badge */}
-              <div className={`flex items-center gap-2 ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>
+              <div className="flex items-center gap-2 text-gray-800">
                 <h3 className="font-semibold text-sm truncate">
                   {model.preset.name}
                   {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
@@ -426,35 +397,15 @@ function AsrModelCard({
 
           {/* Status/Action */}
           <div className="relative flex-shrink-0 z-10">
-            {isDownloading ? (
-              // 下载中：显示进度（优先检查下载状态）
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
-                {onDownloadCancel && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDownloadCancel();
-                    }}
-                    className="text-xs text-red-500 hover:text-red-600 underline"
-                  >
-                    {t('models.cancel')}
-                  </button>
-                )}
-              </div>
-            ) : isDownloaded ? (
+            {isDownloaded ? (
               // 已下载模型：显示已下载版本状态
               <div className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg">
-                {isSelected ? (
-                  <CheckIcon className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <span className="text-gray-500">
-                    {downloadedQuants.length > 0
-                      ? `${t('models.downloaded')} ${downloadedQuants.length}`
-                      : t('models.downloaded')}
-                  </span>
-                )}
-                {hasMultipleQuantVariants && (
+                <span className="text-gray-500">
+                  {downloadedQuants.length > 0
+                    ? `${t('models.downloaded')} ${downloadedQuants.length}`
+                    : t('models.downloaded')}
+                </span>
+                {(hasMultipleQuantVariants || downloadedQuants.length > 0) && (
                   <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
                 )}
               </div>
@@ -492,43 +443,41 @@ function AsrModelCard({
             <div className="space-y-1.5">
               {quantVariants?.map((variant) => {
                 const isDownloadedVariant = downloadedQuants.includes(variant.quant);
-                const isActiveVariant = activeQuant === variant.quant;
+                const variantKey = `${model.preset.id}-${variant.quant}`;
+                const variantDownloadState = downloadStates?.[variantKey];
+                const isVariantDownloading = variantDownloadState?.downloading ?? false;
+                const variantProgress = variantDownloadState?.progress;
+
+                // 检查当前下载数量是否已达上限（最多 5 个）
+                const currentDownloadCount = Object.values(downloadStates || {}).filter(
+                  state => state.downloading
+                ).length;
+                const canStartDownload = currentDownloadCount < 5 || isVariantDownloading;
 
                 return (
                   <div
                     key={variant.quant}
-                    onClick={isDownloadedVariant ? (e) => {
-                      e.stopPropagation();
-                      if (onSwitchQuant && !isActiveVariant) {
-                        onSwitchQuant(variant.quant);
-                      }
-                    } : undefined}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                      isDownloadedVariant
-                        ? isActiveVariant
-                          ? 'bg-blue-50 border border-blue-200'
-                          : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
-                        : 'hover:bg-gray-50'
+                    className={`relative flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                      isVariantDownloading ? '' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      {/* 单选按钮样式 */}
-                      <span className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
-                        isActiveVariant
-                          ? 'border-blue-500 bg-blue-500'
-                          : isDownloadedVariant
-                            ? 'border-gray-300'
-                            : 'border-gray-200'
-                      }`}>
-                        {isActiveVariant && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </span>
-                      {/* Display precision label instead of quant name */}
+                    {/* Item progress background */}
+                    {isVariantDownloading && (
+                      <div className="absolute inset-0 overflow-hidden rounded-lg">
+                        <div
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
+                          style={{ width: `${variantProgress?.percentage ?? 0}%` }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="relative flex items-center gap-2 z-10">
+                      {/* Display precision label with size in parentheses */}
                       <span className="font-medium text-gray-700">
                         {QUANT_LABELS_MAP[variant.quant]
                           ? t(`models.quantLabels.${QUANT_LABELS_MAP[variant.quant]}`)
                           : variant.quant}
+                        <span className="text-gray-400 font-normal ml-0.5">({formatBytes(variant.sizeBytes)})</span>
                       </span>
                       {variant.isRecommended && (
                         <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
@@ -536,24 +485,39 @@ function AsrModelCard({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400">{formatBytes(variant.sizeBytes)}</span>
-                      {isDownloadedVariant ? (
-                        isActiveVariant ? (
-                          <span className="text-blue-600 font-medium">{t('models.currentUse')}</span>
-                        ) : (
-                          <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
-                        )
+                    <div className="relative flex items-center gap-2 z-10">
+                      {isVariantDownloading ? (
+                        // 下载中：显示进度和取消按钮
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-blue-600">{variantProgress?.percentage || 0}%</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCancelDownload(variant.quant);  // 只取消当前版本
+                            }}
+                            className="text-xs text-red-500 hover:text-red-600 underline"
+                          >
+                            {t('models.cancel')}
+                          </button>
+                        </div>
+                      ) : isDownloadedVariant ? (
+                        <span className="text-emerald-600 font-medium">{t('models.downloaded')}</span>
                       ) : (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setShowQuantPanel(false); // 收起面板
+                            if (!canStartDownload) {
+                              return; // 超过下载数量限制
+                            }
                             if (onDownloadWithQuant) {
                               onDownloadWithQuant(variant);
                             }
                           }}
-                          className="px-2 py-0.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className={`px-2 py-0.5 rounded transition-colors ${
+                            canStartDownload
+                              ? 'text-blue-600 hover:bg-blue-50'
+                              : 'text-gray-400 cursor-not-allowed'
+                          }`}
                         >
                           {t('models.download')}
                         </button>
@@ -574,11 +538,6 @@ function AsrModelCard({
         )}
 
               </div>
-
-      {/* Selected indicator bar */}
-      {isSelected && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-b-xl" />
-      )}
     </div>
   );
 }
@@ -739,8 +698,6 @@ export default function ModelConfigPanel({
   downloadStates = {},
   onDownload,
   onDownloadCancel,
-  onAsrModelSelect,
-  selectedAsrModelId,
   onConfigUpdate,
 }: ModelConfigPanelProps) {
   const { t, i18n } = useTranslation();
@@ -855,12 +812,6 @@ export default function ModelConfigPanel({
   }, []);
 
   // Handlers
-  const handleAsrModelSelect = (modelId: string) => {
-    if (onAsrModelSelect) {
-      onAsrModelSelect(modelId);
-    }
-  };
-
   const handleAsrDownload = (model: AsrModelWithStatus) => {
     if (onDownload) {
       // Build a Model object from AsrModelWithStatus
@@ -1098,37 +1049,29 @@ export default function ModelConfigPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {sortAsrModels(asrModels, currentLanguage).map((model) => {
-              // 检查是否有任何量化版本正在下载
-              // 需要检查所有可能的量化版本 ID，因为下载状态的 key 是带量化后缀的
               const quantVariants = model.quantVariants || [];
-              const isDownloading = quantVariants.some(
-                v => downloadStates[`${model.preset.id}-${v.quant}`]?.downloading
-              ) || (downloadStates[model.preset.id]?.downloading ?? false);
-
-              // 获取当前下载的进度（如果有）
-              const downloadProgress = quantVariants
-                .map(v => downloadStates[`${model.preset.id}-${v.quant}`]?.progress)
-                .find(p => p !== undefined) || downloadStates[model.preset.id]?.progress;
 
               return (
               <AsrModelCard
                 key={model.preset.id}
                 model={model}
-                isSelected={selectedAsrModelId === model.preset.id}
-                isDownloading={isDownloading}
-                downloadProgress={downloadProgress}
-                onSelect={() => handleAsrModelSelect(model.preset.id)}
                 onDownload={() => handleAsrDownload(model)}
-                onDownloadCancel={() => {
-                  // 取消所有可能的下载
-                  quantVariants.forEach(v => {
-                    handleDownloadCancel(`${model.preset.id}-${v.quant}`);
-                  });
-                  handleDownloadCancel(model.preset.id);
+                onCancelDownload={(quant) => {
+                  if (quant) {
+                    // 取消特定量化版本的下载
+                    handleDownloadCancel(`${model.preset.id}-${quant}`);
+                  } else {
+                    // 取消所有下载（向后兼容）
+                    quantVariants.forEach(v => {
+                      handleDownloadCancel(`${model.preset.id}-${v.quant}`);
+                    });
+                    handleDownloadCancel(model.preset.id);
+                  }
                 }}
                 t={t}
                 currentLanguage={currentLanguage}
                 quantVariants={quantVariants}
+                downloadStates={downloadStates}
                 onDownloadWithQuant={(variant) => {
                   // 根据选择的量化版本更新下载 URL
                   const modelObj: Model = {
@@ -1146,15 +1089,6 @@ export default function ModelConfigPanel({
                     modelType: 'asr',
                   };
                   onDownload?.(modelObj);
-                }}
-                onSwitchQuant={(quant) => {
-                  // 切换激活的量化版本
-                  // 简化实现：更新场景配置中的模型 ID
-                  const modelWithQuant = `${model.preset.id}-${quant}`;
-                  log.info(`切换模型量化版本: ${model.preset.id} -> ${modelWithQuant}`);
-                  // TODO: 调用后端切换版本的命令
-                  // 暂时只更新当前选择的模型 ID
-                  handleAsrModelSelect(modelWithQuant);
                 }}
               />
               );

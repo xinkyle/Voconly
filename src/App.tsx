@@ -1384,14 +1384,8 @@ function App() {
                 onDownload={handleDownload}
                 onDownloadCancel={(modelId) => {
                   log.info(`Download cancel requested for ${modelId}`);
-                  // The actual cancellation is handled by the component
-                  // This callback is for any additional cleanup if needed
-                }}
-                onAsrModelSelect={(modelId) => {
-                  log.info(`Selected ASR model: ${modelId}`);
                 }}
                 onConfigUpdate={async () => {
-                  // Reload config from file to sync custom_asr_model_dirs
                   const latestConfig = await loadConfig();
                   setConfig(latestConfig);
                   log.info('Config reloaded after custom dir update');
