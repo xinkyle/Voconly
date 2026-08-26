@@ -15,23 +15,11 @@ import ShortcutErrorModal from './ShortcutErrorModal';
 import SceneForm from './SceneForm';
 import { Tutorial } from './Tutorial';
 import MemoryStatus from './MemoryStatus';
+import AsrModelSelectModal from './AsrModelSelectModal';
 import { createLogger } from '../services/log';
 
 // 创建日志记录器
 const log = createLogger('HomePanel');
-
-// Default available models from project config with description keys for i18n
-// Used to provide i18n descriptions for known models
-const DEFAULT_AVAILABLE_MODELS: (Model & { descriptionKey: string })[] = [
-  { id: 'whisper-tiny', name: 'Whisper Tiny', backend: 'Whisper', size: '75MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperTiny' },
-  { id: 'whisper-base', name: 'Whisper Base', backend: 'Whisper', size: '142MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperBase' },
-  { id: 'whisper-small', name: 'Whisper Small', backend: 'Whisper', size: '244MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperSmall' },
-  { id: 'whisper-medium', name: 'Whisper Medium', backend: 'Whisper', size: '1.5GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperMedium' },
-  { id: 'whisper-large', name: 'Whisper Large', backend: 'Whisper', size: '2.9GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperLarge' },
-  { id: 'whisper-turbo', name: 'Whisper Turbo', backend: 'Whisper', size: '1.6GB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.whisperTurbo' },
-  { id: 'sensevoice-small', name: 'SenseVoice Small', backend: 'Onnx', size: '229MB', downloaded: false, downloadUrls: [], languages: ['zh', 'zh-yue', 'en', 'ja', 'ko'], supportsAutoDetect: true, descriptionKey: 'models.descriptions.sensevoiceSmall' },
-  { id: 'parakeet-v3', name: 'Parakeet V3', backend: 'Onnx', size: '640MB', downloaded: false, downloadUrls: [], languages: ['zh', 'en'], supportsAutoDetect: false, descriptionKey: 'models.descriptions.parakeetV3' },
-];
 
 interface HomePanelProps {
   scenes?: Scene[];
@@ -56,12 +44,6 @@ interface HomePanelProps {
 const KeyboardIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-  </svg>
-);
-
-const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
   </svg>
 );
 
@@ -272,12 +254,10 @@ interface SceneCardProps {
   /// 用户对每个 ASR 模型的默认语言偏好
   modelLanguagePrefs: Record<string, string>;
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
-  onDownload?: (model: Model) => void;
   isListening: boolean;
   onModelClick: () => void;
   onShortcutClick: () => void;
   onModelSelect: (modelId: string) => void;
-  isSelectingModel: boolean;
   onToggleEnabled: () => void;
   onLlmConfigClick: () => void;
   llmEnabled: boolean;
@@ -424,12 +404,10 @@ function SceneCard({
   asrModels,
   modelLanguagePrefs,
   downloadStates = {},
-  onDownload,
   isListening,
   onModelClick,
   onShortcutClick,
   onModelSelect,
-  isSelectingModel,
   onToggleEnabled,
   onLlmConfigClick,
   llmEnabled,
@@ -473,37 +451,6 @@ function SceneCard({
     // 4. 否则使用第一个支持的语言
     return languages[0] || 'zh';
   };
-
-  // Build model list from ASR models (same logic as ModelConfigPanel.tsx)
-  const modelList = asrModels.map(model => {
-    const knownModel = DEFAULT_AVAILABLE_MODELS.find(m => m.id === model.preset.id);
-    const descriptionKey = knownModel?.descriptionKey;
-    const isDownloaded = model.downloaded;
-    // Get download state
-    const downloadState = downloadStates[model.preset.id];
-    // Get language info from preset or models prop
-    const modelFromProps = models.find(m => m.id === model.preset.id);
-    const languages = model.preset.languages || modelFromProps?.languages || [];
-    const supportsAutoDetect = model.preset.supportsAutoDetect ?? modelFromProps?.supportsAutoDetect ?? (languages.length > 10);
-
-    const defaultLanguage = getRecommendedLanguage(model.preset.id, languages, supportsAutoDetect);
-
-    return {
-      id: model.preset.id,
-      name: model.preset.quant ? `${model.preset.name} (${model.preset.quant})` : model.preset.name,
-      backend: model.preset.backend || 'Whisper',
-      size: model.preset.size,
-      downloaded: isDownloaded,
-      description: model.preset.description,
-      descriptionKey,
-      downloading: downloadState?.downloading ?? false,
-      downloadProgress: downloadState?.progress,
-      downloadUrls: model.preset.downloadUrls || [],
-      languages,
-      supportsAutoDetect,
-      defaultLanguage,
-    };
-  });
 
   return (
     <div
@@ -797,154 +744,6 @@ function SceneCard({
           })()}
         </div>
       </div>
-
-      {/* Model Select Dialog */}
-      {isSelectingModel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          onClick={() => onModelSelect(scene.model?.modelId ? getFullModelId(scene.model) : '')}
-        >
-          <div
-            className="bg-white rounded-xl p-5 w-[900px] max-h-[80vh] overflow-hidden shadow-2xl animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-gray-900 rounded-lg">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h4 className="font-semibold text-gray-900 text-base">{t('home.selectModel')}</h4>
-              </div>
-              <button
-                onClick={() => onModelSelect(scene.model?.modelId ? getFullModelId(scene.model) : '')}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {/* Two-column grid layout for model cards */}
-            <div className="grid grid-cols-2 gap-3 max-h-[32rem] overflow-y-auto p-1">
-              {modelList.map((m) => {
-                const isSelected = scene.model?.modelId === m.id;
-                const isDownloaded = m.downloaded;
-                const isDownloading = m.downloading;
-                const canDownload = !isDownloaded && !isDownloading && m.downloadUrls && m.downloadUrls.length > 0 && onDownload;
-
-                const handleItemClick = () => {
-                  if (isDownloaded) {
-                    onModelSelect(m.id);
-                  } else if (canDownload) {
-                    // Select the model first, then trigger download
-                    onModelSelect(m.id);
-                    onDownload({
-                      id: m.id,
-                      name: m.name,
-                      backend: m.backend,
-                      size: m.size,
-                      downloaded: false,
-                      downloadUrls: m.downloadUrls,
-                      languages: [],
-                    });
-                  }
-                };
-
-                return (
-                  <div
-                    key={m.id}
-                    onClick={handleItemClick}
-                    className={`group relative flex flex-col px-3 py-2.5 rounded-xl border transition-all duration-200 text-left overflow-hidden ${
-                      isSelected
-                        ? 'border-gray-900 bg-gray-100 cursor-pointer'
-                        : isDownloaded
-                          ? 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white cursor-pointer'
-                          : isDownloading
-                            ? 'border-blue-200 bg-white cursor-default'
-                            : canDownload
-                              ? 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer'
-                              : 'border-gray-100 bg-gray-50/50 cursor-not-allowed opacity-60'
-                    }`}
-                  >
-                    {/* Full-card progress background */}
-                    {isDownloading && (
-                      <div className="absolute inset-0 overflow-hidden rounded-xl">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
-                          style={{ width: `${m.downloadProgress?.percentage ?? 0}%` }}
-                        />
-                        <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                      </div>
-                    )}
-
-                    {/* Status badge - top right corner */}
-                    <div className="absolute top-2 right-2 z-10">
-                      {isDownloaded && (
-                        <CheckIcon className="w-4 h-4 text-emerald-600" />
-                      )}
-                      {!isDownloaded && !isDownloading && canDownload && (
-                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      )}
-                    </div>
-
-                    {/* Model Info */}
-                    <div className="relative flex-1 min-w-0 z-10">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <h5 className={`font-semibold text-sm truncate ${
-                          isSelected ? 'text-gray-900' : isDownloading ? 'text-blue-600' : 'text-gray-800'
-                        }`}>
-                          {m.name}
-                        </h5>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Size badge */}
-                        <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
-                          isSelected
-                            ? 'bg-gray-900/10 text-gray-600'
-                            : isDownloading
-                              ? 'bg-blue-100 text-blue-500'
-                              : isDownloaded
-                                ? 'bg-gray-200 text-gray-500'
-                                : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {m.size}
-                        </span>
-                        {/* Downloading badge */}
-                        {isDownloading && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-blue-50 text-blue-600 animate-pulse">
-                            {t('models.downloading')}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1.5 leading-relaxed line-clamp-2">
-                        {m.descriptionKey ? t(m.descriptionKey) : m.description || ''}
-                      </p>
-                      {/* Progress info */}
-                      {isDownloading && m.downloadProgress && (
-                        <div className="mt-1.5 flex items-center gap-2 text-xs">
-                          <span className="font-medium text-blue-600">{m.downloadProgress.percentage}%</span>
-                          <span className="text-gray-400">
-                            {formatBytes(m.downloadProgress.downloaded)} / {formatBytes(m.downloadProgress.total)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Selection Indicator - bottom bar */}
-                    {isSelected && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-b-xl" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Prompt Type Quick Switch Popup */}
       {isSelectingPromptType && onPromptTypeSelect && (
@@ -1703,12 +1502,10 @@ export default function HomePanel({
               asrModels={asrModels}
               modelLanguagePrefs={modelLanguagePrefs}
               downloadStates={downloadStates}
-              onDownload={onDownload}
               isListening={listeningSceneId === scene.id}
               onModelClick={() => handleModelClick(scene.id)}
               onShortcutClick={() => handleShortcutClick(scene.id)}
               onModelSelect={(modelId) => handleModelSelect(scene.id, modelId)}
-              isSelectingModel={selectingSceneId === scene.id}
               onToggleEnabled={() => handleToggleEnabled(scene.id)}
               onLlmConfigClick={() => setLlmConfigScene(scene)}
               llmEnabled={isLlmEnabled}
@@ -1797,6 +1594,24 @@ export default function HomePanel({
           onClose={() => setShortcutError(null)}
         />
       )}
+
+      {/* ASR Model Select Modal */}
+      {selectingSceneId && (() => {
+        const scene = localScenes.find(s => s.id === selectingSceneId);
+        if (!scene) return null;
+
+        return (
+          <AsrModelSelectModal
+            models={asrModels}
+            selectedModelId={scene.model?.modelId ? getFullModelId(scene.model) : ''}
+            onSelect={(modelId) => handleModelSelect(selectingSceneId, modelId)}
+            onClose={() => setSelectingSceneId(null)}
+            downloadStates={downloadStates}
+            onDownload={onDownload}
+            currentLanguage={i18n.language}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { subscribeToDownloadComplete, cancelModelDownload } from '../services/do
 import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
 import { AudioLines, Info } from 'lucide-react';
+import { sortAsrModels } from './AsrModelSelectModal';
 
 const log = createLogger('ModelConfigPanel');
 
@@ -1089,7 +1090,7 @@ export default function ModelConfigPanel({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {asrModels.map((model) => {
+            {sortAsrModels(asrModels, currentLanguage).map((model) => {
               // 检查是否有任何量化版本正在下载
               // 需要检查所有可能的量化版本 ID，因为下载状态的 key 是带量化后缀的
               const quantVariants = model.quantVariants || [];

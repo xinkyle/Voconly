@@ -584,8 +584,14 @@ export function isModelDownloaded(
     return false;
   }
 
-  // If no quantization specified, check if any version is downloaded
+  // If no quantization specified, check if the model is downloaded
   if (!quant) {
+    // For models without quantization (like ONNX), check the downloaded flag directly
+    // downloadedQuants may be empty for ONNX models
+    if (model.downloaded) {
+      return true;
+    }
+    // For GGUF models with quantization, check downloadedQuants
     const downloadedQuants = model.downloadedQuants || [];
     return downloadedQuants.length > 0;
   }
