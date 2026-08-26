@@ -340,6 +340,12 @@ pub struct AppConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub model_language_prefs: HashMap<String, String>,
 
+    /// 用户对每个 ASR 模型的精度版本偏好
+    /// key: 模型 ID (如 "Qwen3-ASR-1.7B")
+    /// value: 精度版本 (如 "Q5_K_M", "Q8_0")
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub model_quant_prefs: HashMap<String, String>,
+
     pub scenes: Vec<Scene>,
     /// LLM 后处理配置
     #[serde(default)]
@@ -421,6 +427,9 @@ impl Default for AppConfig {
 
             // 新增：用户对每个模型的语言偏好
             model_language_prefs: HashMap::new(),
+
+            // 新增：用户对每个模型的精度版本偏好
+            model_quant_prefs: HashMap::new(),
 
             scenes: vec![
                 Scene {

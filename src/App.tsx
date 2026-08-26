@@ -1220,10 +1220,15 @@ function App() {
   const handleQuantPrefChange = useCallback(async (modelId: string, quant: string) => {
     if (!config) return;
 
+    console.log(`[DEBUG handleQuantPrefChange] modelId=${modelId}, quant=${quant}`);
+    console.log(`[DEBUG handleQuantPrefChange] Current modelQuantPrefs:`, JSON.stringify(config.modelQuantPrefs));
+
     const updatedPrefs = {
       ...(config.modelQuantPrefs || {}),
       [modelId]: quant,
     };
+
+    console.log(`[DEBUG handleQuantPrefChange] Updated prefs:`, JSON.stringify(updatedPrefs));
 
     const newConfig = { ...config, modelQuantPrefs: updatedPrefs };
     setConfig(newConfig);

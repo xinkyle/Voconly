@@ -333,10 +333,13 @@ function AsrModelSelectModal({
 
   // Handle selecting a quantization variant
   const handleQuantSelect = async (model: AsrModelWithStatus, quant: string, isDownloaded: boolean) => {
+    console.log(`[DEBUG handleQuantSelect] model=${model.preset.id}, quant=${quant}, isDownloaded=${isDownloaded}`);
     if (isDownloaded) {
       // Save quantization preference before selecting
       if (onQuantPrefChange) {
+        console.log(`[DEBUG handleQuantSelect] Calling onQuantPrefChange(${model.preset.id}, ${quant})`);
         await onQuantPrefChange(model.preset.id, quant);
+        console.log(`[DEBUG handleQuantSelect] onQuantPrefChange completed`);
       }
       // Select and close
       const selectId = `${model.preset.id}-${quant}`;
@@ -345,7 +348,9 @@ function AsrModelSelectModal({
     } else {
       // Save quantization preference for future use
       if (onQuantPrefChange) {
+        console.log(`[DEBUG handleQuantSelect] Calling onQuantPrefChange(${model.preset.id}, ${quant})`);
         await onQuantPrefChange(model.preset.id, quant);
+        console.log(`[DEBUG handleQuantSelect] onQuantPrefChange completed`);
       }
       // Start downloading directly and collapse the panel
       startDownload(model, quant);
@@ -399,6 +404,7 @@ function AsrModelSelectModal({
 
             // Get default quantization (respecting user preference)
             const defaultQuantInfo = getDefaultQuant(model, modelQuantPrefs);
+            console.log(`[DEBUG] Model: ${model.preset.id}, modelQuantPrefs:`, JSON.stringify(modelQuantPrefs), 'defaultQuantInfo:', JSON.stringify(defaultQuantInfo));
             const defaultQuantLabel = defaultQuantInfo?.quant && QUANT_LABELS[defaultQuantInfo.quant]
               ? t(`models.quantLabels.${QUANT_LABELS[defaultQuantInfo.quant]}`)
               : defaultQuantInfo?.quant || '';

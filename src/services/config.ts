@@ -75,6 +75,8 @@ interface RustAppConfig {
   models?: RustModel[];
   /// 用户对每个 ASR 模型的默认语言偏好
   modelLanguagePrefs?: Record<string, string>;
+  /// 用户对每个 ASR 模型的精度版本偏好
+  modelQuantPrefs?: Record<string, string>;
   scenes: RustScene[];
   llm: RustLlmConfig;
   llmProfiles?: RustLlmProfile[];
@@ -225,6 +227,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     models: rust.models?.map(convertModelFromRust),
     // 新增：用户对每个模型的语言偏好
     modelLanguagePrefs: rust.modelLanguagePrefs,
+    // 新增：用户对每个模型的精度版本偏好
+    modelQuantPrefs: rust.modelQuantPrefs,
     scenes: rust.scenes.map(convertSceneFromRust),
     llm: rust.llm ? convertLlmConfigFromRust(rust.llm) : undefined,
     llmProfiles: rust.llmProfiles?.map(convertLlmProfileFromRust),
@@ -252,6 +256,8 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
     models: config.models?.map(convertModelToRust) || [],
     // 新增：用户对每个模型的语言偏好
     modelLanguagePrefs: config.modelLanguagePrefs || {},
+    // 新增：用户对每个模型的精度版本偏好
+    modelQuantPrefs: config.modelQuantPrefs || {},
     scenes: config.scenes.map(convertSceneToRust),
     llm: config.llm ? convertLlmConfigToRust(config.llm) : {
       enabled: false,
