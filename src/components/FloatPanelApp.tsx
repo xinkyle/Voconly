@@ -113,6 +113,20 @@ interface StreamingErrorEvent {
   savedText: string;
 }
 
+interface StreamingPartialEvent {
+  segmentIndex: number;
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
+interface StreamingFinalEvent {
+  segmentIndex: number;
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
 interface LlmErrorState {
   visible: boolean;
   error: string;
@@ -235,6 +249,16 @@ export default function FloatPanelApp() {
     }
   }, [previewCollapsed]);
 
+  // 更新显示文本（从 segments Map 合并）
+  const updateDisplayText = useCallback(() => {
+    const segments = segmentsRef.current;
+    const sortedIndexes = Array.from(segments.keys()).sort((a, b) => a - b);
+    const texts = sortedIndexes.map(idx => segments.get(idx)?.text || '').filter(t => t);
+    const displayText = texts.join(' ');
+    setPreviewText(displayText);
+    setPreviewVisible(displayText.length > 0);
+  }, []);
+
   // LLM 错误状态
   const [llmError, setLlmError] = useState<LlmErrorState>({
     visible: false,
@@ -277,6 +301,9 @@ export default function FloatPanelApp() {
   const hasUserEditedRef = useRef(false);
   // 防抖同步定时器
   const syncTimeoutRef = useRef<number | null>(null);
+
+  // 存储片段结果: segment_index -> { text, isFinal }
+  const segmentsRef = useRef<Map<number, { text: string; isFinal: boolean }>>(new Map());
 
   // 同步 previewText 到 contentEditable div 的 innerHTML
   useEffect(() => {
@@ -814,6 +841,47 @@ export default function FloatPanelApp() {
         }
       }).catch((e) => {
         log.error(`Failed to listen streaming-error: ${e}`);
+        return () => {};
+      })
+    );
+
+    // Partial 识别结果事件（实时显示）
+    unlistenPromises.push(
+      listen<StreamingPartialEvent>('streaming-partial-update', (event) => {
+        log.debug(`[Streaming] Partial update: index=${event.payload.segmentIndex}, text="${event.payload.text}"`);
+        segmentsRef.current.set(event.payload.segmentIndex, {
+          text: event.payload.text,
+          isFinal: false
+        });
+        updateDisplayText();
+      }).catch((e) => {
+        log.error(`Failed to listen streaming-partial-update: ${e}`);
+        return () => {};
+      })
+    );
+
+    // Final 识别结果事件（替代同 index 的 Partial）
+    unlistenPromises.push(
+      listen<StreamingFinalEvent>('streaming-final-update', (event) => {
+        log.debug(`[Streaming] Final update: index=${event.payload.segmentIndex}, text="${event.payload.text}"`);
+        segmentsRef.current.set(event.payload.segmentIndex, {
+          text: event.payload.text,
+          isFinal: true
+        });
+        updateDisplayText();
+      }).catch((e) => {
+        log.error(`Failed to listen streaming-final-update: ${e}`);
+        return () => {};
+      })
+    );
+
+    // 录音停止时清空 segments
+    unlistenPromises.push(
+      listen<void>('streaming-recording-stopped', () => {
+        log.debug(`[Streaming] Recording stopped, clearing segments`);
+        segmentsRef.current.clear();
+      }).catch((e) => {
+        log.error(`Failed to listen streaming-recording-stopped: ${e}`);
         return () => {};
       })
     );

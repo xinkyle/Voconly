@@ -73,6 +73,90 @@ const SOFT_THRESHOLD_SECS: f64 = 45.0;
 /// This prevents audio growing too long for ASR models
 const HARD_THRESHOLD_SECS: f64 = 60.0;
 
+// ============================================================================
+// Partial/Final 实时转录常量
+// ============================================================================
+
+/// Partial 识别触发间隔（样本数）
+/// 4000 样本 @ 16kHz = 0.25 秒
+const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
+
+/// 最大并行识别任务数
+const MAX_PARALLEL_RECOGNITIONS: usize = 4;
+
+// ============================================================================
+// Partial/Final 事件结构定义
+// ============================================================================
+
+/// Partial 识别结果事件
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamingPartialEvent {
+    /// 语音片段索引
+    segment_index: u32,
+    /// 识别文本
+    text: String,
+    /// 开始时间（毫秒）
+    start_ms: u64,
+    /// 结束时间（毫秒）
+    end_ms: u64,
+}
+
+/// Final 识别结果事件
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StreamingFinalEvent {
+    /// 语音片段索引
+    segment_index: u32,
+    /// 识别文本
+    text: String,
+    /// 开始时间（毫秒）
+    start_ms: u64,
+    /// 结束时间（毫秒）
+    end_ms: u64,
+}
+
+/// 识别任务类型
+#[derive(Clone, Copy, PartialEq)]
+enum RecognitionKind {
+    Partial,
+    Final,
+}
+
+/// 识别任务
+struct RecognitionTask {
+    /// 音频样本
+    samples: Vec<f32>,
+    /// 任务类型
+    kind: RecognitionKind,
+    /// 片段索引
+    segment_index: u32,
+    /// 开始时间（毫秒）
+    start_ms: u64,
+    /// 结束时间（毫秒）
+    end_ms: u64,
+}
+
+/// 识别结果
+struct RecognitionResult {
+    /// 任务类型
+    kind: RecognitionKind,
+    /// 片段索引
+    segment_index: u32,
+    /// 识别文本
+    text: String,
+    /// 开始时间（毫秒）
+    start_ms: u64,
+    /// 结束时间（毫秒）
+    end_ms: u64,
+}
+
+/// 样本数转毫秒
+#[inline]
+fn samples_to_ms(samples: usize) -> u64 {
+    (samples as f64 / 16000.0 * 1000.0) as u64
+}
+
 /// Internal command for the audio worker thread
 enum Cmd {
     Start(String), // scene_id
@@ -390,6 +474,28 @@ fn run_consumer(
     let mut current_segment_start: usize = 0; // 当前分段起始索引
     let mut current_scene_id: String = String::new(); // 当前场景 ID
 
+    // ===== Partial/Final 实时转录状态变量 =====
+    /// 当前语音片段索引
+    let mut partial_segment_index: u32 = 0;
+
+    /// 下一次 Partial 触发的样本位置
+    let mut next_partial_sample: usize = 0;
+
+    /// 语音开始的样本位置
+    let mut speech_start_sample: usize = 0;
+
+    /// 总共处理的样本数
+    let mut total_samples_processed: usize = 0;
+
+    /// 是否正在语音中
+    let mut speech_started: bool = false;
+
+    /// 识别结果接收通道
+    let (recognition_tx, recognition_rx): (mpsc::Sender<RecognitionResult>, mpsc::Receiver<RecognitionResult>) = mpsc::channel();
+
+    /// 当前活跃的识别线程数量
+    let mut active_recognition_threads: usize = 0;
+
     /// Helper function to reset VAD sensitivity to Normal mode
     /// Returns true if sensitivity was reset, false if already normal
     fn reset_vad_sensitivity(
@@ -459,6 +565,57 @@ fn run_consumer(
         *segment = merged;
 
         emit_audio_released(app_handle);
+    }
+
+    /// 生成并行识别任务（用于 Partial/Final 实时转录）
+    fn spawn_recognition_task(
+        tx: &mpsc::Sender<RecognitionResult>,
+        task: RecognitionTask,
+        app_handle: &AppHandle,
+        scene_id: &str,
+    ) {
+        let tx = tx.clone();
+        let app_handle = app_handle.clone();
+        let scene_id = scene_id.to_string();
+        let segment_index = task.segment_index;
+        let kind = task.kind;
+        let start_ms = task.start_ms;
+        let end_ms = task.end_ms;
+        let samples = task.samples;
+
+        std::thread::spawn(move || {
+            // 获取 AppServices
+            let services = app_handle.try_state::<crate::config::AppServices>();
+
+            let text = if let Some(services) = services {
+                match crate::commands::transcribe::transcribe_samples_internal(
+                    &services,
+                    &samples,
+                    &scene_id,
+                ) {
+                    Ok(text) => text,
+                    Err(e) => {
+                        log::error!("[Partial/Final] Recognition error: {}", e);
+                        String::new()
+                    }
+                }
+            } else {
+                log::error!("[Partial/Final] AppServices not available");
+                String::new()
+            };
+
+            let result = RecognitionResult {
+                kind,
+                segment_index,
+                text,
+                start_ms,
+                end_ms,
+            };
+
+            if tx.send(result).is_err() {
+                log::error!("[Partial/Final] Failed to send recognition result");
+            }
+        });
     }
 
     fn handle_frame(
@@ -756,6 +913,38 @@ fn run_consumer(
 
                         in_speech_segment = true;
 
+                        // ===== Partial/Final: 检测语音开始 =====
+                        if !speech_started {
+                            speech_started = true;
+                            speech_start_sample = total_samples_processed;
+                            next_partial_sample = total_samples_processed + PARTIAL_INTERVAL_SAMPLES;
+                            log::info!("[Partial/Final] Speech started at sample {}, next_partial={}", speech_start_sample, next_partial_sample);
+                        }
+
+                        // ===== Partial/Final: 更新样本计数 =====
+                        total_samples_processed += added_len;
+
+                        // ===== Partial/Final: Partial 识别触发 =====
+                        if speech_started && total_samples_processed >= next_partial_sample {
+                            log::info!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}, threads_count={}",
+                                total_samples_processed, next_partial_sample, active_recognition_threads);
+                            // 检查并行任务数是否超限
+                            if active_recognition_threads < MAX_PARALLEL_RECOGNITIONS {
+                                let task = RecognitionTask {
+                                    samples: segment_buffer.clone(),
+                                    kind: RecognitionKind::Partial,
+                                    segment_index: partial_segment_index,
+                                    start_ms: samples_to_ms(speech_start_sample),
+                                    end_ms: samples_to_ms(total_samples_processed),
+                                };
+                                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
+                                active_recognition_threads += 1;
+                                log::info!("[Partial/Final] Scheduled partial recognition, index={}, buffer_len={}",
+                                    partial_segment_index, segment_buffer.len());
+                            }
+                            next_partial_sample += PARTIAL_INTERVAL_SAMPLES;
+                        }
+
                         let segment_duration = get_duration_secs(&segment_buffer);
                         log::debug!("[Streaming] Voice detected, added {} samples, segment_buffer now {} samples ({:.2}s)",
                             added_len, segment_buffer.len(), segment_duration);
@@ -799,9 +988,28 @@ fn run_consumer(
                     } else if in_speech_segment {
                         // Transition from speech to silence - segment boundary detected
                         in_speech_segment = false;
-
-                        log::info!("[Streaming] Speech ended, segment_buffer has {} samples ({:.2}s)",
+                        log::info!("[Streaming] Speech ended (is_voice=false, in_speech_segment -> false), segment_buffer has {} samples ({:.2}s)",
                             segment_buffer.len(), get_duration_secs(&segment_buffer));
+
+                        // ===== Partial/Final: Final 识别触发 =====
+                        if speech_started && !segment_buffer.is_empty() {
+                            // 更新样本计数（当前帧是静音，不增加）
+                            let task = RecognitionTask {
+                                samples: segment_buffer.clone(),
+                                kind: RecognitionKind::Final,
+                                segment_index: partial_segment_index,
+                                start_ms: samples_to_ms(speech_start_sample),
+                                end_ms: samples_to_ms(total_samples_processed),
+                            };
+                            spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
+                            active_recognition_threads += 1;
+                            log::info!("[Partial/Final] Scheduled final recognition, index={}, buffer_len={}",
+                                partial_segment_index, segment_buffer.len());
+
+                            // 索引递增，准备下一个片段
+                            partial_segment_index += 1;
+                            speech_started = false;
+                        }
 
                         // Merge with pending buffer if any
                         merge_pending_into_segment(&mut pending_buffer, &mut segment_buffer, &app_handle, "Speech ended");
@@ -861,6 +1069,37 @@ fn run_consumer(
             }
         });
 
+        // ===== Partial/Final: 处理识别结果 =====
+        while let Ok(recognition) = recognition_rx.try_recv() {
+            match recognition.kind {
+                RecognitionKind::Partial => {
+                    // 发送 Partial 事件
+                    let event = StreamingPartialEvent {
+                        segment_index: recognition.segment_index,
+                        text: recognition.text.clone(),
+                        start_ms: recognition.start_ms,
+                        end_ms: recognition.end_ms,
+                    };
+                    let _ = app_handle.emit_to("float-panel", "streaming-partial-update", &event);
+                    log::info!("[Partial/Final] Partial result: index={}, text={}",
+                        recognition.segment_index, recognition.text);
+                }
+                RecognitionKind::Final => {
+                    // 发送 Final 事件
+                    let event = StreamingFinalEvent {
+                        segment_index: recognition.segment_index,
+                        text: recognition.text.clone(),
+                        start_ms: recognition.start_ms,
+                        end_ms: recognition.end_ms,
+                    };
+                    let _ = app_handle.emit_to("float-panel", "streaming-final-update", &event);
+                    log::info!("[Partial/Final] Final result: index={}, text={}",
+                        recognition.segment_index, recognition.text);
+                }
+            }
+            active_recognition_threads = active_recognition_threads.saturating_sub(1);
+        }
+
         // Check for commands
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
@@ -882,9 +1121,25 @@ fn run_consumer(
                         v.lock().unwrap().reset();
                     }
 
+                    // ===== Partial/Final: 重置状态变量 =====
+                    partial_segment_index = 0;
+                    next_partial_sample = 0;
+                    speech_start_sample = 0;
+                    total_samples_processed = 0;
+                    speech_started = false;
+                    active_recognition_threads = 0;
+
                     // === 模型能力检测 ===
                     // 检测当前场景绑定的模型是否支持流式转录
                     use_streaming_channel = false; // 默认使用分段模式
+
+                    // 从 AppState 读取 streaming_mode 设置（由 start_vad_recording 设置）
+                    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+                        if let Ok(mode) = state.streaming_mode.lock() {
+                            streaming_mode = *mode;
+                            log::info!("[Capture] streaming_mode from AppState: {}", streaming_mode);
+                        }
+                    }
 
                     if let Some(services) = app_handle.try_state::<crate::config::AppServices>() {
                         if let Some(model_manager_guard) = services.model_manager.lock().ok() {
@@ -1203,6 +1458,14 @@ fn run_consumer(
                     pending_buffer.clear();
                     in_speech_segment = false;
                     current_segment_start = 0;
+
+                    // ===== Partial/Final: 重置状态变量 =====
+                    partial_segment_index = 0;
+                    next_partial_sample = 0;
+                    speech_start_sample = 0;
+                    total_samples_processed = 0;
+                    speech_started = false;
+                    active_recognition_threads = 0;
 
                     // Reset VAD status
                     last_vad_status = false;
