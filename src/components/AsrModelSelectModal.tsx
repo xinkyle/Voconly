@@ -106,7 +106,7 @@ const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: numb
     <span className="text-[11px] text-gray-500 w-10 flex-shrink-0">{label}</span>
     <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
       <div
-        className={`h-full rounded-full ${color === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-[#047857]' : 'bg-emerald-500'}`}
         style={{ width: `${(score || 0) * 100}%` }}
       />
     </div>
@@ -458,7 +458,7 @@ function AsrModelSelectModal({
                           )}
                           {/* Recommendation badge */}
                           {showRecommendation && (
-                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white">
+                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-600 text-white">
                               {t('models.recommended')}
                             </span>
                           )}
@@ -481,7 +481,7 @@ function AsrModelSelectModal({
                               </div>
                             )}
                             {model.preset.supportsStreaming && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200 flex-shrink-0">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-[rgba(0,212,170,0.1)] text-[#00d4aa] rounded-full border border-[rgba(0,212,170,0.3)] flex-shrink-0">
                                 <AudioLines className="w-3 h-3" />
                                 {t('models.streaming')}
                               </span>
