@@ -24,7 +24,7 @@ import type { DownloadProgress, DownloadCompleteEvent } from '../services/downlo
 import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
 import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
-import { AudioLines, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { sortAsrModels } from './AsrModelSelectModal';
 
 const log = createLogger('ModelConfigPanel');
@@ -371,8 +371,8 @@ function AsrModelCard({
               </div>
               {/* Description */}
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
-              {/* Accuracy, Speed Scores and Streaming Badge */}
-              {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined || model.preset.supportsStreaming) && (
+              {/* Accuracy and Speed Scores */}
+              {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
                 <div className="flex items-center gap-3 mt-2">
                   {model.preset.accuracyScore !== undefined && (
                     <div className="flex-shrink-0">
@@ -383,12 +383,6 @@ function AsrModelCard({
                     <div className="flex-shrink-0">
                       <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
                     </div>
-                  )}
-                  {model.preset.supportsStreaming && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-[rgba(0,212,170,0.1)] text-[#00d4aa] rounded-full border border-[rgba(0,212,170,0.3)] flex-shrink-0">
-                      <AudioLines className="w-3 h-3" />
-                      {t('models.streaming')}
-                    </span>
                   )}
                 </div>
               )}

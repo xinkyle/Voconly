@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import type { Model, BackendType } from '../types';
 import type { AsrModelWithStatus, QuantVariant } from '../services/config';
 import type { DownloadProgress } from '../services/downloader';
-import { AudioLines } from 'lucide-react';
 import { QUANT_LABELS } from '../services/config';
 
 // Recommended models for different languages
@@ -467,8 +466,8 @@ function AsrModelSelectModal({
                         <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
                           {model.preset.description || ''}
                         </p>
-                        {/* Accuracy, Speed Scores and Streaming Badges */}
-                        {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined || model.preset.supportsStreaming) && (
+                        {/* Accuracy and Speed Scores */}
+                        {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
                           <div className="flex items-center gap-3 mt-2">
                             {model.preset.accuracyScore !== undefined && (
                               <div className="flex-shrink-0">
@@ -479,12 +478,6 @@ function AsrModelSelectModal({
                               <div className="flex-shrink-0">
                                 <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
                               </div>
-                            )}
-                            {model.preset.supportsStreaming && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-[rgba(0,212,170,0.1)] text-[#00d4aa] rounded-full border border-[rgba(0,212,170,0.3)] flex-shrink-0">
-                                <AudioLines className="w-3 h-3" />
-                                {t('models.streaming')}
-                              </span>
                             )}
                           </div>
                         )}
