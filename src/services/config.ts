@@ -498,6 +498,26 @@ export interface QuantVariant {
 }
 
 /**
+ * Quantization precision labels
+ * Maps quantization types to precision categories
+ * Used to display precision label instead of quant name (Q5_K_M → "低精度")
+ */
+export const QUANT_LABELS: Record<string, 'low' | 'medium' | 'high'> = {
+  'Q5_K_M': 'low',
+  'Q8_0': 'medium',
+  'F16': 'high',
+};
+
+/**
+ * Get precision label for a quantization type
+ * @param quant Quantization type (e.g., "Q5_K_M", "Q8_0", "F16")
+ * @returns Precision label key ('low', 'medium', 'high') or undefined
+ */
+export function getQuantLabel(quant: string): 'low' | 'medium' | 'high' | undefined {
+  return QUANT_LABELS[quant];
+}
+
+/**
  * LLM Model with Status (matches Rust LlmModelWithStatus)
  */
 export interface LlmModelWithStatus {

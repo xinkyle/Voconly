@@ -6,7 +6,7 @@ import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
 import { translateSceneName } from '../utils/i18n';
 import { unloadModel, loadModel } from '../services/whisper';
-import { getAsrModelList, type AsrModelWithStatus, loadConfig, saveConfig, isModelDownloaded, parseModelId } from '../services/config';
+import { getAsrModelList, type AsrModelWithStatus, loadConfig, saveConfig, isModelDownloaded, parseModelId, QUANT_LABELS } from '../services/config';
 import { saveLlmProfile, getLlmPromptPresets } from '../services/llm';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { useToast } from './ui/Toast';
@@ -20,6 +20,23 @@ import { createLogger } from '../services/log';
 
 // 创建日志记录器
 const log = createLogger('HomePanel');
+
+// 精度标签中文映射（用于非组件函数）
+const QUANT_LABEL_NAMES_ZH: Record<string, string> = {
+  'low': '低精度',
+  'medium': '中精度',
+  'high': '高精度',
+};
+
+// 获取量化版本的显示名称
+function getQuantDisplayName(quant: string, t?: (key: string) => string): string {
+  const label = QUANT_LABELS[quant];
+  if (label) {
+    // 如果有翻译函数，使用翻译；否则使用中文默认值
+    return t ? t(`models.quantLabels.${label}`) : QUANT_LABEL_NAMES_ZH[label] || quant;
+  }
+  return quant;
+}
 
 interface HomePanelProps {
   scenes?: Scene[];
@@ -88,7 +105,7 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
 
 // Get model name by ID
 // First searches in asrModels (scanned models from directory), then falls back to models (predefined list)
-function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[]): string {
+function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[], t?: (key: string) => string): string {
   // Parse model ID to handle quantization suffix (e.g., "qwen3-asr-1.7b-Q8_0")
   const { baseId, quant } = parseModelId(modelId);
 
@@ -100,7 +117,8 @@ function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWith
       // Add quantization version if available from modelId or preset
       const displayQuant = quant || asrModel.preset.quant;
       if (displayQuant) {
-        return `${name} (${displayQuant})`;
+        const quantName = getQuantDisplayName(displayQuant, t);
+        return `${name} (${quantName})`;
       }
       return name;
     }
@@ -114,7 +132,8 @@ function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWith
   }
   // Add quantization version if available
   if (quant) {
-    return `${model.name} (${quant})`;
+    const quantName = getQuantDisplayName(quant, t);
+    return `${model.name} (${quantName})`;
   }
   return model.name;
 }
@@ -636,7 +655,7 @@ function SceneCard({
                           <>
                             <div className="flex items-center gap-1.5">
                               <span className={`font-medium text-sm ${isDownloading ? 'text-blue-600' : isDownloaded ? 'text-gray-900' : 'text-amber-700'}`}>
-                                {getModelName(scene.model?.modelId ?? '', models, asrModels)}
+                                {getModelName(scene.model?.modelId ?? '', models, asrModels, t)}
                               </span>
                               {/* Not downloaded badge */}
                               {!isDownloaded && !isDownloading && (
@@ -675,7 +694,7 @@ function SceneCard({
                       <span className="font-medium text-sm text-gray-400">{t('home.noModelSelected')}</span>
                     ) : (
                       <>
-                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ?? '', models, asrModels)}</span>
+                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ?? '', models, asrModels, t)}</span>
                         <span className="text-xs text-gray-300 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
                       </>
                     )}

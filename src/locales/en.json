@@ -103,6 +103,11 @@
     "currentUse": "Current",
     "downloadedCount": "Downloaded",
     "totalSize": "Total",
+    "quantLabels": {
+      "low": "Low Precision",
+      "medium": "Medium Precision",
+      "high": "High Precision"
+    },
     "descriptions": {
       "whisperTiny": "Best for quick testing, extremely fast but lower accuracy",
       "whisperBase": "Best for daily use, balanced speed and accuracy",

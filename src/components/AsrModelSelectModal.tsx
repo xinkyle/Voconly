@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Model, BackendType } from '../types';
-import type { AsrModelWithStatus, QuantVariant } from '../services/config';
+import type { AsrModelWithStatus, QuantVariant, getQuantLabel } from '../services/config';
 import type { DownloadProgress } from '../services/downloader';
 import { AudioLines } from 'lucide-react';
+import { QUANT_LABELS } from '../services/config';
 
 // Recommended models for different languages
 const ZH_RECOMMENDED_MODELS: Set<string> = new Set([
@@ -375,7 +376,9 @@ function AsrModelSelectModal({
                             <>
                               <CheckIcon className="w-4 h-4 text-emerald-600" />
                               <span className="text-gray-700">
-                                {selectedQuant ? `${t('sceneList.selected')} ${selectedQuant}` : t('sceneList.selected')}
+                                {selectedQuant
+                                  ? `${t('sceneList.selected')} ${QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}`
+                                  : t('sceneList.selected')}
                               </span>
                               {hasMultipleQuantVariants && (
                                 <span className="text-gray-400 ml-1">{isExpanded ? '▲' : '▼'}</span>
@@ -442,7 +445,12 @@ function AsrModelSelectModal({
                                     <span className="w-2 h-2 rounded-full bg-white" />
                                   )}
                                 </span>
-                                <span className="font-medium text-gray-700">{variant.quant}</span>
+                                {/* Display precision label instead of quant name */}
+                                <span className="font-medium text-gray-700">
+                                  {QUANT_LABELS[variant.quant]
+                                    ? t(`models.quantLabels.${QUANT_LABELS[variant.quant]}`)
+                                    : variant.quant}
+                                </span>
                                 {variant.isRecommended && (
                                   <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
                                     {t('models.recommended')}

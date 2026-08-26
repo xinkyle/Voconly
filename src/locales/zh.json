@@ -103,6 +103,11 @@
     "currentUse": "当前使用",
     "downloadedCount": "已下载",
     "totalSize": "总大小",
+    "quantLabels": {
+      "low": "低精度",
+      "medium": "中精度",
+      "high": "高精度"
+    },
     "descriptions": {
       "whisperTiny": "适合快速测试，速度极快但准确度较低",
       "whisperBase": "适合日常使用，速度与准确度平衡",

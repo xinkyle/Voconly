@@ -8,6 +8,7 @@ import type {
   ModelPreset,
   LlmModelPreset,
   QuantVariant,
+  QUANT_LABELS,
 } from '../services/config';
 import type { Model, ProviderWithConfig, LlmProviderInstance } from '../types';
 import {
@@ -16,6 +17,7 @@ import {
   getCustomAsrModelDirs,
   addCustomAsrModelDir,
   removeCustomAsrModelDir,
+  QUANT_LABELS as QUANT_LABELS_MAP,
 } from '../services/config';
 import { getProviderList, saveProviderConfig, deleteProviderConfig, detectGpu } from '../services/llm';
 import { createLogger } from '../services/log';
@@ -522,7 +524,12 @@ function AsrModelCard({
                           <span className="w-1.5 h-1.5 rounded-full bg-white" />
                         )}
                       </span>
-                      <span className="font-medium text-gray-700">{variant.quant}</span>
+                      {/* Display precision label instead of quant name */}
+                      <span className="font-medium text-gray-700">
+                        {QUANT_LABELS_MAP[variant.quant]
+                          ? t(`models.quantLabels.${QUANT_LABELS_MAP[variant.quant]}`)
+                          : variant.quant}
+                      </span>
                       {variant.isRecommended && (
                         <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
                           {t('models.recommended')}
