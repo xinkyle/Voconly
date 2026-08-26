@@ -1276,24 +1276,15 @@ export default function FloatPanelApp() {
   // 是否显示转录等待动效：正在等待转录结果（仅分段转录模式）
   const showTranscribeIndicator = state.status === 'recording' && isAwaitingTranscribe && segmentTranscribeEnabledRef.current;
 
-  // 状态圆点样式优先级：
-  // 1. 音频在缓存中 (isAudioBuffered) -> 橙点 'buffered'（仅分段转录模式）
-  // 2. 等待转录 (showTranscribeIndicator) -> 绿点 'transcribing'（仅分段转录模式）
-  // 3. 其他 -> 按原状态
-  // 注意：分段转录关闭时，不显示橙色和绿色指示器，保持红点
-  let actualDotClass: string;
-  if (segmentTranscribeEnabledRef.current) {
-    if (isAudioBuffered && state.status === 'recording') {
-      actualDotClass = 'buffered';
-   } else if (showTranscribeIndicator) {
-      actualDotClass = 'transcribing';
-    } else {
-      actualDotClass = statusConfig.dotClass;
-    }
-  } else {
-    // 分段转录关闭：始终使用原始状态（录音时保持红点）
-    actualDotClass = statusConfig.dotClass;
-  }
+  // 状态圆点样式：
+  // - 分段转录开启 + 录音中 + 说话中：绿点（正在实时转录）
+  // - 分段转录开启 + 录音中 + 静音：红点（等待说话）
+  // - 分段转录关闭 + 录音中：红点（等待结束后转录）
+  // - 其他状态：按原状态
+  const actualDotClass: string =
+    segmentTranscribeEnabledRef.current && state.status === 'recording'
+      ? (voiceDetected ? 'transcribing' : 'recording')  // 绿点/红点
+      : statusConfig.dotClass;
 
   // 如果显示 LLM 错误状态，渲染错误状态 UI
   if (llmError.visible) {
