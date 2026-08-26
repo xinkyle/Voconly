@@ -659,7 +659,7 @@ function SceneCard({
                           <>
                             <div className="flex items-center gap-1.5">
                               <span className={`font-medium text-sm ${isDownloading ? 'text-blue-600' : isDownloaded ? 'text-gray-900' : 'text-amber-700'}`}>
-                                {getModelName(scene.model?.modelId ?? '', models, asrModels, t)}
+                                {getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels, t)}
                               </span>
                               {/* Not downloaded badge */}
                               {!isDownloaded && !isDownloading && (
@@ -698,7 +698,7 @@ function SceneCard({
                       <span className="font-medium text-sm text-gray-400">{t('home.noModelSelected')}</span>
                     ) : (
                       <>
-                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ?? '', models, asrModels, t)}</span>
+                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels, t)}</span>
                         <span className="text-xs text-gray-300 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
                       </>
                     )}
