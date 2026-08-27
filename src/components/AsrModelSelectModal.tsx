@@ -101,11 +101,11 @@ function getModelSize(model: AsrModelWithStatus): string {
 
 // Score bar component for model quality metrics
 const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
-  <div className="flex items-center gap-1.5">
-    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0">{label}</span>
-    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
+  <div className="flex items-center gap-2">
+    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0 text-right">{label}</span>
+    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[72px]">
       <div
-        className={`h-full rounded-full ${color === 'blue' ? 'bg-[#047857]' : 'bg-emerald-500'}`}
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-teal-600' : 'bg-amber-300'}`}
         style={{ width: `${(score || 0) * 100}%` }}
       />
     </div>
@@ -468,16 +468,12 @@ function AsrModelSelectModal({
                         </p>
                         {/* Accuracy and Speed Scores */}
                         {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
-                          <div className="flex items-center gap-3 mt-2">
+                          <div className="flex items-center gap-4 mt-2">
                             {model.preset.accuracyScore !== undefined && (
-                              <div className="flex-shrink-0">
-                                <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
-                              </div>
+                              <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
                             )}
                             {model.preset.speedScore !== undefined && (
-                              <div className="flex-shrink-0">
-                                <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
-                              </div>
+                              <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
                             )}
                           </div>
                         )}
@@ -485,7 +481,7 @@ function AsrModelSelectModal({
                     </div>
 
                     {/* Right side: Status indicator */}
-                    <div className="flex-shrink-0" onClick={(e) => handleTagClick(e, model)}>
+                    <div className="flex-shrink-0 min-w-[72px] text-right" onClick={(e) => handleTagClick(e, model)}>
                       {isDownloading ? (
                         // Downloading: show progress and cancel button
                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>

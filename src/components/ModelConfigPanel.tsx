@@ -52,11 +52,11 @@ function getModelSize(model: AsrModelWithStatus | LlmModelWithStatus): string {
 
 // Score bar component for model quality metrics
 const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
-  <div className="flex items-center gap-1.5">
-    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0">{label}</span>
-    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[60px]">
+  <div className="flex items-center gap-2">
+    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0 text-right">{label}</span>
+    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[72px]">
       <div
-        className={`h-full rounded-full ${color === 'blue' ? 'bg-[#047857]' : 'bg-emerald-500'}`}
+        className={`h-full rounded-full ${color === 'blue' ? 'bg-teal-600' : 'bg-amber-300'}`}
         style={{ width: `${(score || 0) * 100}%` }}
       />
     </div>
@@ -373,16 +373,12 @@ function AsrModelCard({
               <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
               {/* Accuracy and Speed Scores */}
               {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-4 mt-2">
                   {model.preset.accuracyScore !== undefined && (
-                    <div className="flex-shrink-0">
-                      <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
-                    </div>
+                    <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
                   )}
                   {model.preset.speedScore !== undefined && (
-                    <div className="flex-shrink-0">
-                      <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
-                    </div>
+                    <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
                   )}
                 </div>
               )}
@@ -390,7 +386,7 @@ function AsrModelCard({
           </div>
 
           {/* Status/Action */}
-          <div className="relative flex-shrink-0 z-10">
+          <div className="relative flex-shrink-0 z-10 min-w-[72px] text-right">
             {isDownloaded ? (
               // 已下载模型：显示已下载版本状态
               <div className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg">
@@ -577,7 +573,7 @@ function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDo
           </div>
 
           {/* Status/Action */}
-          <div className="relative flex-shrink-0 z-10">
+          <div className="relative flex-shrink-0 z-10 min-w-[72px] text-right">
             {isDownloaded ? (
               <CheckIcon className="w-4 h-4 text-emerald-600" />
             ) : isDownloading ? (
