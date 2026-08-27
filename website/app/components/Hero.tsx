@@ -6,8 +6,8 @@ import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
 const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
-const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
-const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
+const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.4.1/Voconly_0.4.1_x64-setup.exe';
+const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.4.1/Voconly_0.4.1_x64-setup.exe';
 
 export default function Hero() {
   const { t, lang } = useI18n();

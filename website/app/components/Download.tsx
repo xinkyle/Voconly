@@ -5,8 +5,8 @@ import { Download as DownloadIcon, Monitor, Apple, Terminal } from 'lucide-react
 import { useI18n } from '../lib/i18n-context';
 
 const GITHUB_RELEASE_URL = 'https://github.com/xinkyle/Voconly/releases';
-const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.3.7/Voconly_0.3.7_x64-setup.exe';
-const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.3.6/Voconly_0.3.6_x64-setup.exe';
+const GITEE_WINDOWS_DOWNLOAD_URL = 'https://gitee.com/xingkyle/Voconly/releases/download/v0.4.1/Voconly_0.4.1_x64-setup.exe';
+const GITHUB_WINDOWS_DOWNLOAD_URL = 'https://github.com/xinkyle/Voconly/releases/download/v0.4.1/Voconly_0.4.1_x64-setup.exe';
 
 // 颜色配置
 const colorConfig = {
@@ -37,7 +37,7 @@ export default function Download() {
     {
       nameKey: 'download.windows.name',
       icon: Monitor,
-      version: lang === 'zh' ? 'v0.3.7' : 'v0.3.6',
+      version: 'v0.4.1',
       size: '~45 MB',
       href: windowsDownloadUrl,
       available: true,
