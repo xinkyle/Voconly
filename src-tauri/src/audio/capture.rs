@@ -62,15 +62,13 @@ const MAX_TRANSCRIBE_QUEUE_LEN: usize = 10;
 /// Maximum time to wait for audio chunks before considering the stream dead
 const MAX_RECV_TIMEOUT_MS: u64 = 5000;
 
-/// Minimum segment duration in seconds for streaming transcription
-const MIN_SEGMENT_DURATION_SECS: f64 = 2.0;
-
-/// Soft threshold: after this duration, VAD becomes more sensitive
-/// (reduced hangover tolerance for faster segmentation on pauses)
-const SOFT_THRESHOLD_SECS: f64 = 45.0;
+/// Soft threshold: after this duration, VAD becomes extremely sensitive
+/// (minimal hangover tolerance for finding any pause to segment)
+/// Set to 10s to give a 5-second window (10-15s) to find a pause before hard threshold
+const SOFT_THRESHOLD_SECS: f64 = 10.0;
 
 /// Hard threshold: force segment if exceeded, regardless of VAD state
-/// This prevents audio growing too long for ASR models
+/// This is the last resort - should rarely trigger if soft threshold works correctly
 const HARD_THRESHOLD_SECS: f64 = 15.0;
 
 // ============================================================================
@@ -205,9 +203,9 @@ impl AudioCapture {
 
         // Wrap with SmoothedVad for temporal smoothing
         // Prefill: 3 frames (96ms) - capture speech onset, reduce previous sentence tail inclusion
-        // Hangover: 12 frames (384ms) - tolerate natural pauses (breath, thinking)
+        // Hangover: 10 frames (320ms) - tolerate natural pauses, but segment earlier to avoid hard threshold
         // Onset: 2 frames (64ms) - require consecutive voice frames
-        let smoothed_vad = SmoothedVad::new(Box::new(silero), 3, 12, 2);
+        let smoothed_vad = SmoothedVad::new(Box::new(silero), 3, 10, 2);
 
         Ok(AudioCapture {
             device: None,
@@ -472,7 +470,6 @@ fn run_consumer(
     let mut streaming_mode = false;
     let mut use_streaming_channel = false; // 是否使用流式通道（基于模型能力）
     let mut segment_buffer = Vec::<f32>::new(); // Current segment being collected
-    let mut pending_buffer = Vec::<f32>::new(); // Buffer for segments < 3s
     let mut in_speech_segment = false; // Track if we're currently in a speech segment
     let mut soft_threshold_active = false; // Track if we've exceeded soft threshold (30s)
                                            // After soft threshold, we actively look for any pause (breath, swallowing) to segment
@@ -528,54 +525,6 @@ fn run_consumer(
         } else {
             false
         }
-    }
-
-    /// 发送音频释放事件（pending被合并后，橙点→绿点）
-    fn emit_audio_released(app_handle: &AppHandle) {
-        let _ = app_handle.emit_to(
-            "float-panel",
-            "audio-released",
-            AudioBufferStatus {
-                has_pending_audio: false,
-                pending_duration_secs: 0.0,
-            },
-        );
-    }
-
-    /// 发送音频缓存事件（短片段进pending时，显示橙点）
-    fn emit_audio_buffered(app_handle: &AppHandle, duration: f64) {
-        let _ = app_handle.emit_to(
-            "float-panel",
-            "audio-buffered",
-            AudioBufferStatus {
-                has_pending_audio: true,
-                pending_duration_secs: duration,
-            },
-        );
-    }
-
-    /// 合并 pending_buffer 到 segment_buffer（硬阈值/语音结束时调用）
-    fn merge_pending_into_segment(
-        pending: &mut Vec<f32>,
-        segment: &mut Vec<f32>,
-        app_handle: &AppHandle,
-        context: &str,
-    ) {
-        if pending.is_empty() {
-            return;
-        }
-        let pending_duration = get_duration_secs(pending);
-        log::info!(
-            "[Streaming] {}: merging pending_buffer ({:.2}s)",
-            context,
-            pending_duration
-        );
-
-        let mut merged = std::mem::take(pending);
-        merged.extend_from_slice(segment);
-        *segment = merged;
-
-        emit_audio_released(app_handle);
     }
 
     /// 生成并行识别任务（用于 Partial/Final 实时转录）
@@ -978,14 +927,11 @@ fn run_consumer(
                             }
                         }
 
-                        // 【硬阈值】超过60秒后，强制分段（不停止录音）
+                        // 【硬阈值】超过阈值后，强制分段（不停止录音）
                         // 这防止用户一直说话不停顿导致音频过长影响ASR识别
                         if segment_duration >= HARD_THRESHOLD_SECS {
                             log::info!("[Streaming] Hard threshold triggered ({:.2}s >= {:.2}s), forcing segment emit",
                                 segment_duration, HARD_THRESHOLD_SECS);
-
-                            // 先合并 pending_buffer（如果有），避免丢失之前累积的短片段
-                            merge_pending_into_segment(&mut pending_buffer, &mut segment_buffer, &app_handle, "Hard threshold");
 
                             // ===== Partial/Final: 触发 Final 识别 =====
                             // 硬阈值分段时，也发送 Final 识别结果（与语音结束时的逻辑一致）
@@ -1011,7 +957,6 @@ fn run_consumer(
                             enqueue_segment(&app_handle, full_recording.clone(), current_segment_start, segment_sample_count, &current_scene_id);
                             current_segment_start = current_len;
                             segment_buffer.clear();
-                            // pending_buffer 已被 mem::take 清空，无需额外 clear
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Hard threshold");
@@ -1055,39 +1000,19 @@ fn run_consumer(
                             speech_started = false;
                         }
 
-                        // Merge with pending buffer if any
-                        merge_pending_into_segment(&mut pending_buffer, &mut segment_buffer, &app_handle, "Speech ended");
-
+                        // 发送 segment
                         let duration = get_duration_secs(&segment_buffer);
-                        log::info!("[Streaming] Final segment duration: {:.2}s (min required: {:.2}s)",
-                            duration, MIN_SEGMENT_DURATION_SECS);
+                        log::info!("[Streaming] Final segment duration: {:.2}s", duration);
 
-                        if duration >= MIN_SEGMENT_DURATION_SECS {
-                            // Segment is long enough, emit it
-                            log::info!("[Streaming] Segment ready, calling enqueue_segment");
+                        if !segment_buffer.is_empty() {
                             let current_len = full_recording.lock().unwrap().len();
                             let segment_sample_count = current_len - current_segment_start;
                             enqueue_segment(&app_handle, full_recording.clone(), current_segment_start, segment_sample_count, &current_scene_id);
                             current_segment_start = current_len;
                             segment_buffer.clear();
 
-                            // 【重要】分段发送后，重置软阈值状态和VAD敏感度
-                            // 为下一个segment做准备
+                            // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Segment sent");
-                        } else {
-                            // Segment too short, move to pending buffer
-                            let pending_duration = duration; // 保存时长用于事件
-                            log::info!("[Streaming] Segment too short ({:.2}s < {:.2}s), moving to pending_buffer",
-                                duration, MIN_SEGMENT_DURATION_SECS);
-                            pending_buffer = std::mem::take(&mut segment_buffer);
-                            segment_buffer.clear();
-
-                            // 发送音频缓存状态事件，通知前端显示橙点
-                            emit_audio_buffered(&app_handle, pending_duration);
-
-                            // 【修复 Bug 1】短片段进 pending_buffer 时恢复 VAD 敏感度
-                            // 避免下一个片段仍处于高敏感度模式
-                            reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Short segment moved to pending");
                         }
                     }
                 }  // end of else if streaming_mode && recording
@@ -1156,7 +1081,6 @@ fn run_consumer(
                     last_vad_status = false;
                     in_speech_segment = false;
                     segment_buffer.clear();
-                    pending_buffer.clear();
                     current_segment_start = 0; // 重置分段起始索引
                     current_scene_id = scene_id.clone(); // 保存 scene_id
                     full_recording.lock().unwrap().clear(); // 清空全量录音
@@ -1348,28 +1272,8 @@ fn run_consumer(
                         // 重置 VAD 敏感度
                         reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Stop (streaming)");
                     } else if streaming_mode {
-                        log::info!("[Streaming] segment_buffer: {} samples ({:.2}s), pending_buffer: {} samples ({:.2}s)",
-                            segment_buffer.len(), get_duration_secs(&segment_buffer),
-                            pending_buffer.len(), get_duration_secs(&pending_buffer));
-
-                        // Merge pending buffer with current segment
-                        if !pending_buffer.is_empty() {
-                            log::info!("[Streaming] Merging pending_buffer into segment_buffer before stop");
-                            pending_buffer.extend_from_slice(&segment_buffer);
-                            segment_buffer = pending_buffer.clone();
-                            pending_buffer.clear();
-
-                            // 【新增】发送音频释放事件，通知前端缓存已清空
-                            log::info!("[Streaming] Sending audio-released event (stop command)");
-                            let _ = app_handle.emit_to(
-                                "float-panel",
-                                "audio-released",
-                                AudioBufferStatus {
-                                    has_pending_audio: false,
-                                    pending_duration_secs: 0.0,
-                                },
-                            );
-                        }
+                        log::info!("[Streaming] segment_buffer: {} samples ({:.2}s)",
+                            segment_buffer.len(), get_duration_secs(&segment_buffer));
 
                         // Emit any remaining segment
                         if !segment_buffer.is_empty() {
@@ -1502,7 +1406,6 @@ fn run_consumer(
                     // Discard all buffers without emitting any segments
                     processed_samples.clear();
                     segment_buffer.clear();
-                    pending_buffer.clear();
                     in_speech_segment = false;
                     current_segment_start = 0;
 
@@ -1577,14 +1480,6 @@ fn run_consumer(
 #[serde(rename_all = "camelCase")]
 struct VadStatus {
     is_voice: bool,
-}
-
-/// Audio buffer status event payload
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AudioBufferStatus {
-    has_pending_audio: bool,
-    pending_duration_secs: f64,
 }
 
 /// Transcription text result event payload

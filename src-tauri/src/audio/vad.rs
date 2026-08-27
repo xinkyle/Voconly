@@ -89,7 +89,7 @@ impl SmoothedVad {
             prefill_frames,
             hangover_frames,
             normal_hangover_frames: hangover_frames,
-            high_hangover_frames: 6, // 180ms - tolerate natural pauses while controlling segment length
+            high_hangover_frames: 2, // 64ms - extremely sensitive, finds any pause
             onset_frames,
             frame_buffer: VecDeque::new(),
             hangover_counter: 0,
