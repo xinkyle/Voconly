@@ -94,6 +94,8 @@ const MAX_PARALLEL_RECOGNITIONS: usize = 4;
 struct StreamingPartialEvent {
     /// 语音片段索引
     segment_index: u32,
+    /// 版本号（递增，用于防止旧结果覆盖新结果）
+    version: u32,
     /// 识别文本
     text: String,
     /// 开始时间（毫秒）
@@ -108,6 +110,8 @@ struct StreamingPartialEvent {
 struct StreamingFinalEvent {
     /// 语音片段索引
     segment_index: u32,
+    /// 版本号（递增，用于防止旧结果覆盖新结果）
+    version: u32,
     /// 识别文本
     text: String,
     /// 开始时间（毫秒）
@@ -131,6 +135,8 @@ struct RecognitionTask {
     kind: RecognitionKind,
     /// 片段索引
     segment_index: u32,
+    /// 版本号（递增，用于防止旧结果覆盖新结果）
+    version: u32,
     /// 开始时间（毫秒）
     start_ms: u64,
     /// 结束时间（毫秒）
@@ -143,6 +149,8 @@ struct RecognitionResult {
     kind: RecognitionKind,
     /// 片段索引
     segment_index: u32,
+    /// 版本号
+    version: u32,
     /// 识别文本
     text: String,
     /// 开始时间（毫秒）
@@ -478,6 +486,9 @@ fn run_consumer(
     /// 当前语音片段索引
     let mut partial_segment_index: u32 = 0;
 
+    /// 版本号计数器（递增，用于防止旧结果覆盖新结果）
+    let mut recognition_version: u32 = 0;
+
     /// 下一次 Partial 触发的样本位置
     let mut next_partial_sample: usize = 0;
 
@@ -578,6 +589,7 @@ fn run_consumer(
         let app_handle = app_handle.clone();
         let scene_id = scene_id.to_string();
         let segment_index = task.segment_index;
+        let version = task.version;
         let kind = task.kind;
         let start_ms = task.start_ms;
         let end_ms = task.end_ms;
@@ -607,6 +619,7 @@ fn run_consumer(
             let result = RecognitionResult {
                 kind,
                 segment_index,
+                version,
                 text,
                 start_ms,
                 end_ms,
@@ -930,17 +943,20 @@ fn run_consumer(
                                 total_samples_processed, next_partial_sample, active_recognition_threads);
                             // 检查并行任务数是否超限
                             if active_recognition_threads < MAX_PARALLEL_RECOGNITIONS {
+                                // 递增版本号
+                                recognition_version += 1;
                                 let task = RecognitionTask {
                                     samples: segment_buffer.clone(),
                                     kind: RecognitionKind::Partial,
                                     segment_index: partial_segment_index,
+                                    version: recognition_version,
                                     start_ms: samples_to_ms(speech_start_sample),
                                     end_ms: samples_to_ms(total_samples_processed),
                                 };
                                 spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
                                 active_recognition_threads += 1;
-                                log::info!("[Partial/Final] Scheduled partial recognition, index={}, buffer_len={}",
-                                    partial_segment_index, segment_buffer.len());
+                                log::info!("[Partial/Final] Scheduled partial recognition, index={}, version={}, buffer_len={}",
+                                    partial_segment_index, recognition_version, segment_buffer.len());
                             }
                             next_partial_sample += PARTIAL_INTERVAL_SAMPLES;
                         }
@@ -993,18 +1009,20 @@ fn run_consumer(
 
                         // ===== Partial/Final: Final 识别触发 =====
                         if speech_started && !segment_buffer.is_empty() {
-                            // 更新样本计数（当前帧是静音，不增加）
+                            // 递增版本号
+                            recognition_version += 1;
                             let task = RecognitionTask {
                                 samples: segment_buffer.clone(),
                                 kind: RecognitionKind::Final,
                                 segment_index: partial_segment_index,
+                                version: recognition_version,
                                 start_ms: samples_to_ms(speech_start_sample),
                                 end_ms: samples_to_ms(total_samples_processed),
                             };
                             spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
                             active_recognition_threads += 1;
-                            log::info!("[Partial/Final] Scheduled final recognition, index={}, buffer_len={}",
-                                partial_segment_index, segment_buffer.len());
+                            log::info!("[Partial/Final] Scheduled final recognition, index={}, version={}, buffer_len={}",
+                                partial_segment_index, recognition_version, segment_buffer.len());
 
                             // 索引递增，准备下一个片段
                             partial_segment_index += 1;
@@ -1076,25 +1094,27 @@ fn run_consumer(
                     // 发送 Partial 事件
                     let event = StreamingPartialEvent {
                         segment_index: recognition.segment_index,
+                        version: recognition.version,
                         text: recognition.text.clone(),
                         start_ms: recognition.start_ms,
                         end_ms: recognition.end_ms,
                     };
                     let _ = app_handle.emit_to("float-panel", "streaming-partial-update", &event);
-                    log::info!("[Partial/Final] Partial result: index={}, text={}",
-                        recognition.segment_index, recognition.text);
+                    log::info!("[Partial/Final] Partial result: index={}, version={}, text={}",
+                        recognition.segment_index, recognition.version, recognition.text);
                 }
                 RecognitionKind::Final => {
                     // 发送 Final 事件
                     let event = StreamingFinalEvent {
                         segment_index: recognition.segment_index,
+                        version: recognition.version,
                         text: recognition.text.clone(),
                         start_ms: recognition.start_ms,
                         end_ms: recognition.end_ms,
                     };
                     let _ = app_handle.emit_to("float-panel", "streaming-final-update", &event);
-                    log::info!("[Partial/Final] Final result: index={}, text={}",
-                        recognition.segment_index, recognition.text);
+                    log::info!("[Partial/Final] Final result: index={}, version={}, text={}",
+                        recognition.segment_index, recognition.version, recognition.text);
                 }
             }
             active_recognition_threads = active_recognition_threads.saturating_sub(1);
@@ -1123,6 +1143,7 @@ fn run_consumer(
 
                     // ===== Partial/Final: 重置状态变量 =====
                     partial_segment_index = 0;
+                    recognition_version = 0;
                     next_partial_sample = 0;
                     speech_start_sample = 0;
                     total_samples_processed = 0;
@@ -1461,6 +1482,7 @@ fn run_consumer(
 
                     // ===== Partial/Final: 重置状态变量 =====
                     partial_segment_index = 0;
+                    recognition_version = 0;
                     next_partial_sample = 0;
                     speech_start_sample = 0;
                     total_samples_processed = 0;

@@ -115,6 +115,7 @@ interface StreamingErrorEvent {
 
 interface StreamingPartialEvent {
   segmentIndex: number;
+  version: number;
   text: string;
   startMs: number;
   endMs: number;
@@ -122,6 +123,7 @@ interface StreamingPartialEvent {
 
 interface StreamingFinalEvent {
   segmentIndex: number;
+  version: number;
   text: string;
   startMs: number;
   endMs: number;
@@ -303,8 +305,8 @@ export default function FloatPanelApp() {
   // 防抖同步定时器
   const syncTimeoutRef = useRef<number | null>(null);
 
-  // 存储片段结果: segment_index -> { text, isFinal }
-  const segmentsRef = useRef<Map<number, { text: string; isFinal: boolean }>>(new Map());
+  // 存储片段结果: segment_index -> { text, isFinal, version }
+  const segmentsRef = useRef<Map<number, { text: string; isFinal: boolean; version: number }>>(new Map());
 
   // 同步 previewText 到 contentEditable div 的 innerHTML
   useEffect(() => {
@@ -849,10 +851,19 @@ export default function FloatPanelApp() {
     // Partial 识别结果事件（实时显示）
     unlistenPromises.push(
       listen<StreamingPartialEvent>('streaming-partial-update', (event) => {
-        log.debug(`[Streaming] Partial update: index=${event.payload.segmentIndex}, text="${event.payload.text}"`);
+        log.debug(`[Streaming] Partial update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
+
+        // 版本号检查：只有更新的版本才覆盖
+        const existing = segmentsRef.current.get(event.payload.segmentIndex);
+        if (existing && existing.version > event.payload.version) {
+          log.debug(`[Streaming] Ignoring outdated Partial: existing version=${existing.version}, new version=${event.payload.version}`);
+          return;
+        }
+
         segmentsRef.current.set(event.payload.segmentIndex, {
           text: event.payload.text,
-          isFinal: false
+          isFinal: false,
+          version: event.payload.version,
         });
 
         // 【关键修复】第一个 Partial 结果到达时，立即展开药丸
@@ -908,10 +919,19 @@ export default function FloatPanelApp() {
     // Final 识别结果事件（替代同 index 的 Partial）
     unlistenPromises.push(
       listen<StreamingFinalEvent>('streaming-final-update', (event) => {
-        log.debug(`[Streaming] Final update: index=${event.payload.segmentIndex}, text="${event.payload.text}"`);
+        log.debug(`[Streaming] Final update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
+
+        // 版本号检查：只有更新的版本才覆盖
+        const existing = segmentsRef.current.get(event.payload.segmentIndex);
+        if (existing && existing.version > event.payload.version) {
+          log.debug(`[Streaming] Ignoring outdated Final: existing version=${existing.version}, new version=${event.payload.version}`);
+          return;
+        }
+
         segmentsRef.current.set(event.payload.segmentIndex, {
           text: event.payload.text,
-          isFinal: true
+          isFinal: true,
+          version: event.payload.version,
         });
         updateDisplayText();
       }).catch((e) => {
