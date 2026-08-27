@@ -24,13 +24,13 @@ interface UpdateDialogProps {
 
 /**
  * Parse bilingual release notes
- * Format: "English content\n---\n中文内容"
+ * Format: "中文内容\n---\nEnglish content"
  */
 function parseBilingualNotes(notes: string, language: string): string {
   const parts = notes.split('\n---\n');
   if (parts.length === 2) {
     // Return Chinese for zh-CN or zh, otherwise return English
-    return language.startsWith('zh') ? parts[1].trim() : parts[0].trim();
+    return language.startsWith('zh') ? parts[0].trim() : parts[1].trim();
   }
   // Fallback: return as-is if no separator found
   return notes;
