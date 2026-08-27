@@ -945,9 +945,9 @@ export default function ModelConfigPanel({
   return (
     <div className="min-h-[400px] space-y-6">
       {/* Page Header */}
-      <div className="p-4 bg-gray-100 border border-gray-200 rounded-xl">
-        <h1 className="text-xl font-semibold text-gray-900">{t('modelConfig.title')}</h1>
-        <p className="text-sm text-gray-600 mt-0.5">{t('modelConfig.subtitle')}</p>
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('modelConfig.title')}</h1>
+        <p className="text-sm text-gray-600">{t('modelConfig.subtitle')}</p>
       </div>
 
       {/* Section 1: ASR Models - Voice to Text */}

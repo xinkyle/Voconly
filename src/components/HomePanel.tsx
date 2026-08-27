@@ -107,24 +107,17 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
   );
 }
 
-// Get model name by ID
+// Get model name by ID (without quantization)
 // First searches in asrModels (scanned models from directory), then falls back to models (predefined list)
-function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[], t?: (key: string) => string): string {
+function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWithStatus[]): string {
   // Parse model ID to handle quantization suffix (e.g., "qwen3-asr-1.7b-Q8_0")
-  const { baseId, quant } = parseModelId(modelId);
+  const { baseId } = parseModelId(modelId);
 
   // First, try to find in asrModels (scanned models from disk) - case-insensitive
   if (asrModels) {
     const asrModel = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
     if (asrModel) {
-      const name = asrModel.preset.name;
-      // Add quantization version if available from modelId or preset
-      const displayQuant = quant || asrModel.preset.quant;
-      if (displayQuant) {
-        const quantName = getQuantDisplayName(displayQuant, t);
-        return `${name} (${quantName})`;
-      }
-      return name;
+      return asrModel.preset.name;
     }
   }
 
@@ -134,12 +127,31 @@ function getModelName(modelId: string, models: Model[], asrModels?: AsrModelWith
     // Don't log error for custom models, just return the ID as name
     return modelId;
   }
-  // Add quantization version if available
-  if (quant) {
-    const quantName = getQuantDisplayName(quant, t);
-    return `${model.name} (${quantName})`;
-  }
   return model.name;
+}
+
+// Get model quantization display name by ID
+function getModelQuant(modelId: string, asrModels?: AsrModelWithStatus[], t?: (key: string) => string): string | null {
+  // Parse model ID to handle quantization suffix
+  const { baseId, quant } = parseModelId(modelId);
+
+  // First, try to find in asrModels
+  if (asrModels) {
+    const asrModel = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
+    if (asrModel) {
+      const displayQuant = quant || asrModel.preset.quant;
+      if (displayQuant) {
+        return getQuantDisplayName(displayQuant, t);
+      }
+    }
+  }
+
+  // Fallback to quant from modelId
+  if (quant) {
+    return getQuantDisplayName(quant, t);
+  }
+
+  return null;
 }
 
 // Get model size by ID (formatted: GB for >= 1GB, MB for < 1GB)
@@ -659,7 +671,7 @@ function SceneCard({
                           <>
                             <div className="flex items-center gap-1.5">
                               <span className={`font-medium text-sm ${isDownloading ? 'text-blue-600' : isDownloaded ? 'text-gray-900' : 'text-amber-700'}`}>
-                                {getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels, t)}
+                                {getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels)}
                               </span>
                               {/* Not downloaded badge */}
                               {!isDownloaded && !isDownloading && (
@@ -679,7 +691,22 @@ function SceneCard({
                                 </span>
                               )
                             ) : isDownloaded ? (
-                              <span className="text-xs text-gray-400 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
+                              <div className="flex items-center gap-2 text-xs text-gray-400 mt-0">
+                                {(() => {
+                                  const quant = getModelQuant(scene.model?.modelId ? getFullModelId(scene.model) : '', asrModels, t);
+                                  const size = getModelSize(scene.model?.modelId ?? '', models, asrModels);
+                                  if (quant && size) {
+                                    return (
+                                      <>
+                                        <span>{quant}</span>
+                                        <span className="text-gray-300">·</span>
+                                        <span>{size}</span>
+                                      </>
+                                    );
+                                  }
+                                  return quant || size || null;
+                                })()}
+                              </div>
                             ) : (
                               <span className="text-xs text-amber-500 mt-0.5">
                                 {t('home.clickToSelect')}
@@ -698,8 +725,23 @@ function SceneCard({
                       <span className="font-medium text-sm text-gray-400">{t('home.noModelSelected')}</span>
                     ) : (
                       <>
-                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels, t)}</span>
-                        <span className="text-xs text-gray-300 mt-0">({getModelSize(scene.model?.modelId ?? '', models, asrModels)})</span>
+                        <span className="font-medium text-sm text-gray-400">{getModelName(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels)}</span>
+                        <div className="flex items-center gap-2 text-xs text-gray-300 mt-0">
+                          {(() => {
+                            const quant = getModelQuant(scene.model?.modelId ? getFullModelId(scene.model) : '', asrModels, t);
+                            const size = getModelSize(scene.model?.modelId ?? '', models, asrModels);
+                            if (quant && size) {
+                              return (
+                                <>
+                                  <span>{quant}</span>
+                                  <span className="text-gray-200">·</span>
+                                  <span>{size}</span>
+                                </>
+                              );
+                            }
+                            return quant || size || null;
+                          })()}
+                        </div>
                       </>
                     )}
                   </div>

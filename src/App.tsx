@@ -1238,106 +1238,71 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F7] flex">
-        {/* Sidebar */}
-        <aside className="w-[180px] bg-white border-r border-gray-100 flex flex-col">
-          {/* Logo */}
+      <div className="h-screen flex overflow-hidden">
+        {/* 左侧 */}
+        <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
+          {/* Logo + 标题 */}
+          <div
+            className="h-9 flex items-center px-5 select-none pt-3.5"
+            data-tauri-drag-region
+          >
+            <LogoIcon className="w-5 h-5" />
+            <span className="text-sm text-gray-700 font-medium ml-2">Voconly</span>
+          </div>
+
+          {/* Logo（重复显示） */}
           <div className="h-16 flex items-center px-5">
             <div className="mr-2.5">
               <LogoIcon />
             </div>
             <span className="font-semibold text-gray-900">Voconly</span>
           </div>
-        </aside>
+        </div>
 
-        {/* Main Content */}
-        <main className="flex-1 flex items-center justify-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-gray-500">{t('app.loading')}</p>
-          </div>
-        </main>
+        {/* 右侧 - 白色卡片 */}
+        <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+          {/* 顶部 - 空白 */}
+          <div className="h-9 select-none" data-tauri-drag-region />
+
+          {/* Loading 内容 */}
+          <main className="flex-1 flex items-center justify-center">
+            <div className="flex items-center space-x-3">
+              <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-gray-500">{t('app.loading')}</p>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
 
-  // TitleBar Component
-  const TitleBar = () => {
-    const handleMinimize = async () => {
-      const window = getCurrentWindow();
-      await window.minimize();
-    };
+  
+  // Window control handlers
+  const handleMinimize = async () => {
+    const window = getCurrentWindow();
+    await window.minimize();
+  };
 
-    const handleMaximize = async () => {
-      const window = getCurrentWindow();
-      const isMaximized = await window.isMaximized();
-      if (isMaximized) {
-        await window.unmaximize();
-      } else {
-        await window.maximize();
-      }
-    };
+  const handleMaximize = async () => {
+    const window = getCurrentWindow();
+    const isMaximized = await window.isMaximized();
+    if (isMaximized) {
+      await window.unmaximize();
+    } else {
+      await window.maximize();
+    }
+  };
 
-    const handleClose = async () => {
-      const window = getCurrentWindow();
-      await window.close();
-    };
-
-    return (
-      <div
-        className="h-9 bg-[#F5F5F7] flex items-center justify-between select-none"
-        data-tauri-drag-region
-      >
-        <div className="flex-1 flex items-center gap-2 px-4" data-tauri-drag-region>
-          <LogoIcon className="w-5 h-5 text-gray-700" />
-          <span className="text-sm text-gray-700 font-medium">Voconly</span>
-          {/* Update indicator */}
-          {hasUpdate && (
-            <button
-              onClick={() => setShowUpdateDialog(true)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
-              title={t('update.newVersionAvailable')}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span className="text-xs text-emerald-600 font-medium">{t('update.newVersionBadge')}</span>
-            </button>
-          )}
-        </div>
-        <div className="flex items-center">
-          <button
-            onClick={handleMinimize}
-            className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <button
-            onClick={handleMaximize}
-            className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </button>
-          <button
-            onClick={handleClose}
-            className="w-12 h-9 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    );
+  const handleClose = async () => {
+    const window = getCurrentWindow();
+    await window.close();
   };
 
   // Render sidebar navigation
   const renderSidebar = () => (
-    <aside className="w-[180px] bg-[#F5F5F7] flex flex-col overflow-hidden">
+    <>
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-4 py-4 space-y-1">
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -1360,7 +1325,7 @@ function App() {
       <div className="p-3 border-t border-gray-100">
         <AboutMenu />
       </div>
-    </aside>
+    </>
   );
 
   // Render settings tabs
@@ -1393,23 +1358,82 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-[#F5F5F7] flex flex-col overflow-hidden">
-      {/* Title Bar */}
-      <TitleBar />
+    <div className="h-screen flex overflow-hidden">
+      {/* 左侧 - Logo + 标题 + 导航 */}
+      <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
+        {/* 顶部 - Logo + 标题（可拖动） */}
+        <div
+          className="h-9 flex items-center px-5 select-none pt-3.5"
+          data-tauri-drag-region
+        >
+          <LogoIcon className="w-5 h-5" />
+          <span className="text-sm text-gray-700 font-medium ml-2">Voconly</span>
+          {/* Update indicator */}
+          {hasUpdate && (
+            <button
+              onClick={() => setShowUpdateDialog(true)}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+              title={t('update.newVersionAvailable')}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span className="text-xs text-emerald-600 font-medium">{t('update.newVersionBadge')}</span>
+            </button>
+          )}
+        </div>
 
-      {/* Main Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        {renderSidebar()}
+        {/* 导航 */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {renderSidebar()}
+        </div>
+      </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 overflow-y-auto">
-          <div className="w-full h-full">
+      {/* 右侧 - 完整的白色卡片 */}
+      <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+        {/* 顶部 - 窗口控制按钮（可拖动） */}
+        <div
+          className="h-9 flex items-center justify-end select-none pt-3.5"
+          data-tauri-drag-region
+        >
+          {/* 窗口控制按钮 */}
+          <div className="flex">
+            <button
+              onClick={handleMinimize}
+              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <button
+              onClick={handleMaximize}
+              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
+            <button
+              onClick={handleClose}
+              className="w-12 h-9 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <main className="flex-1 overflow-hidden flex flex-col">
           {/* Settings Tabs */}
-          {activeNav === 'settings' && renderSettingsTabs()}
+          {activeNav === 'settings' && (
+            <div className="flex justify-center pt-8 pb-4">
+              {renderSettingsTabs()}
+            </div>
+          )}
 
-          {/* Content Area */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 animate-fade-in">
+          {/* Content Area - 可滚动区域 */}
+          <div className="flex-1 overflow-y-auto p-8">
             {activeNav === 'models' && (
               <ModelConfigPanel
                 downloadStates={downloadStates}
@@ -1519,8 +1543,8 @@ function App() {
               />
             )}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
 
       {/* Model download confirmation dialog */}
       {showModelDialog && (
@@ -1616,7 +1640,6 @@ function App() {
           setMemoryError(prev => ({ ...prev, visible: false }));
         }}
       />
-      </div>
     </div>
   );
 }
