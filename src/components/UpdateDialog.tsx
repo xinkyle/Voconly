@@ -23,6 +23,20 @@ interface UpdateDialogProps {
 }
 
 /**
+ * Parse bilingual release notes
+ * Format: "English content\n---\n中文内容"
+ */
+function parseBilingualNotes(notes: string, language: string): string {
+  const parts = notes.split('\n---\n');
+  if (parts.length === 2) {
+    // Return Chinese for zh-CN or zh, otherwise return English
+    return language.startsWith('zh') ? parts[1].trim() : parts[0].trim();
+  }
+  // Fallback: return as-is if no separator found
+  return notes;
+}
+
+/**
  * Format file size in MB
  */
 function formatFileSize(bytes: number): string {
@@ -36,7 +50,7 @@ export default function UpdateDialog({
   onClose,
   versionInfo: externalVersionInfo,
 }: UpdateDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Use ref to store externalVersionInfo - changes won't trigger effect re-run
   const externalVersionInfoRef = useRef(externalVersionInfo);
@@ -265,7 +279,7 @@ export default function UpdateDialog({
                 {t('update.changelog')}
               </h3>
               <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                {versionInfo.body}
+                {parseBilingualNotes(versionInfo.body, i18n.language)}
               </div>
             </div>
           )}
