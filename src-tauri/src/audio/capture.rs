@@ -76,11 +76,14 @@ const HARD_THRESHOLD_SECS: f64 = 15.0;
 // ============================================================================
 
 /// Partial 识别触发间隔（样本数）
-/// 4000 样本 @ 16kHz = 0.25 秒
-const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
+/// 8000 样本 @ 16kHz = 0.5 秒
+const PARTIAL_INTERVAL_SAMPLES: usize = 8000;
 
 /// 最大并行识别任务数
 const MAX_PARALLEL_RECOGNITIONS: usize = 4;
+
+/// 待处理任务队列最大容量
+const MAX_PENDING_QUEUE_SIZE: usize = 8;
 
 // ============================================================================
 // Partial/Final 事件结构定义
@@ -155,6 +158,76 @@ struct RecognitionResult {
     start_ms: u64,
     /// 结束时间（毫秒）
     end_ms: u64,
+}
+
+/// 待处理的识别任务队列
+/// - 同 segment_index 的任务只保留最新的（替换旧任务）
+/// - 队列满时替换尾部任务
+struct PendingTaskQueue {
+    /// 任务列表
+    tasks: Vec<RecognitionTask>,
+    /// 最大容量
+    max_size: usize,
+}
+
+impl PendingTaskQueue {
+    fn new(max_size: usize) -> Self {
+        Self {
+            tasks: Vec::with_capacity(max_size),
+            max_size,
+        }
+    }
+
+    /// 推入新任务
+    /// - 如果队列中有同 index 的任务，替换它
+    /// - 否则追加到队列
+    /// - 队列满时替换尾部
+    fn push(&mut self, task: RecognitionTask) {
+        let segment_index = task.segment_index;
+
+        // 查找同 segment_index 的任务
+        for i in 0..self.tasks.len() {
+            if self.tasks[i].segment_index == segment_index {
+                // 找到了同 index 的任务，替换
+                self.tasks[i] = task;
+                log::info!(
+                    "[Queue] Replaced task with same index: {}, queue size: {}",
+                    segment_index,
+                    self.tasks.len()
+                );
+                return;
+            }
+        }
+
+        // 没找到同 index 的任务
+        if self.tasks.len() >= self.max_size {
+            // 队列满，替换尾部
+            self.tasks.pop();
+            log::info!("[Queue] Queue full, replaced tail task");
+        }
+
+        self.tasks.push(task);
+        log::info!("[Queue] Added new task, queue size: {}", self.tasks.len());
+    }
+
+    /// 取出下一个任务（从头部）
+    fn pop(&mut self) -> Option<RecognitionTask> {
+        if self.tasks.is_empty() {
+            None
+        } else {
+            Some(self.tasks.remove(0))
+        }
+    }
+
+    /// 队列是否为空
+    fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
+
+    /// 清空队列
+    fn clear(&mut self) {
+        self.tasks.clear();
+    }
 }
 
 /// 样本数转毫秒
@@ -503,6 +576,9 @@ fn run_consumer(
 
     /// 当前活跃的识别线程数量
     let mut active_recognition_threads: usize = 0;
+
+    /// 待处理的识别任务队列
+    let mut pending_queue = PendingTaskQueue::new(MAX_PENDING_QUEUE_SIZE);
 
     /// Helper function to reset VAD sensitivity to Normal mode
     /// Returns true if sensitivity was reset, false if already normal
@@ -888,25 +964,25 @@ fn run_consumer(
 
                         // ===== Partial/Final: Partial 识别触发 =====
                         if speech_started && total_samples_processed >= next_partial_sample {
-                            log::info!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}, threads_count={}",
-                                total_samples_processed, next_partial_sample, active_recognition_threads);
-                            // 检查并行任务数是否超限
-                            if active_recognition_threads < MAX_PARALLEL_RECOGNITIONS {
-                                // 递增版本号
-                                recognition_version += 1;
-                                let task = RecognitionTask {
-                                    samples: segment_buffer.clone(),
-                                    kind: RecognitionKind::Partial,
-                                    segment_index: partial_segment_index,
-                                    version: recognition_version,
-                                    start_ms: samples_to_ms(speech_start_sample),
-                                    end_ms: samples_to_ms(total_samples_processed),
-                                };
-                                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
-                                active_recognition_threads += 1;
-                                log::info!("[Partial/Final] Scheduled partial recognition, index={}, version={}, buffer_len={}",
-                                    partial_segment_index, recognition_version, segment_buffer.len());
-                            }
+                            log::info!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}",
+                                total_samples_processed, next_partial_sample);
+
+                            // 递增版本号
+                            recognition_version += 1;
+                            let task = RecognitionTask {
+                                samples: segment_buffer.clone(),
+                                kind: RecognitionKind::Partial,
+                                segment_index: partial_segment_index,
+                                version: recognition_version,
+                                start_ms: samples_to_ms(speech_start_sample),
+                                end_ms: samples_to_ms(total_samples_processed),
+                            };
+
+                            // 放入队列（同 index 替换，队列满时替换尾部）
+                            pending_queue.push(task);
+                            log::info!("[Partial/Final] Queued partial recognition, index={}, version={}, buffer_len={}",
+                                partial_segment_index, recognition_version, segment_buffer.len());
+
                             next_partial_sample += PARTIAL_INTERVAL_SAMPLES;
                         }
 
@@ -945,9 +1021,10 @@ fn run_consumer(
                                     start_ms: samples_to_ms(speech_start_sample),
                                     end_ms: samples_to_ms(total_samples_processed),
                                 };
-                                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
-                                active_recognition_threads += 1;
-                                log::info!("[Partial/Final] Hard threshold: scheduled final recognition, index={}, version={}, buffer_len={}",
+
+                                // 放入队列
+                                pending_queue.push(task);
+                                log::info!("[Partial/Final] Hard threshold: queued final recognition, index={}, version={}, buffer_len={}",
                                     partial_segment_index, recognition_version, segment_buffer.len());
                             }
 
@@ -990,9 +1067,10 @@ fn run_consumer(
                                 start_ms: samples_to_ms(speech_start_sample),
                                 end_ms: samples_to_ms(total_samples_processed),
                             };
-                            spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
-                            active_recognition_threads += 1;
-                            log::info!("[Partial/Final] Scheduled final recognition, index={}, version={}, buffer_len={}",
+
+                            // 放入队列
+                            pending_queue.push(task);
+                            log::info!("[Partial/Final] Queued final recognition, index={}, version={}, buffer_len={}",
                                 partial_segment_index, recognition_version, segment_buffer.len());
 
                             // 索引递增，准备下一个片段
@@ -1071,6 +1149,17 @@ fn run_consumer(
             active_recognition_threads = active_recognition_threads.saturating_sub(1);
         }
 
+        // ===== Partial/Final: 从队列取任务执行 =====
+        // 如果有空闲 Worker 且队列不为空，启动新任务
+        while active_recognition_threads < MAX_PARALLEL_RECOGNITIONS && !pending_queue.is_empty() {
+            if let Some(task) = pending_queue.pop() {
+                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
+                active_recognition_threads += 1;
+                log::info!("[Queue] Started task from queue, active_threads={}, queue_size={}",
+                    active_recognition_threads, pending_queue.tasks.len());
+            }
+        }
+
         // Check for commands
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
@@ -1087,6 +1176,15 @@ fn run_consumer(
                                                             // 【进度条】新录音开始，重置待转录时长
                     *PENDING_TRANSCRIBE_DURATION.lock().unwrap() = 0.0;
                     log::info!("[进度条] Start: 重置待转录时长为 0");
+
+                    // 【修复】清空预览文本缓存，防止历史文本残留
+                    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+                        if let Ok(mut preview) = state.preview_text.lock() {
+                            preview.clear();
+                            log::info!("[Capture] 预览文本缓存已清空");
+                        }
+                    }
+
                     if let Some(v) = &vad {
                         v.lock().unwrap().reset();
                     }
@@ -1099,6 +1197,7 @@ fn run_consumer(
                     total_samples_processed = 0;
                     speech_started = false;
                     active_recognition_threads = 0;
+                    pending_queue.clear();
 
                     // === 模型能力检测 ===
                     // 检测当前场景绑定的模型是否支持流式转录
@@ -1417,6 +1516,7 @@ fn run_consumer(
                     total_samples_processed = 0;
                     speech_started = false;
                     active_recognition_threads = 0;
+                    pending_queue.clear();
 
                     // Reset VAD status
                     last_vad_status = false;
