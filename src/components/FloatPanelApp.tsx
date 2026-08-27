@@ -1303,9 +1303,6 @@ export default function FloatPanelApp() {
   // 是否有预览内容（用于决定是否显示折叠按钮）
   const hasPreviewContent = previewVisible && previewText;
 
-  // 是否显示转录等待动效：正在等待转录结果（仅分段转录模式）
-  const showTranscribeIndicator = state.status === 'recording' && isAwaitingTranscribe && segmentTranscribeEnabledRef.current;
-
   // 状态圆点样式：
   // - 分段转录开启 + 录音中 + 说话中：绿点（正在实时转录）
   // - 分段转录开启 + 录音中 + 静音：红点（等待说话）
