@@ -71,7 +71,7 @@ const SOFT_THRESHOLD_SECS: f64 = 45.0;
 
 /// Hard threshold: force segment if exceeded, regardless of VAD state
 /// This prevents audio growing too long for ASR models
-const HARD_THRESHOLD_SECS: f64 = 60.0;
+const HARD_THRESHOLD_SECS: f64 = 15.0;
 
 // ============================================================================
 // Partial/Final 实时转录常量
@@ -987,6 +987,24 @@ fn run_consumer(
                             // 先合并 pending_buffer（如果有），避免丢失之前累积的短片段
                             merge_pending_into_segment(&mut pending_buffer, &mut segment_buffer, &app_handle, "Hard threshold");
 
+                            // ===== Partial/Final: 触发 Final 识别 =====
+                            // 硬阈值分段时，也发送 Final 识别结果（与语音结束时的逻辑一致）
+                            if speech_started && !segment_buffer.is_empty() {
+                                recognition_version += 1;
+                                let task = RecognitionTask {
+                                    samples: segment_buffer.clone(),
+                                    kind: RecognitionKind::Final,
+                                    segment_index: partial_segment_index,
+                                    version: recognition_version,
+                                    start_ms: samples_to_ms(speech_start_sample),
+                                    end_ms: samples_to_ms(total_samples_processed),
+                                };
+                                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
+                                active_recognition_threads += 1;
+                                log::info!("[Partial/Final] Hard threshold: scheduled final recognition, index={}, version={}, buffer_len={}",
+                                    partial_segment_index, recognition_version, segment_buffer.len());
+                            }
+
                             // 强制发送 segment（不等待 silence）
                             let current_len = full_recording.lock().unwrap().len();
                             let segment_sample_count = current_len - current_segment_start;
@@ -997,6 +1015,14 @@ fn run_consumer(
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Hard threshold");
+
+                            // 【修复】重置 Partial/Final 状态，准备下一个片段
+                            // 这样下一个片段会使用新的索引，避免覆盖之前的结果
+                            if speech_started {
+                                partial_segment_index += 1;
+                                speech_started = false;
+                                log::info!("[Partial/Final] Hard threshold: reset state, next segment will use index={}", partial_segment_index);
+                            }
 
                             // 注意：不设置 in_speech_segment = false，因为用户还在说话
                             // VAD 状态保持 true，继续累积新的语音帧
