@@ -501,7 +501,9 @@ export default function FloatPanelApp() {
             sessionRef.current = null;
             estimatedTimeRef.current = 0;
             llmCompleteReceivedRef.current = false;
-            log.debug('[StateUpdate] 新录音开始，进度会话已结束，旧动画将自终止');
+            // 【关键修复】清空 segments 缓存，防止旧内容污染新会话
+            segmentsRef.current.clear();
+            log.debug('[StateUpdate] 新录音开始，segments 已清空，旧动画将自终止');
           }
           if (newState.status !== 'recording') {
             setVoiceDetected(false);
@@ -856,6 +858,12 @@ export default function FloatPanelApp() {
       listen<StreamingPartialEvent>('streaming-partial-update', (event) => {
         log.debug(`[Streaming] Partial update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
 
+        // 【关键修复】如果当前状态不是 recording，忽略旧会话的事件
+        if (statusRef.current !== 'recording') {
+          log.debug(`[Streaming] Ignoring Partial from old session (status=${statusRef.current})`);
+          return;
+        }
+
         // 版本号检查：只有更新的版本才覆盖
         const existing = segmentsRef.current.get(event.payload.segmentIndex);
         if (existing && existing.version > event.payload.version) {
@@ -930,6 +938,12 @@ export default function FloatPanelApp() {
     unlistenPromises.push(
       listen<StreamingFinalEvent>('streaming-final-update', (event) => {
         log.debug(`[Streaming] Final update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
+
+        // 【关键修复】如果当前状态不是 recording，忽略旧会话的事件
+        if (statusRef.current !== 'recording') {
+          log.debug(`[Streaming] Ignoring Final from old session (status=${statusRef.current})`);
+          return;
+        }
 
         // 版本号检查：只有更新的版本才覆盖
         const existing = segmentsRef.current.get(event.payload.segmentIndex);
