@@ -142,7 +142,7 @@ export const faqZh: FaqCategory[] = [
 2. 检查磁盘空间（模型文件 0.5GB-2GB）
 3. 如果下载中断，可以重新点击下载
 4. **手动下载导入：**
-   • 从 [ModelScope](https://modelscope.cn/profile/voconly) 或 [HuggingFace](https://huggingface.co/voconly) 下载模型
+   • 从 [ModelScope](https://modelscope.cn/profile/voconly) 或 [HuggingFace](https://huggingface.co/voconly-org) 下载模型
    • 在模型列表中点击"导入外部模型"
    • 选择模型所在文件夹即可导入`,
       },
@@ -428,7 +428,7 @@ If you only need offline voice input, you can completely disable LLM features. A
 2. Check disk space (models are 0.5GB-2GB)
 3. If interrupted, retry the download
 4. **Manual Import:**
-   - Download from [ModelScope](https://modelscope.cn/profile/voconly) or [HuggingFace](https://huggingface.co/voconly)
+   - Download from [ModelScope](https://modelscope.cn/profile/voconly) or [HuggingFace](https://huggingface.co/voconly-org)
    - Click "Import External Model" in the model list
    - Select the model folder to import`,
       },

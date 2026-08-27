@@ -45,7 +45,7 @@ Voconly 支持多种 ASR 模型，推荐新手从以下选项开始：
 
 如果你本地有GPU，内存也充盈，建议访问下面两个网站：
 中文访问魔搭社区：https://www.modelscope.cn/profile/voconly
-英文访问huggingface：https://huggingface.co/voconly
+英文访问huggingface：https://huggingface.co/voconly-org
 下载模型更多量化版本：
 通常F16 > Q8 > q5 > q4
 越靠前模型越大，占用资源越多，看本地资源而定。 

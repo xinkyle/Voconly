@@ -159,7 +159,7 @@ pub fn get_llm_model_presets() -> Vec<LlmModelPreset> {
                 },
                 DownloadSourceInfo {
                     name: "HuggingFace".to_string(),
-                    url: "https://huggingface.co/voconly/Qwen3.5-9B-Q4_K_M-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf".to_string(),
+                    url: "https://huggingface.co/voconly-org/Qwen3.5-9B-Q4_K_M-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf".to_string(),
                     is_china_accessible: false,
                     priority: 1,
                 },
@@ -183,7 +183,7 @@ pub fn get_llm_model_presets() -> Vec<LlmModelPreset> {
                 },
                 DownloadSourceInfo {
                     name: "HuggingFace".to_string(),
-                    url: "https://huggingface.co/voconly/Qwen3-4B-Instruct-2507-Q4_K_M-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf".to_string(),
+                    url: "https://huggingface.co/voconly-org/Qwen3-4B-Instruct-2507-Q4_K_M-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf".to_string(),
                     is_china_accessible: false,
                     priority: 1,
                 },

@@ -983,7 +983,7 @@ export default function ModelConfigPanel({
                                 ModelScope (魔搭社区)
                               </button>
                               <button
-                                onClick={() => openUrl('https://huggingface.co/voconly')}
+                                onClick={() => openUrl('https://huggingface.co/voconly-org')}
                                 className="text-blue-600 hover:text-blue-700 hover:underline block"
                               >
                                 HuggingFace

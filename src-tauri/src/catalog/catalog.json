@@ -50,7 +50,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/Qwen3-ASR-1.7B-gguf/resolve/main/",
+          "url": "https://huggingface.co/voconly-org/Qwen3-ASR-1.7B-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
@@ -100,7 +100,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/cohere-transcribe-03-2026-gguf/resolve/main/",
+          "url": "https://huggingface.co/voconly-org/cohere-transcribe-03-2026-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
@@ -150,7 +150,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/",
+          "url": "https://huggingface.co/voconly-org/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
@@ -200,7 +200,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/parakeet-unified-en-0.6b-gguf/resolve/main/",
+          "url": "https://huggingface.co/voconly-org/parakeet-unified-en-0.6b-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
@@ -250,7 +250,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/whisper-large-v3-turbo-gguf/resolve/main/",
+          "url": "https://huggingface.co/voconly-org/whisper-large-v3-turbo-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
         }
@@ -279,7 +279,7 @@
         },
         {
           "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
+          "url": "https://huggingface.co/voconly-org/sensevoice-small/resolve/main/sensevoice-small.zip",
           "is_china_accessible": false,
           "priority": 2
         }

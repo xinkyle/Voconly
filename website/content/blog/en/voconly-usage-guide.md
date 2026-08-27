@@ -45,7 +45,7 @@ If you need higher recognition accuracy, especially for Chinese-English mixed tr
 
 If you have a local GPU and ample memory, we recommend visiting these two websites:
 Chinese users visit ModelScope: https://www.modelscope.cn/profile/voconly
-English users visit HuggingFace: https://huggingface.co/voconly
+English users visit HuggingFace: https://huggingface.co/voconly-org
 Download more quantized versions of models:
 Usually F16 > Q8 > Q5 > Q4
 The earlier ones are larger and use more resources—choose based on your local resources.
