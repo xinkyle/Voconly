@@ -694,7 +694,7 @@ function SceneCard({
                               <div className="flex items-center gap-2 text-xs text-gray-400 mt-0">
                                 {(() => {
                                   const quant = getModelQuant(scene.model?.modelId ? getFullModelId(scene.model) : '', asrModels, t);
-                                  const size = getModelSize(scene.model?.modelId ?? '', models, asrModels);
+                                  const size = getModelSize(scene.model?.modelId ? getFullModelId(scene.model) : '', models, asrModels);
                                   if (quant && size) {
                                     return (
                                       <>

@@ -76,8 +76,8 @@ const HARD_THRESHOLD_SECS: f64 = 15.0;
 // ============================================================================
 
 /// Partial 识别触发间隔（样本数）
-/// 8000 样本 @ 16kHz = 0.5 秒
-const PARTIAL_INTERVAL_SAMPLES: usize = 8000;
+/// 4000 样本 @ 16kHz = 0.25 秒
+const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
 
 /// 最大并行识别任务数
 const MAX_PARALLEL_RECOGNITIONS: usize = 4;
