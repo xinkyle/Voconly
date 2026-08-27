@@ -36,7 +36,7 @@
         {
           "filename": "Qwen3-ASR-1.7B-F16.gguf",
           "quant": "F16",
-          "size_bytes": 4370061248,
+          "size_bytes": 4091390944,
           "is_recommended": false
         }
       ],
@@ -86,7 +86,7 @@
         {
           "filename": "cohere-transcribe-03-2026-F16.gguf",
           "quant": "F16",
-          "size_bytes": 4821310464,
+          "size_bytes": 4106644992,
           "is_recommended": false
         }
       ],
@@ -136,7 +136,7 @@
         {
           "filename": "nemotron-3.5-asr-streaming-0.6b-F16.gguf",
           "quant": "F16",
-          "size_bytes": 1502188480,
+          "size_bytes": 1277750240,
           "is_recommended": false
         }
       ],
@@ -186,7 +186,7 @@
         {
           "filename": "parakeet-unified-en-0.6b-F16.gguf",
           "quant": "F16",
-          "size_bytes": 1462715136,
+          "size_bytes": 1239114240,
           "is_recommended": false
         }
       ],
@@ -236,7 +236,7 @@
         {
           "filename": "whisper-large-v3-turbo-F16.gguf",
           "quant": "F16",
-          "size_bytes": 1772763648,
+          "size_bytes": 1636749024,
           "is_recommended": false
         }
       ],
