@@ -295,6 +295,9 @@ export default function FloatPanelApp() {
   // 是否应该显示预览文字（展开过程中延迟显示，避免文字在小窗口闪现）
   const [shouldShowPreviewText, setShouldShowPreviewText] = useState(true);
 
+  // 是否隐藏状态栏（在调整窗口过程中隐藏，避免位置跳动）
+  const [hideStatusBar, setHideStatusBar] = useState(false);
+
   // 追踪是否已自动展开窗口（首次收到文字时）
   const hasAutoExpandedRef = useRef(false);
 
@@ -878,7 +881,10 @@ export default function FloatPanelApp() {
             hasAutoExpandedRef.current = true;
             const userCollapsed = localStorage.getItem('voconly-preview-collapsed') === 'true';
             if (!userCollapsed) {
-              log.debug(`[Streaming] 首次 Partial 结果，立即展开药丸: ${displayText.length} chars`);
+              log.debug(`[Streaming] 首次 Partial 结果，展开药丸: ${displayText.length} chars`);
+
+              // 【关键】在调整窗口过程中，隐藏状态栏，避免位置跳动
+              setHideStatusBar(true);
               setIsExpandingWindow(true);
               setShouldShowPreviewText(false);
               pendingTextRef.current = displayText;
@@ -888,7 +894,7 @@ export default function FloatPanelApp() {
                 requestAnimationFrame(() => {
                   invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
                     .then(() => {
-                      log.debug(`[Streaming] 窗口已变大，现在填充文字`);
+                      log.debug(`[Streaming] 窗口已变大，现在填充文字并显示状态栏`);
                       const pendingText = pendingTextRef.current;
                       if (pendingText) {
                         setPreviewText(pendingText);
@@ -897,9 +903,13 @@ export default function FloatPanelApp() {
                       }
                       setIsExpandingWindow(false);
                       setShouldShowPreviewText(true);
+                      // 窗口调整完成，显示状态栏
+                      setHideStatusBar(false);
                     })
                     .catch((e) => {
                       log.error(`[Streaming] 自动展开失败: ${e}`);
+                      // 失败时也要显示状态栏
+                      setHideStatusBar(false);
                     });
                 });
               });
@@ -1408,7 +1418,9 @@ export default function FloatPanelApp() {
         {showFusedPanel && <div className="divider-line" />}
 
         {/* 状态区域 - 原药丸内容 */}
-        <div className={`status-area ${showFusedPanel ? 'fused' : ''}`}>
+        {/* 在调整窗口过程中隐藏状态栏，避免位置跳动 */}
+        {!hideStatusBar && (
+          <div className={`status-area ${showFusedPanel ? 'fused' : ''}`}>
           {/* 进度背景 - 使用 transform: scaleX 实现，不依赖父元素宽度计算 */}
           {showProgress && (
             <div
@@ -1469,6 +1481,7 @@ export default function FloatPanelApp() {
             {showWaveform && <Waveform isActive={waveformActive} />}
           </div>
         </div>
+        )}
       </div>
     </div>
   );
