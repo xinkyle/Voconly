@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HistoryRecord } from '../types';
-import { getFullStats, type FullStats } from '../services/history';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
 
@@ -38,12 +37,6 @@ const TextIcon = () => (
 const MicIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-  </svg>
-);
-
-const CalendarIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 
@@ -112,23 +105,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
   const { t } = useTranslation();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [fullStats, setFullStats] = useState<FullStats>({
-    totalDuration: 0,
-    totalWords: 0,
-    totalCount: 0,
-    todayCount: 0,
-    activeDays: 0,
-  });
   const { showToast } = useToast();
-
-  // 计算平均值
-  const avgStats = useMemo(() => {
-    const days = fullStats.activeDays || 1;
-    return {
-      avgWordsPerDay: Math.round(fullStats.totalWords / days),
-      avgRecordsPerDay: Math.round(fullStats.totalCount / days),
-    };
-  }, [fullStats]);
 
   // Copy text to clipboard
   const handleCopy = async (text: string) => {
@@ -142,23 +119,6 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
       log.error(`Failed to copy: ${err}`);
     }
   };
-
-  // 加载完整统计（当前 + 归档）
-  useEffect(() => {
-    getFullStats()
-      .then(stats => {
-        setFullStats({
-          totalDuration: stats?.totalDuration ?? 0,
-          totalWords: stats?.totalWords ?? 0,
-          totalCount: stats?.totalCount ?? 0,
-          todayCount: stats?.todayCount ?? 0,
-          activeDays: stats?.activeDays ?? 0,
-        });
-      })
-      .catch(() => {
-        setFullStats({ totalDuration: 0, totalWords: 0, totalCount: 0, todayCount: 0, activeDays: 0 });
-      });
-  }, [records]); // records 变化时重新获取
 
   // Pagination logic
   const totalPages = Math.ceil(records.length / PAGE_SIZE);
@@ -197,63 +157,6 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
           <TrashIcon />
           {t('memory.clear')}
         </button>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Duration */}
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-600 mb-2">
-            <ClockIcon />
-            <span className="text-sm font-semibold">{t('memory.totalDuration')}</span>
-          </div>
-          <div className="text-xl font-semibold text-gray-900">
-            {formatDuration(fullStats.totalDuration)}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {fullStats.activeDays > 0 ? t('memory.activeDays', { count: fullStats.activeDays }) : t('memory.totalDurationDesc')}
-          </div>
-        </div>
-
-        {/* Total Words */}
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-600 mb-2">
-            <TextIcon />
-            <span className="text-sm font-semibold">{t('memory.totalWords')}</span>
-          </div>
-          <div className="text-xl font-semibold text-gray-900">
-            {(fullStats.totalWords ?? 0).toLocaleString()}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {fullStats.activeDays > 0 ? t('memory.avgWordsPerDay', { count: avgStats.avgWordsPerDay.toLocaleString() }) : t('memory.totalWordsDesc')}
-          </div>
-        </div>
-
-        {/* Total Records */}
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-600 mb-2">
-            <MicIcon />
-            <span className="text-sm font-semibold">{t('memory.totalCount')}</span>
-          </div>
-          <div className="text-xl font-semibold text-gray-900">
-            {fullStats.totalCount}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {fullStats.activeDays > 0 ? t('memory.avgRecordsPerDay', { count: avgStats.avgRecordsPerDay }) : t('memory.totalCountDesc')}
-          </div>
-        </div>
-
-        {/* Today's Records */}
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center gap-2 text-gray-600 mb-2">
-            <CalendarIcon />
-            <span className="text-sm font-semibold">{t('memory.todayCount')}</span>
-          </div>
-          <div className="text-xl font-semibold text-gray-900">
-            {fullStats.todayCount}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">{t('memory.todayCountDesc')}</div>
-        </div>
       </div>
 
       {/* History List */}
