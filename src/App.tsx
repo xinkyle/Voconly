@@ -119,6 +119,9 @@ function App() {
   // Global download state (persists across tab switches)
   const [downloadStates, setDownloadStates] = useState<Record<string, { downloading: boolean; progress?: DownloadProgress }>>({});
 
+  // Trigger model selection from App.tsx (used when download fails and user wants to select other model)
+  const [triggerSelectModelSceneId, setTriggerSelectModelSceneId] = useState<string | null>(null);
+
   // Update dialog state
   const [hasUpdate, setHasUpdate] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -1221,7 +1224,7 @@ function App() {
           <div className="h-9 select-none" data-tauri-drag-region />
 
           {/* Loading 内容 */}
-          <main className="flex-1 flex items-center justify-center px-12 py-8">
+          <main className="flex-1 flex items-center justify-center">
             <div className="flex items-center space-x-3">
               <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
               <p className="text-gray-500">{t('app.loading')}</p>
@@ -1354,25 +1357,25 @@ function App() {
           <div className="flex">
             <button
               onClick={handleMinimize}
-              className="w-12 h-9 flex items-center justify-center transition-colors"
+              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
-              <svg className="w-4 h-4 text-gray-400 hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
               </svg>
             </button>
             <button
               onClick={handleMaximize}
-              className="w-12 h-9 flex items-center justify-center transition-colors"
+              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
-              <svg className="w-4 h-4 text-gray-400 hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
               </svg>
             </button>
             <button
               onClick={handleClose}
-              className="w-12 h-9 flex items-center justify-center transition-colors"
+              className="w-12 h-9 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
             >
-              <svg className="w-4 h-4 text-gray-400 hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -1389,7 +1392,7 @@ function App() {
           )}
 
           {/* Content Area - 可滚动区域 */}
-          <div className="flex-1 overflow-y-auto px-16 py-8">
+          <div className="flex-1 overflow-y-auto p-8">
             {activeNav === 'models' && (
               <ModelConfigPanel
                 downloadStates={downloadStates}
@@ -1471,6 +1474,10 @@ function App() {
                 onNavigateToLlmSettings={() => {
                   setActiveNav('models');
                 }}
+                tryRegisterShortcut={registerShortcutWithResult}
+                triggerSelectModelSceneId={triggerSelectModelSceneId}
+                onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
+                onScenesSave={handleSaveScenes}
               />
             </div>
             {activeNav === 'memory' && (
