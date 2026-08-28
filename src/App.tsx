@@ -13,7 +13,7 @@ import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, Settin
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
 import { loadConfig, saveConfig } from './services/config';
-import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, cancelModelDownload, type DownloadProgress } from './services/downloader';
+import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, type DownloadProgress } from './services/downloader';
   import { updateTrayMenu } from './services/tray';
 import { useSceneShortcuts } from './hooks/useShortcut';
 import { useRecorder } from './hooks/useRecorder';
@@ -1420,21 +1420,9 @@ function App() {
               <SettingsShortcut
                 scenes={config?.scenes || []}
                 models={config?.models || []}
-                globalModelConfig={config?.globalModelConfig}
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
-                downloadStates={downloadStates}
-                onDownload={handleDownload}
-                onDownloadCancel={(modelId) => {
-                  log.info(`Cancel download: ${modelId}`);
-                  cancelModelDownload(modelId);
-                  setDownloadStates(prev => {
-                    const next = { ...prev };
-                    delete next[modelId];
-                    return next;
-                  });
-                }}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'prompt' && (

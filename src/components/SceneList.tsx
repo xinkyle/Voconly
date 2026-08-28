@@ -1,18 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Scene, Model, GlobalModelConfig } from '../types';
+import type { Scene, Model } from '../types';
 import { getFullModelId } from '../types';
 import SceneForm from './SceneForm';
-import LlmConfigModal from './LlmConfigModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
-import AsrModelSelectModal from './AsrModelSelectModal';
 import { extractShortcutFromEvent } from '../utils/keyboard';
 import { translateSceneName } from '../utils/i18n';
-import { scanAsrModels, getAsrModelList, type ModelPreset, type AsrModelWithStatus, parseModelId } from '../services/config';
+import { getLlmPromptPresets } from '../services/llm';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
 import { loadModel, unloadModel } from '../services/whisper';
-import type { DownloadProgress } from '../services/downloader';
 
 // 创建日志记录器
 const log = createLogger('SceneList');
@@ -20,46 +17,41 @@ const log = createLogger('SceneList');
 interface SceneListProps {
   scenes?: Scene[];
   models?: Model[];
-  globalModelConfig?: GlobalModelConfig;
   onEdit?: (scene: Scene) => void;
   onToggle?: (sceneId: string, enabled: boolean) => void;
   onAdd?: () => void;
   onSave?: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
-  // Download related props
-  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
-  onDownload?: (model: Model) => void;
-  onDownloadCancel?: (modelId: string) => void;
 }
 
-// Get model name by ID
-// First searches in scannedModels (scanned models from directory), then falls back to models (predefined list)
-function getModelName(modelId: string, models: Model[], scannedModels?: ModelPreset[]): string {
-  // First, try to find in scannedModels (scanned models from disk)
-  if (scannedModels) {
-    const scannedModel = scannedModels.find(m => m.id === modelId);
-    if (scannedModel) {
-      return scannedModel.name;
-    }
+// 提示词类型显示名称
+const getPromptTypeLabel = (type: string, t: (key: string) => string): string => {
+  const labels: Record<string, string> = {
+    lightPolish: t('llmConfig.promptTypes.lightPolish'),
+    translate: t('llmConfig.promptTypes.translate'),
+    professionalPolish: t('llmConfig.promptTypes.professionalPolish'),
+    meetingSecretary: t('llmConfig.promptTypes.meetingSecretary'),
+  };
+  return labels[type] || type;
+};
+
+// 获取提示词显示标签
+const getPromptDisplayLabel = (
+  promptType: string | undefined,
+  customPrompt: string | undefined,
+  t: (key: string) => string
+): string | null => {
+  // 优先显示自定义提示词
+  if (customPrompt) {
+    return t('llmConfig.promptTypes.custom');
   }
-
-  // Fallback to predefined models list
-  const model = models.find(m => m.id === modelId);
-  if (!model) {
-    // Don't log error for custom models, just return the ID as name
-    return modelId;
+  // 显示预设类型
+  if (promptType) {
+    return getPromptTypeLabel(promptType, t);
   }
-  return model.name;
-}
-
-// Validate model ID format
-function validateModelId(modelId: string): boolean {
-  // Model IDs should be alphanumeric with hyphens, underscores, and dots
-  // Prevent path traversal, special characters, etc.
-  const validPattern = /^[a-zA-Z0-9_.-]+$/;
-  return validPattern.test(modelId);
-}
+  return null;
+};
 
 // Toggle Switch Component
 function ToggleSwitch({
@@ -94,29 +86,23 @@ function ToggleSwitch({
 export default function SceneList({
   scenes = [],
   models = [],
-  globalModelConfig,
   onEdit,
   onToggle,
   onAdd,
   onSave,
   checkConflict,
   tryRegisterShortcut,
-  downloadStates,
-  onDownload,
-  onDownloadCancel,
 }: SceneListProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
   const [showForm, setShowForm] = useState(false);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
-  const [scannedModels, setScannedModels] = useState<ModelPreset[]>([]);
-  const [allModels, setAllModels] = useState<AsrModelWithStatus[]>([]);
   const { showToast } = useToast();
 
   // For inline editing
   const [listeningShortcut, setListeningShortcut] = useState<string | null>(null); // scene id
-  const [selectingModel, setSelectingModel] = useState<Scene | null>(null);
-  const [llmConfigScene, setLlmConfigScene] = useState<Scene | null>(null);
+  const [selectingPromptTypeSceneId, setSelectingPromptTypeSceneId] = useState<string | null>(null);
+  const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
 
   // For shortcut error modal
   const [shortcutError, setShortcutError] = useState<{
@@ -128,24 +114,19 @@ export default function SceneList({
   // Ref for the listening timeout
   const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load scanned models and all models on mount
+  // Load custom presets
   useEffect(() => {
-    const loadModels = async () => {
+    const loadPresets = async () => {
       try {
-        // Load scanned models (for backward compatibility)
-        const scanned = await scanAsrModels();
-        setScannedModels(scanned);
-        log.info(`Scanned ${scanned.length} ASR models`);
-
-        // Load full model list with status
-        const fullList = await getAsrModelList();
-        setAllModels(fullList);
-        log.info(`Loaded ${fullList.length} models with status`);
+        const presets = await getLlmPromptPresets();
+        if (presets?.customPresets) {
+          setCustomPresets(presets.customPresets);
+        }
       } catch (err) {
-        log.error(`Failed to load models: ${err}`);
+        log.error(`Failed to load custom presets: ${err}`);
       }
     };
-    loadModels();
+    loadPresets();
   }, []);
 
   // Update local scenes when prop changes
@@ -425,53 +406,33 @@ export default function SceneList({
     }
   }, [listeningShortcut, handleKeyDown]);
 
-  // Handle model select
-  const handleModelClick = (scene: Scene) => {
-    setSelectingModel(scene);
+  // Handle prompt type selection
+  const handlePromptTypeClick = (sceneId: string) => {
+    setSelectingPromptTypeSceneId(sceneId);
   };
 
-  const handleModelSelect = (modelId: string) => {
-    if (!selectingModel) return;
-    log.debug(`handleModelSelect: sceneId=${selectingModel.id}, newModelId=${modelId}`);
+  const handlePromptTypeSelect = (promptType: string) => {
+    if (!selectingPromptTypeSceneId) return;
 
-    // Validate model ID format
-    if (!validateModelId(modelId)) {
-      log.error(`Invalid model ID format: ${modelId}`);
-      showToast({
-        type: 'error',
-        title: t('sceneList.invalidModelId'),
-        description: t('sceneList.invalidModelIdDesc'),
-      });
-      return;
-    }
+    // 更新场景的提示词类型
+    const updatedScenes = localScenes.map((scene) => {
+      if (scene.id === selectingPromptTypeSceneId) {
+        return {
+          ...scene,
+          promptType: promptType,
+          customPrompt: undefined, // 选择预设时清除自定义提示词
+        };
+      }
+      return scene;
+    });
 
-    // 解析模型 ID（可能包含量化后缀）
-    const { baseId, quant } = parseModelId(modelId);
-    const updatedScene = {
-      ...selectingModel,
-      model: {
-        modelId: baseId,
-        quantization: quant,
-      },
-    };
-    log.debug(`Updated scene: ${JSON.stringify(updatedScene)}`);
+    setLocalScenes(updatedScenes);
 
-    // Calculate new scenes first
-    const newScenes = localScenes.map((s) => (s.id === updatedScene.id ? updatedScene : s));
-    log.debug(`New scenes: ${JSON.stringify(newScenes)}`);
-
-    // Update local state
-    setLocalScenes(newScenes);
-
-    // Notify parent
     if (onSave) {
-      log.debug('Calling onSave');
-      onSave(newScenes);
-    } else {
-      log.debug('No onSave callback!');
+      onSave(updatedScenes);
     }
 
-    setSelectingModel(null);
+    setSelectingPromptTypeSceneId(null);
   };
 
   // Render scene list
@@ -499,14 +460,11 @@ export default function SceneList({
             const isListening = listeningShortcut === scene.id;
             // 检查该场景是否启用了 LLM
             // 判断依据：全局 LLM 已配置 且 场景有提示词配置
-            const hasGlobalLlm = globalModelConfig?.llm?.providerId && globalModelConfig?.llm?.model;
-            const hasPrompt = scene.promptType || scene.customPrompt;
-            const llmEnabled = !!(hasGlobalLlm && hasPrompt);
 
             return (
               <div
                 key={scene.id}
-                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
+                className={`relative flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
                   scene.enabled
                     ? 'bg-white border-gray-100'
                     : 'bg-gray-50/50 border-gray-100'
@@ -561,45 +519,98 @@ export default function SceneList({
                     </div>
                   )}
 
-                  {/* Model - Click to select */}
+                  {/* Prompt Type - Click to select */}
                   {scene.enabled ? (
                     <button
-                      onClick={() => handleModelClick(scene)}
+                      onClick={() => handlePromptTypeClick(scene.id)}
                       className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      title={!scene.model?.modelId ? t('home.selectModelFirst') : t('sceneList.clickToSwitchModel')}
+                      title={t('sceneList.clickToSelectPrompt')}
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                       </svg>
-                      {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.clickToSelect')}
+                      {getPromptDisplayLabel(scene.promptType, scene.customPrompt, t) || t('home.clickToSelect')}
                     </button>
                   ) : (
                     <div className="flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-medium bg-gray-100/50 text-gray-400 cursor-not-allowed">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                       </svg>
-                      {scene.model?.modelId ? getModelName(scene.model.modelId, models, scannedModels) : t('home.noModelSelected')}
+                      {getPromptDisplayLabel(scene.promptType, scene.customPrompt, t) || t('home.noPromptSelected')}
                     </div>
                   )}
                 </div>
 
+                {/* Prompt Type Selection Dropdown */}
+                {selectingPromptTypeSceneId === scene.id && (
+                  <div className="absolute left-0 top-full mt-1 z-50">
+                    <div
+                      className="bg-white rounded-xl p-4 w-[280px] shadow-xl animate-fade-in"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900 text-sm">{t('home.selectPromptType')}</h4>
+                        <button
+                          onClick={() => setSelectingPromptTypeSceneId(null)}
+                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {/* 内置预设 */}
+                        {(['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'] as const).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => handlePromptTypeSelect(type)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ${
+                              scene.promptType === type
+                                ? 'bg-gray-900 text-white'
+                                : 'hover:bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            <span className="text-sm font-medium">{getPromptTypeLabel(type, t)}</span>
+                            {scene.promptType === type && (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+
+                        {/* 自定义预设 */}
+                        {customPresets && Object.keys(customPresets).length > 0 && (
+                          <>
+                            <div className="border-t border-gray-100 my-2" />
+                            {Object.entries(customPresets).map(([presetName]) => (
+                              <button
+                                key={presetName}
+                                onClick={() => handlePromptTypeSelect(presetName)}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ${
+                                  scene.promptType === presetName
+                                    ? 'bg-gray-900 text-white'
+                                    : 'hover:bg-blue-50 text-blue-700'
+                                }`}
+                              >
+                                <span className="text-sm font-medium">{presetName}</span>
+                                {scene.promptType === presetName && (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Right side: Delete and Toggles */}
                 <div className="flex items-center gap-3">
-                  {/* LLM Config Button */}
-                  <button
-                    onClick={() => setLlmConfigScene(scene)}
-                    className={`p-1.5 rounded-lg transition-all duration-200 ${
-                      llmEnabled
-                        ? 'text-white bg-emerald-600 hover:bg-emerald-700'
-                        : 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
-                    }`}
-                    title={llmEnabled ? t('home.llmEnabled') : t('sceneList.llmConfig')}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </button>
-
                   {/* Delete Button */}
                   <button
                     onClick={() => handleDelete(scene.id)}
@@ -641,29 +652,6 @@ export default function SceneList({
           onSave={handleSave}
           onCancel={handleCancel}
           checkConflict={checkConflict}
-        />
-      )}
-
-      {/* Model Select Modal */}
-      {selectingModel && (
-        <AsrModelSelectModal
-          models={allModels}
-          selectedModelId={getFullModelId(selectingModel.model)}
-          onSelect={handleModelSelect}
-          onClose={() => setSelectingModel(null)}
-          downloadStates={downloadStates}
-          onDownload={onDownload}
-          onDownloadCancel={onDownloadCancel}
-          currentLanguage={i18n.language}
-        />
-      )}
-
-      {/* LLM Config Modal */}
-      {llmConfigScene && (
-        <LlmConfigModal
-          isOpen={!!llmConfigScene}
-          scene={llmConfigScene}
-          onClose={() => setLlmConfigScene(null)}
         />
       )}
 
