@@ -62,10 +62,68 @@ pub struct DownloadLlmModelRequest {
     pub prefer_china: Option<bool>,
 }
 
-/// 获取 LLM 配置的辅助函数
-fn get_llm_config(services: &State<'_, AppServices>) -> LlmConfig {
+/// 从全局配置构建 LlmConfig 的辅助函数
+/// 返回 (LlmConfig, ProviderMeta, LlmProviderInstance) 或错误信息
+fn build_llm_config_from_global(
+    services: &State<'_, AppServices>,
+) -> Result<(LlmConfig, ProviderMeta, LlmProviderInstance), String> {
     let config = services.config.lock().unwrap();
-    config.llm.clone()
+
+    // 获取全局 LLM 配置
+    let global_llm = &config.global_model_config.llm;
+
+    // 检查是否配置了 LLM
+    if global_llm.provider_id.is_empty() || global_llm.model.is_empty() {
+        return Err("全局 LLM 未配置".to_string());
+    }
+
+    let provider_id = &global_llm.provider_id;
+
+    // 获取 provider 元数据
+    let meta = get_provider_meta_list()
+        .into_iter()
+        .find(|m| m.id == *provider_id)
+        .ok_or_else(|| format!("未找到 Provider 元数据: {}", provider_id))?;
+
+    // 获取 provider 实例配置
+    let instance = config
+        .llm_providers
+        .get(provider_id)
+        .cloned()
+        .unwrap_or_else(|| {
+            // 如果没有配置实例，使用默认配置
+            LlmProviderInstance {
+                meta_id: provider_id.clone(),
+                enabled: true,
+                base_url: meta.base_url.clone(),
+                api_key: None,
+                default_model: None,
+                n_gpu_layers: None,
+                context_limit: None,
+                max_tokens: None,
+            }
+        });
+
+    // 构建 LlmConfig
+    let llm_config = LlmConfig {
+        enabled: true,
+        provider: crate::llm::LlmProviderConfig {
+            provider_type: meta
+                .id
+                .parse()
+                .unwrap_or(crate::llm::LlmProviderType::Custom),
+            enabled: true,
+            base_url: instance.base_url.clone(),
+            api_key: instance.api_key.clone(),
+            model: global_llm.model.clone(),
+            timeout_secs: 3600,
+        },
+        user_prompt_template: String::new(), // 健康检查不需要提示词
+        max_tokens: global_llm.max_tokens,
+        temperature: global_llm.temperature,
+    };
+
+    Ok((llm_config, meta, instance))
 }
 
 /// 检查 LLM 服务状态
@@ -75,8 +133,21 @@ pub async fn llm_health_check(
 ) -> Result<LlmHealthResponse, String> {
     info!("[LLM] Running health check");
 
-    let llm_config = get_llm_config(&services);
-    let provider_name = format!("{:?}", llm_config.provider.provider_type);
+    // 使用新的全局配置
+    let (llm_config, provider_meta, provider_instance) = match build_llm_config_from_global(&services) {
+        Ok(result) => result,
+        Err(e) => {
+            info!("[LLM] Failed to build config: {}", e);
+            return Ok(LlmHealthResponse {
+                available: false,
+                provider: String::new(),
+                models: vec![],
+                error: Some(e),
+            });
+        }
+    };
+
+    let provider_name = provider_meta.label.clone();
     info!(
         "[LLM] Health check - provider: {}, base_url: {}, model: {}",
         provider_name, llm_config.provider.base_url, llm_config.provider.model
@@ -86,7 +157,7 @@ pub async fn llm_health_check(
         llm_config.enabled, llm_config.temperature
     );
 
-    let llm_service = match LlmService::new(llm_config) {
+    let llm_service = match LlmService::from_provider_instance(llm_config.clone(), provider_meta, provider_instance) {
         Ok(service) => service,
         Err(e) => {
             info!("[LLM] Failed to create service: {}", e);
@@ -141,13 +212,13 @@ pub async fn llm_health_check(
 pub async fn llm_list_models(services: State<'_, AppServices>) -> Result<Vec<String>, String> {
     info!("[LLM] Listing models");
 
-    let llm_config = get_llm_config(&services);
+    let (llm_config, provider_meta, provider_instance) = build_llm_config_from_global(&services)?;
     info!(
-        "[LLM] Config - provider: {:?}, base_url: {}, model: {}",
-        llm_config.provider.provider_type, llm_config.provider.base_url, llm_config.provider.model
+        "[LLM] Config - provider: {}, base_url: {}, model: {}",
+        provider_meta.label, llm_config.provider.base_url, llm_config.provider.model
     );
 
-    let llm_service = LlmService::new(llm_config)?;
+    let llm_service = LlmService::from_provider_instance(llm_config, provider_meta, provider_instance)?;
     let models = llm_service.list_models().await?;
     info!("[LLM] Found {} models: {:?}", models.len(), models);
     Ok(models)
@@ -161,7 +232,7 @@ pub async fn llm_process_text(
 ) -> Result<LlmResponse, String> {
     info!("[LLM] Processing text: {} chars", request.text.len());
 
-    let mut llm_config = get_llm_config(&services);
+    let (mut llm_config, provider_meta, provider_instance) = build_llm_config_from_global(&services)?;
 
     // 应用覆盖参数
     if let Some(model) = request.model {
@@ -173,7 +244,7 @@ pub async fn llm_process_text(
 
     // 获取超时时间（在 move 之前）
     let timeout_secs = llm_config.provider.timeout_secs;
-    let llm_service = LlmService::new(llm_config)?;
+    let llm_service = LlmService::from_provider_instance(llm_config, provider_meta, provider_instance)?;
 
     // 添加超时保护（默认30秒，可从配置覆盖）
     let timeout = std::time::Duration::from_secs(timeout_secs as u64);
@@ -652,7 +723,9 @@ pub async fn llm_process_text_for_scene_with_progress(
 }
 
 /// 获取 LLM Profile（按场景 ID）
+/// DEPRECATED: 请使用 Scene.promptType 和 Scene.customPrompt
 #[tauri::command]
+#[allow(deprecated)]
 pub fn get_llm_profile(
     services: State<'_, AppServices>,
     scene_id: String,
@@ -671,7 +744,9 @@ pub fn get_llm_profile(
 }
 
 /// 保存 LLM Profile（创建或更新）
+/// DEPRECATED: 请使用 Scene.promptType 和 Scene.customPrompt
 #[tauri::command]
+#[allow(deprecated)]
 pub fn save_llm_profile(
     services: State<'_, AppServices>,
     profile: LlmProfile,

@@ -421,17 +421,23 @@ pub struct AppConfig {
     pub model_quant_prefs: HashMap<String, String>,
 
     pub scenes: Vec<Scene>,
-    /// LLM 后处理配置
+    /// DEPRECATED: LLM 后处理配置已迁移到 global_model_config.llm
+    /// 此字段仅保留用于向后兼容旧配置文件
     #[serde(default)]
+    #[deprecated(note = "Use global_model_config.llm instead")]
     pub llm: LlmConfig,
-    /// LLM 全局 Provider 配置
+    /// DEPRECATED: LLM Provider 配置已迁移到 llm_providers
+    /// 此字段仅保留用于向后兼容旧配置文件
     #[serde(default)]
+    #[deprecated(note = "Use llm_providers instead")]
     pub llm_provider: LlmProviderConfig,
     /// 已配置的 LLM Provider 实例
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub llm_providers: HashMap<String, LlmProviderInstance>,
-    /// LLM 场景级 Profile 列表
+    /// DEPRECATED: LLM 场景级 Profile 已迁移到 Scene.promptType 和 Scene.customPrompt
+    /// 此字段仅保留用于向后兼容旧配置文件
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[deprecated(note = "Use Scene.promptType and Scene.customPrompt instead")]
     pub llm_profiles: Vec<LlmProfile>,
     /// 提示词预设（单一存储，不按语言分）
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -541,9 +547,12 @@ impl Default for AppConfig {
             max_history_records: Some(100),
             max_recording_duration: Some(180), // 默认3分钟
             tutorial_completed: Some(false), // 默认未完成教程
+            #[allow(deprecated)]
             llm: LlmConfig::default(),
+            #[allow(deprecated)]
             llm_provider: LlmProviderConfig::default(),
             llm_providers: HashMap::new(),
+            #[allow(deprecated)]
             llm_profiles: Vec::new(),
             llm_prompt_presets: None,
             log_level: Some("info".to_string()),

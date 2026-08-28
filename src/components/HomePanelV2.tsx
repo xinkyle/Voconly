@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Scene, GlobalModelConfig, LlmProfile } from '../types';
+import type { Scene, GlobalModelConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { formatShortcut } from '../utils/keyboard';
@@ -41,7 +41,6 @@ const SettingsIcon = () => (
 interface HomePanelV2Props {
   scenes?: Scene[];
   globalModelConfig?: GlobalModelConfig;
-  llmProfiles?: LlmProfile[];
   modelQuantPrefs?: Record<string, string>;
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
   onDownload?: (model: any) => void;
@@ -75,7 +74,6 @@ const getPromptDisplayLabel = (
 export default function HomePanelV2({
   scenes = [],
   globalModelConfig,
-  llmProfiles = [],
   modelQuantPrefs = {},
   downloadStates = {},
   onDownload,
@@ -173,20 +171,16 @@ export default function HomePanelV2({
       return scene.promptType;
     }
 
-    // 向后兼容：从 LlmProfile 获取
-    const profile = llmProfiles.find(p => p.sceneId === scene.id);
-    if (profile?.userPromptType) {
-      return profile.userPromptType;
-    }
-
     // 默认值
     return 'lightPolish';
   };
 
   // 检查场景是否启用了 LLM
+  // 判断依据：全局 LLM 已配置 且 场景有提示词配置
   const isSceneLlmEnabled = (scene: Scene): boolean => {
-    const profile = llmProfiles.find(p => p.sceneId === scene.id);
-    return profile?.enabled ?? false;
+    const hasGlobalLlm = globalModelConfig?.llm?.providerId && globalModelConfig?.llm?.model;
+    const hasPrompt = scene.promptType || scene.customPrompt;
+    return !!(hasGlobalLlm && hasPrompt);
   };
 
   return (

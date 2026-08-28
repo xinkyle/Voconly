@@ -31,7 +31,7 @@ import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
 import { checkModelExists } from './services/downloader';
-import { processTextForSceneWithProgress, getLlmProfile } from './services/llm';
+import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
 import { translateSceneName, countWords } from './utils/i18n';
@@ -643,10 +643,13 @@ function App() {
       pendingTranscribeDurationRef.current = 0; // 重置，避免影响下次录音
       const device: 'CPU' | 'GPU' = 'GPU'; // 简化处理，默认使用 GPU
 
-      // 预先检查 LLM profile（用于进度条预估）
-      const llmProfile = await getLlmProfile(scene.id);
-      const hasLlmProfile = llmProfile !== null && llmProfile.enabled;
-      const llmModelId = llmProfile?.model;
+      // 检查 LLM 配置（用于进度条预估）
+      // 新架构：全局 LLM 配置 + 场景提示词
+      const hasGlobalLlm = config?.globalModelConfig?.llm?.providerId && config?.globalModelConfig?.llm?.model;
+      const currentScene = config?.scenes.find(s => s.id === scene.id);
+      const hasPrompt = currentScene?.promptType || currentScene?.customPrompt;
+      const hasLlmProfile = !!(hasGlobalLlm && hasPrompt);
+      const llmModelId = config?.globalModelConfig?.llm?.model || undefined;
 
       // 获取 skipLlm 标记（双击跳过 LLM）
       const skipLlm = skipLlmRef.current;
@@ -831,12 +834,12 @@ function App() {
         stepStart = recordTime('LLM 后处理', stepStart);
 
         // 收集 LLM 性能数据
-        if (llmProfile?.model) {
+        if (llmModelId) {
           const textLen = recognizedText.length;
-          const llmEstimate = estimateLlmTime(llmProfile.model, textLen);
+          const llmEstimate = estimateLlmTime(llmModelId, textLen);
 
           llmPerformanceData = {
-            modelId: llmProfile.model,
+            modelId: llmModelId,
             estimatedTime: llmEstimate.estimatedTime,
             actualTime: llmActualTime,
             samples: llmEstimate.samples,  // 使用预估返回的 samples
@@ -1405,7 +1408,7 @@ function App() {
               <SettingsShortcut
                 scenes={config?.scenes || []}
                 models={config?.models || []}
-                llmProfiles={config?.llmProfiles || []}
+                globalModelConfig={config?.globalModelConfig}
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
@@ -1450,7 +1453,6 @@ function App() {
               <HomePanelV2
                 scenes={config?.scenes || []}
                 globalModelConfig={config?.globalModelConfig}
-                llmProfiles={config?.llmProfiles || []}
                 modelQuantPrefs={config?.modelQuantPrefs || {}}
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
