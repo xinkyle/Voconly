@@ -302,12 +302,40 @@ impl ModelManager {
         }
     }
 
+    /// 获取全局 ASR 模型 ID
+    ///
+    /// 从 GlobalModelConfig.asr_model 获取全局 ASR 模型。
+    /// 所有场景共用同一个 ASR 模型。
+    pub fn get_global_asr_model(&self) -> Result<String, String> {
+        let config = self
+            .config
+            .lock()
+            .map_err(|e: std::sync::PoisonError<_>| e.to_string())?;
+
+        let asr_model = &config.global_model_config.asr_model;
+
+        // 返回完整的模型 ID（基础 ID + 量化后缀）
+        Ok(asr_model.full_id())
+    }
+
     /// 获取场景绑定的模型ID
+    ///
+    /// 注意：现在使用全局 ASR 模型，此方法保留用于向后兼容。
+    /// 新代码应使用 get_global_asr_model()。
+    #[deprecated(note = "Use get_global_asr_model() instead")]
     pub fn get_model_id_for_scene(&self, scene_id: &str) -> Result<String, String> {
         let config = self
             .config
             .lock()
             .map_err(|e: std::sync::PoisonError<_>| e.to_string())?;
+
+        // 优先使用全局 ASR 模型
+        let global_asr = &config.global_model_config.asr_model;
+        if !global_asr.model_id.is_empty() {
+            return Ok(global_asr.full_id());
+        }
+
+        // 向后兼容：如果全局模型未设置，使用场景模型
         let scene = config
             .scenes
             .iter()
@@ -671,13 +699,15 @@ impl ModelManager {
 
     /// 获取或加载模型（核心方法）
     ///
-    /// 如果模型未加载，会先清理不再被任何场景使用的旧模型，然后加载新模型。
+    /// 使用全局 ASR 模型（GlobalModelConfig.asr_model）。
+    /// 所有场景共用同一个 ASR 模型。
     ///
     /// 返回 Arc<LoadedModel>，持有模型的共享所有权。
     /// 调用方可以安全地在释放 ModelManager 锁后继续使用模型。
     pub fn get_or_load_model(&mut self, scene_id: &str) -> Result<Arc<LoadedModel>, String> {
-        let model_id = self.get_model_id_for_scene(scene_id)?;
-        info!("[ModelManager] 场景 {} 绑定模型: {}", scene_id, model_id);
+        // 使用全局 ASR 模型（忽略 scene_id，保留参数用于向后兼容）
+        let model_id = self.get_global_asr_model()?;
+        info!("[ModelManager] 全局 ASR 模型: {} (场景: {})", model_id, scene_id);
 
         // 已加载？返回 Arc 克隆
         if let Some(arc) = self.loaded_models.get(&model_id) {
@@ -753,41 +783,33 @@ impl ModelManager {
         }
     }
 
-    /// 应用启动时预加载常驻模型
+    /// 应用启动时预加载全局 ASR 模型
+    ///
+    /// 使用 GlobalModelConfig.asr_model 作为全局 ASR 模型。
+    /// 所有场景共用同一个 ASR 模型。
     pub fn preload_always_models(&mut self) {
-        info!("[ModelManager] 开始预加载常驻模型...");
+        info!("[ModelManager] 开始预加载全局 ASR 模型...");
 
-        let scene_model_ids: Vec<(String, String)> = {
-            let config = match self.config.lock() {
-                Ok(c) => c,
-                Err(_) => {
-                    info!("[ModelManager] 无法获取配置，跳过预加载");
+        // 获取全局 ASR 模型
+        let model_id = match self.get_global_asr_model() {
+            Ok(id) => {
+                if id.is_empty() {
+                    info!("[ModelManager] 全局 ASR 模型未配置，跳过预加载");
                     return;
                 }
-            };
-
-            config
-                .scenes
-                .iter()
-                .filter(|scene| scene.load_strategy.is_always())
-                .map(|scene| (scene.id.clone(), scene.model.full_id()))
-                .collect()
-        }; // config lock is dropped here
-
-        info!(
-            "[ModelManager] 发现 {} 个常驻模型需要预加载",
-            scene_model_ids.len()
-        );
-
-        for (scene_id, model_id) in scene_model_ids {
-            info!(
-                "[ModelManager] 预加载场景 {} 的常驻模型: {}",
-                scene_id, model_id
-            );
-            match self.load_model(&model_id, false) {
-                Ok(_) => info!("[ModelManager] 常驻模型 {} 预加载成功", model_id),
-                Err(e) => info!("[ModelManager] 常驻模型 {} 预加载失败: {}", model_id, e),
+                id
             }
+            Err(e) => {
+                info!("[ModelManager] 获取全局 ASR 模型失败: {}", e);
+                return;
+            }
+        };
+
+        info!("[ModelManager] 预加载全局 ASR 模型: {}", model_id);
+
+        match self.load_model(&model_id, false) {
+            Ok(_) => info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id),
+            Err(e) => info!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e),
         }
 
         info!(

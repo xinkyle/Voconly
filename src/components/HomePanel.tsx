@@ -1613,7 +1613,6 @@ export default function HomePanel({
       {showForm && (
         <SceneForm
           scene={editingScene}
-          models={availableModels}
           onSave={handleSaveScene}
           onCancel={handleCancelForm}
           existingShortcuts={localScenes.map(s => s.shortcut)}

@@ -138,6 +138,7 @@
   "home": {
     "title": "Scene Configuration",
     "subtitle": "Manage your voice input scenes and shortcut settings",
+    "subtitleV2": "Configure ASR and LLM models, manage scene settings",
     "shortcut": "Shortcut",
     "shortcutConflict": "Shortcut \"{{shortcut}}\" is already bound to scene \"{{scene}}\"",
     "voiceModel": "Voice Model",
@@ -158,13 +159,22 @@
     "llmConfig": "LLM config",
     "addMoreScenes": "Add more scenes",
     "goToSettings": "Go to settings to create new voice input scenes",
+    "goToSettingsToAdd": "Go to settings to add scenes",
     "tip": "Models are shared across scenes and won't be loaded twice.",
     "llmCacheHint": "Local LLM models are cached one at a time. Switching models will automatically unload the previous one to free memory.",
     "doubleTapHint": "Double-tap shortcut to output raw transcription, skipping LLM processing",
     "doubleTapHintCloseTip": "Won't show again after closing",
     "clickToSwitchPrompt": "Click to switch prompt",
     "selectPromptType": "Select Prompt",
-    "promptTypeSwitched": "Prompt switched"
+    "promptTypeSwitched": "Prompt switched",
+    "asrModel": "ASR Model",
+    "llmModel": "LLM Model",
+    "scenes": "Scenes",
+    "noScenes": "No scenes",
+    "clickToSelectAsr": "Click to select ASR model",
+    "clickToConfigureLlm": "Click to configure LLM model",
+    "asrModelUpdated": "ASR model updated",
+    "sceneSettings": "Scene settings"
   },
   "scene": {
     "quickDesc": "Fast input, quick response",
@@ -416,6 +426,7 @@
     "idleTimeout": "Idle",
     "autoUnloadAfter": "then auto-unload",
     "enableScene": "Enable this scene",
+    "promptTypeHint": "Select the prompt type for this scene, will be applied during LLM post-processing",
     "minutes": {
       "1": "1 min",
       "3": "3 min",

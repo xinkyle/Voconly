@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { emitTo, listen } from './utils/tauri';
-import type { AppConfig, Scene, FloatPanelState, HistoryRecord, LlmProfile, Model, LlmErrorPayload } from './types';
+import type { AppConfig, Scene, FloatPanelState, HistoryRecord, Model, LlmErrorPayload } from './types';
 import { getFullModelId } from './types';
 import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
-import HomePanel from './components/HomePanel';
 import HomePanelV2 from './components/HomePanelV2';
 import { SettingsShortcut, SettingsSystem, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
@@ -32,7 +31,7 @@ import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
 import { checkModelExists } from './services/downloader';
-import { processTextForSceneWithProgress, getLlmProfile } from './services/llm';
+import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
 import { translateSceneName, countWords } from './utils/i18n';
@@ -145,9 +144,6 @@ function App() {
     requiredMemory: '',
     availableMemory: '',
   });
-
-  // Trigger model selection from App.tsx (used when download fails and user wants to select other model)
-  const [triggerSelectModelSceneId, setTriggerSelectModelSceneId] = useState<string | null>(null);
 
   // Check microphone permission - called after tutorial is complete or if tutorial was already completed
   const checkMicPermission = useCallback(async () => {
@@ -647,10 +643,13 @@ function App() {
       pendingTranscribeDurationRef.current = 0; // 重置，避免影响下次录音
       const device: 'CPU' | 'GPU' = 'GPU'; // 简化处理，默认使用 GPU
 
-      // 预先检查 LLM profile（用于进度条预估）
-      const llmProfile = await getLlmProfile(scene.id);
-      const hasLlmProfile = llmProfile !== null && llmProfile.enabled;
-      const llmModelId = llmProfile?.model;
+      // 检查 LLM 配置（用于进度条预估）
+      // 新架构：全局 LLM 配置 + 场景提示词
+      const hasGlobalLlm = config?.globalModelConfig?.llm?.providerId && config?.globalModelConfig?.llm?.model;
+      const currentScene = config?.scenes.find(s => s.id === scene.id);
+      const hasPrompt = currentScene?.promptType || currentScene?.customPrompt;
+      const hasLlmProfile = !!(hasGlobalLlm && hasPrompt);
+      const llmModelId = config?.globalModelConfig?.llm?.model || undefined;
 
       // 获取 skipLlm 标记（双击跳过 LLM）
       const skipLlm = skipLlmRef.current;
@@ -664,7 +663,10 @@ function App() {
       console.log(`${'─'.repeat(60)}`);
 
       // Step 1: Show "识别中" with spinner and progress info
-      const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
+      // 使用全局 ASR 模型配置
+      const fullModelId = config?.globalModelConfig?.asrModel
+        ? getFullModelId(config.globalModelConfig.asrModel)
+        : '';
       await showFloatPanelStatus('transcribing', sceneName, undefined, {
         modelId: fullModelId,
         device,
@@ -832,12 +834,12 @@ function App() {
         stepStart = recordTime('LLM 后处理', stepStart);
 
         // 收集 LLM 性能数据
-        if (llmProfile?.model) {
+        if (llmModelId) {
           const textLen = recognizedText.length;
-          const llmEstimate = estimateLlmTime(llmProfile.model, textLen);
+          const llmEstimate = estimateLlmTime(llmModelId, textLen);
 
           llmPerformanceData = {
-            modelId: llmProfile.model,
+            modelId: llmModelId,
             estimatedTime: llmEstimate.estimatedTime,
             actualTime: llmActualTime,
             samples: llmEstimate.samples,  // 使用预估返回的 samples
@@ -968,21 +970,20 @@ function App() {
 
       // 检查是否是内存不足错误
       if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
-        const scene = currentSceneRef.current;
-        if (scene) {
-          const model = config?.models?.find(m => m.id === scene.model?.modelId);
-          const modelName = model?.name || scene.model?.modelId || '';
-          const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
-          const requiredMemory = memoryMatch?.[1] || '未知';
-          const availableMemory = memoryMatch?.[2] || '未知';
+        // 使用全局 ASR 模型配置
+        const asrModelId = config?.globalModelConfig?.asrModel?.modelId || '';
+        const model = config?.models?.find(m => m.id === asrModelId);
+        const modelName = model?.name || asrModelId;
+        const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
+        const requiredMemory = memoryMatch?.[1] || '未知';
+        const availableMemory = memoryMatch?.[2] || '未知';
 
-          setMemoryError({
-            visible: true,
-            modelName,
-            requiredMemory,
-            availableMemory,
-          });
-        }
+        setMemoryError({
+          visible: true,
+          modelName,
+          requiredMemory,
+          availableMemory,
+        });
       }
 
       await hideFloatPanelStatus('workflow-error');
@@ -1021,14 +1022,17 @@ function App() {
       return;
     }
 
-    const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
-    const model = config?.models?.find(m => m.id === scene.model?.modelId);
+    // 使用全局 ASR 模型配置
+    const fullModelId = config?.globalModelConfig?.asrModel
+      ? getFullModelId(config.globalModelConfig.asrModel)
+      : '';
+    const model = config?.models?.find(m => m.id === config?.globalModelConfig?.asrModel?.modelId);
 
     // Check if model is currently downloading
     if (downloadStates[fullModelId]?.downloading) {
       showToast({
         type: 'info',
-        title: t('toast.modelDownloading', { name: model?.name || scene.model?.modelId }),
+        title: t('toast.modelDownloading', { name: model?.name || config?.globalModelConfig?.asrModel?.modelId }),
       });
       isProcessingShortcutRef.current = false;
       return;
@@ -1038,8 +1042,8 @@ function App() {
     const modelDownloaded = await checkModelExists(fullModelId);
     if (!modelDownloaded) {
       // Show dialog asking user if they want to download
-      setPendingModelId(scene.model?.modelId ?? '');
-      setPendingModelName(model?.name || scene.model?.modelId || '');
+      setPendingModelId(config?.globalModelConfig?.asrModel?.modelId ?? '');
+      setPendingModelName(model?.name || config?.globalModelConfig?.asrModel?.modelId || '');
       setShowModelDialog(true);
       isProcessingShortcutRef.current = false;
       return;
@@ -1187,55 +1191,6 @@ function App() {
     // Update tray menu with new scenes
     await updateTrayMenu(scenes);
   };
-
-  // Handle LLM profile save - update local config state
-  const handleLlmProfileSave = (profile: LlmProfile) => {
-    if (!config) return;
-    log.debug(`LLM profile saved: ${JSON.stringify(profile, null, 2)}`);
-
-    // Update llm_profiles in config
-    const existingIndex = config.llmProfiles?.findIndex(p => p.sceneId === profile.sceneId) ?? -1;
-    let newProfiles: LlmProfile[];
-
-    if (existingIndex >= 0 && config.llmProfiles) {
-      // Update existing profile
-      newProfiles = [...config.llmProfiles];
-      newProfiles[existingIndex] = profile;
-    } else {
-      // Add new profile
-      newProfiles = [...(config.llmProfiles || []), profile];
-    }
-
-    const newConfig = { ...config, llmProfiles: newProfiles };
-    setConfig(newConfig);
-  };
-
-  // Handle models change - update local config state
-  const handleModelsChange = (models: Model[]) => {
-    if (!config) return;
-    const newConfig = { ...config, models };
-    setConfig(newConfig);
-  };
-
-  // Handle quantization preference change
-  const handleQuantPrefChange = useCallback(async (modelId: string, quant: string) => {
-    if (!config) return;
-
-    console.log(`[DEBUG handleQuantPrefChange] modelId=${modelId}, quant=${quant}`);
-    console.log(`[DEBUG handleQuantPrefChange] Current modelQuantPrefs:`, JSON.stringify(config.modelQuantPrefs));
-
-    const updatedPrefs = {
-      ...(config.modelQuantPrefs || {}),
-      [modelId]: quant,
-    };
-
-    console.log(`[DEBUG handleQuantPrefChange] Updated prefs:`, JSON.stringify(updatedPrefs));
-
-    const newConfig = { ...config, modelQuantPrefs: updatedPrefs };
-    setConfig(newConfig);
-    await saveConfig(newConfig);
-    log.debug(`Quant preference saved: ${modelId} -> ${quant}`);
-  }, [config]);
 
   if (loading) {
     return (
@@ -1453,7 +1408,7 @@ function App() {
               <SettingsShortcut
                 scenes={config?.scenes || []}
                 models={config?.models || []}
-                llmProfiles={config?.llmProfiles || []}
+                globalModelConfig={config?.globalModelConfig}
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
@@ -1493,71 +1448,30 @@ function App() {
             {activeNav === 'dictionary' && (
               <SettingsDictionary />
             )}
-            {/* Keep HomePanel always mounted to preserve state on tab switch */}
+            {/* Keep HomePanelV2 always mounted to preserve state on tab switch */}
             <div className={activeNav === 'home' ? '' : 'hidden'}>
-              {/* 使用新版首页 */}
               <HomePanelV2
                 scenes={config?.scenes || []}
-                models={config?.models || []}
-                llmProfiles={config?.llmProfiles || []}
+                globalModelConfig={config?.globalModelConfig}
                 modelQuantPrefs={config?.modelQuantPrefs || {}}
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
                 onDownloadCancel={handleDownloadCancel}
-                onSave={handleSaveScenes}
-                onModelQuantPrefsChange={handleQuantPrefChange}
-                onLlmProfileSave={handleLlmProfileSave}
-                tutorialCompleted={config?.tutorialCompleted}
-                onTutorialComplete={async () => {
+                onGlobalModelConfigChange={(newGlobalConfig) => {
                   if (config) {
-                    const newConfig = { ...config, tutorialCompleted: true };
+                    const newConfig = { ...config, globalModelConfig: newGlobalConfig };
                     setConfig(newConfig);
-                    await saveConfig(newConfig);
-                    checkMicPermission();
+                    saveConfig(newConfig);
                   }
                 }}
-                tryRegisterShortcut={registerShortcutWithResult}
-                triggerSelectModelSceneId={triggerSelectModelSceneId}
-                onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
+                onNavigateToSettings={() => {
+                  setActiveNav('settings');
+                  setSettingsTab('shortcut');
+                }}
+                onNavigateToLlmSettings={() => {
+                  setActiveNav('models');
+                }}
               />
-              {/* 原版首页保留但隐藏 */}
-              <div className="hidden">
-                <HomePanel
-                  scenes={config?.scenes || []}
-                  models={config?.models || []}
-                  llmProfiles={config?.llmProfiles || []}
-                  modelLanguagePrefs={config?.modelLanguagePrefs || {}}
-                  modelQuantPrefs={config?.modelQuantPrefs || {}}
-                  downloadStates={downloadStates}
-                  onDownload={handleDownload}
-                  onDownloadCancel={handleDownloadCancel}
-                  onSave={handleSaveScenes}
-                  onModelsChange={handleModelsChange}
-                  onModelLanguagePrefsChange={(prefs) => {
-                    loadConfig()
-                      .then((latestConfig) => {
-                        const newConfig = { ...latestConfig, modelLanguagePrefs: prefs };
-                        setConfig(newConfig);
-                        saveConfig(newConfig);
-                      })
-                      .catch((err) => log.error(`Failed to reload config: ${err}`));
-                  }}
-                  onModelQuantPrefsChange={handleQuantPrefChange}
-                  onLlmProfileSave={handleLlmProfileSave}
-                  tutorialCompleted={config?.tutorialCompleted}
-                  onTutorialComplete={async () => {
-                    if (config) {
-                      const newConfig = { ...config, tutorialCompleted: true };
-                      setConfig(newConfig);
-                      await saveConfig(newConfig);
-                      checkMicPermission();
-                    }
-                  }}
-                  tryRegisterShortcut={registerShortcutWithResult}
-                  triggerSelectModelSceneId={triggerSelectModelSceneId}
-                  onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
-                />
-              </div>
             </div>
             {activeNav === 'memory' && (
               <MemoryPanel
@@ -1639,16 +1553,8 @@ function App() {
           if (model) handleDownload(model);
         }}
         onSelectOther={() => {
-          // Find the scene that uses this model and trigger model selection dialog
-          const scene = config?.scenes?.find(s => s.model?.modelId === downloadErrorInfo?.modelId);
-          if (scene) {
-            // Switch to home tab first, then trigger model selection
-            setActiveNav('home');
-            setTriggerSelectModelSceneId(scene.id);
-          } else {
-            // No scene uses this model, go to models tab
-            setActiveNav('models');
-          }
+          // Go to models tab to select a different model
+          setActiveNav('models');
         }}
         onClose={() => {
           setShowDownloadErrorDialog(false);

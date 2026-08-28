@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Scene, Model, LlmProfile } from '../types';
+import type { Scene, Model, GlobalModelConfig } from '../types';
 import { getFullModelId } from '../types';
 import SceneForm from './SceneForm';
 import LlmConfigModal from './LlmConfigModal';
@@ -20,7 +20,7 @@ const log = createLogger('SceneList');
 interface SceneListProps {
   scenes?: Scene[];
   models?: Model[];
-  llmProfiles?: LlmProfile[];
+  globalModelConfig?: GlobalModelConfig;
   onEdit?: (scene: Scene) => void;
   onToggle?: (sceneId: string, enabled: boolean) => void;
   onAdd?: () => void;
@@ -94,7 +94,7 @@ function ToggleSwitch({
 export default function SceneList({
   scenes = [],
   models = [],
-  llmProfiles = [],
+  globalModelConfig,
   onEdit,
   onToggle,
   onAdd,
@@ -498,8 +498,10 @@ export default function SceneList({
           {localScenes.map((scene) => {
             const isListening = listeningShortcut === scene.id;
             // 检查该场景是否启用了 LLM
-            const sceneLlmProfile = llmProfiles.find(p => p.sceneId === scene.id);
-            const llmEnabled = sceneLlmProfile?.enabled ?? false;
+            // 判断依据：全局 LLM 已配置 且 场景有提示词配置
+            const hasGlobalLlm = globalModelConfig?.llm?.providerId && globalModelConfig?.llm?.model;
+            const hasPrompt = scene.promptType || scene.customPrompt;
+            const llmEnabled = !!(hasGlobalLlm && hasPrompt);
 
             return (
               <div
@@ -636,7 +638,6 @@ export default function SceneList({
       {showForm && (
         <SceneForm
           scene={editingScene}
-          models={models}
           onSave={handleSave}
           onCancel={handleCancel}
           checkConflict={checkConflict}

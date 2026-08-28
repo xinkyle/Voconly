@@ -1,5 +1,5 @@
 import { invoke } from '../utils/tauri';
-import type { AppConfig, Model, Scene, BackendType, LlmConfig, LlmProviderConfig, LlmProfile, LlmProviderInstance } from '../types';
+import type { AppConfig, Model, Scene, BackendType, LlmConfig, LlmProviderConfig, LlmProfile, LlmProviderInstance, GlobalModelConfig } from '../types';
 
 // ============== Rust 数据结构 (与 Rust 后端完全匹配，camelCase) ==============
 
@@ -71,6 +71,8 @@ interface RustUserPromptPresets {
 }
 
 interface RustAppConfig {
+  /// 全局模型配置
+  globalModelConfig: GlobalModelConfig;
   /// DEPRECATED: 模型列表已迁移到预设系统
   models?: RustModel[];
   /// 用户对每个 ASR 模型的默认语言偏好
@@ -223,6 +225,8 @@ function convertSceneToRust(scene: Scene): RustScene {
 
 function convertConfigFromRust(rust: RustAppConfig): AppConfig {
   return {
+    // 全局模型配置
+    globalModelConfig: rust.globalModelConfig,
     // DEPRECATED: models 字段仅用于向后兼容，不再主动使用
     models: rust.models?.map(convertModelFromRust),
     // 新增：用户对每个模型的语言偏好
@@ -252,6 +256,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
 
 function convertConfigToRust(config: AppConfig): RustAppConfig {
   return {
+    // 全局模型配置
+    globalModelConfig: config.globalModelConfig,
     // DEPRECATED: models 字段仅用于向后兼容，发送空数组
     models: config.models?.map(convertModelToRust) || [],
     // 新增：用户对每个模型的语言偏好

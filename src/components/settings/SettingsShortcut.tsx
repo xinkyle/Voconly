@@ -1,11 +1,11 @@
 import SceneList from '../SceneList';
-import type { Scene, Model, LlmProfile } from '../../types';
+import type { Scene, Model, GlobalModelConfig } from '../../types';
 import type { DownloadProgress } from '../../services/downloader';
 
 interface SettingsShortcutProps {
   scenes: Scene[];
   models: Model[];
-  llmProfiles?: LlmProfile[];
+  globalModelConfig?: GlobalModelConfig;
   onSave: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
@@ -18,7 +18,7 @@ interface SettingsShortcutProps {
 export default function SettingsShortcut({
   scenes,
   models,
-  llmProfiles = [],
+  globalModelConfig,
   onSave,
   checkConflict,
   tryRegisterShortcut,
@@ -30,7 +30,7 @@ export default function SettingsShortcut({
     <SceneList
       scenes={scenes}
       models={models}
-      llmProfiles={llmProfiles}
+      globalModelConfig={globalModelConfig}
       onSave={onSave}
       checkConflict={checkConflict}
       tryRegisterShortcut={tryRegisterShortcut}

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Scene, Model } from '../types';
-import { getFullModelId } from '../types';
-import { parseModelId } from '../services/config';
+import type { Scene } from '../types';
+import { getLlmPromptPresets } from '../services/llm';
+import { createLogger } from '../services/log';
+
+const log = createLogger('SceneForm');
 
 interface SceneFormProps {
   scene?: Scene | null;
-  models: Model[];
   onSave: (scene: Scene) => void;
   onCancel: () => void;
   existingShortcuts?: string[];
@@ -14,9 +15,16 @@ interface SceneFormProps {
   sceneNames?: Record<string, string>;
 }
 
+// 内置提示词类型
+const BUILTIN_PROMPT_TYPES = [
+  { id: 'lightPolish', labelKey: 'llmConfig.promptTypes.lightPolish' },
+  { id: 'translate', labelKey: 'llmConfig.promptTypes.translate' },
+  { id: 'professionalPolish', labelKey: 'llmConfig.promptTypes.professionalPolish' },
+  { id: 'meetingSecretary', labelKey: 'llmConfig.promptTypes.meetingSecretary' },
+];
+
 export default function SceneForm({
   scene,
-  models,
   onSave,
   onCancel,
   existingShortcuts = [],
@@ -26,17 +34,35 @@ export default function SceneForm({
   const { t } = useTranslation();
   const [name, setName] = useState(scene?.name || '');
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
-  const [modelId, setModelId] = useState(scene?.model?.modelId ? getFullModelId(scene.model) : ''); // 空字符串，让用户手动选择
   const [enabled, setEnabled] = useState(scene?.enabled ?? true);
+  const [promptType, setPromptType] = useState(scene?.promptType || 'lightPolish');
+  const [customPrompt, setCustomPrompt] = useState(scene?.customPrompt || '');
   const [errors, setErrors] = useState<{ name?: string; shortcut?: string; conflict?: string }>({});
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
+
+  // 加载自定义预设
+  useEffect(() => {
+    const loadPresets = async () => {
+      try {
+        const presets = await getLlmPromptPresets();
+        if (presets?.customPresets) {
+          setCustomPresets(presets.customPresets);
+        }
+      } catch (err) {
+        log.error(`Failed to load presets: ${err}`);
+      }
+    };
+    loadPresets();
+  }, []);
 
   useEffect(() => {
     if (scene) {
       setName(scene.name);
       setShortcut(scene.shortcut);
-      setModelId(scene.model?.modelId ? getFullModelId(scene.model) : '');
       setEnabled(scene.enabled);
+      setPromptType(scene.promptType || 'lightPolish');
+      setCustomPrompt(scene.customPrompt || '');
     }
   }, [scene]);
 
@@ -92,18 +118,14 @@ export default function SceneForm({
       return;
     }
 
-    // 解析 modelId（可能包含量化后缀）
-    const { baseId, quant } = parseModelId(modelId);
-
     const sceneData: Scene = {
       id: scene?.id || Date.now().toString(),
       name: name.trim(),
       shortcut: shortcut.trim(),
-      model: {
-        modelId: baseId,
-        quantization: quant,
-      },
+      model: scene?.model || { modelId: '', quantization: undefined },
       enabled,
+      promptType,
+      customPrompt: promptType === 'custom' ? customPrompt : undefined,
     };
 
     onSave(sceneData);
@@ -182,28 +204,53 @@ export default function SceneForm({
             <p className="mt-1.5 text-xs text-gray-500">{t('sceneForm.shortcutSupport')}</p>
           </div>
 
-          {/* Model Selection */}
+          {/* Prompt Type Selection */}
           <div>
-            <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-2">
-              {t('sceneForm.voiceModel')}
+            <label htmlFor="promptType" className="block text-sm font-medium text-gray-700 mb-2">
+              {t('llmConfig.userPrompt')}
             </label>
             <select
-              id="model"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
+              id="promptType"
+              value={promptType}
+              onChange={(e) => setPromptType(e.target.value)}
               className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200"
             >
-              <option value="" disabled>
-                {t('home.selectModel')}
-              </option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} ({model.size})
-                  {model.downloaded ? ` - ${t('sceneForm.downloaded')}` : ''}
+              {BUILTIN_PROMPT_TYPES.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {t(type.labelKey)}
                 </option>
               ))}
+              {Object.keys(customPresets).length > 0 && (
+                <optgroup label={t('llmConfig.promptTypes.custom')}>
+                  {Object.keys(customPresets).map((presetName) => (
+                    <option key={presetName} value={presetName}>
+                      {presetName}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <option value="custom">{t('llmConfig.promptTypes.custom')}</option>
             </select>
+            <p className="mt-1.5 text-xs text-gray-500">{t('sceneForm.promptTypeHint')}</p>
           </div>
+
+          {/* Custom Prompt (only show when "custom" is selected) */}
+          {promptType === 'custom' && (
+            <div>
+              <label htmlFor="customPrompt" className="block text-sm font-medium text-gray-700 mb-2">
+                {t('llmConfig.promptPlaceholder')}
+              </label>
+              <textarea
+                id="customPrompt"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder={t('llmConfig.promptPlaceholder')}
+                rows={4}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 resize-none"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">{t('llmConfig.promptTip')}</p>
+            </div>
+          )}
 
           {/* Enabled Toggle */}
           <div className="flex items-center">
