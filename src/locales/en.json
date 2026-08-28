@@ -7,6 +7,7 @@
     "home": "Home",
     "memory": "History",
     "models": "Models",
+    "provider": "AI Services",
     "dictionary": "Dictionary",
     "settings": "Settings"
   },
@@ -235,8 +236,8 @@
     "gpuRecommended": "GPU Recommended",
     "gpuWarning": "Local LLMs run faster on GPU. CPU works but is slower.",
     "noLlmModels": "No LLM models available",
-    "llmProvidersTitle": "LLM Post-Processing Services",
-    "llmProvidersSubtitle": "Click to configure local or cloud LLM for text polishing, translation, summarization",
+    "llmProvidersTitle": "AI Provider",
+    "llmProvidersSubtitle": "Configure local or cloud AI services",
     "cloudTitle": "Cloud Provider Configuration",
     "cloudSubtitle": "Use cloud APIs for speech recognition or text processing",
     "providerSaved": "Provider configuration saved",

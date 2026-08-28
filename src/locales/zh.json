@@ -7,6 +7,7 @@
     "home": "主页",
     "memory": "历史",
     "models": "模型",
+    "provider": "AI 服务",
     "dictionary": "词典",
     "settings": "设置"
   },
@@ -235,8 +236,8 @@
     "gpuRecommended": "建议使用 GPU",
     "gpuWarning": "本地大模型在 GPU 上运行速度更快。如果没有 GPU，CPU 也能运行但速度较慢。",
     "noLlmModels": "暂无可用的大模型",
-    "llmProvidersTitle": "LLM 后处理服务",
-    "llmProvidersSubtitle": "点击配置本地或云端大模型，用于文本润色、翻译、摘要等",
+    "llmProvidersTitle": "AI Provider",
+    "llmProvidersSubtitle": "配置本地或云端 AI 服务",
     "cloudTitle": "云端 Provider 配置",
     "cloudSubtitle": "使用云端 API 进行语音识别或文本处理",
     "providerSaved": "Provider 配置已保存",

@@ -8,6 +8,7 @@ import { getFullModelId } from './types';
 import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
 import HomePanelV2 from './components/HomePanelV2';
+import ProviderPanel from './components/ProviderPanel';
 import { SettingsShortcut, SettingsSystem, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
@@ -86,6 +87,12 @@ const DictionaryIcon = () => (
   </svg>
 );
 
+const ProviderIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+  </svg>
+);
+
 type NavItem = {
   id: string;
   labelKey: string;
@@ -96,6 +103,7 @@ const navItems: NavItem[] = [
   { id: 'home', labelKey: 'nav.home', icon: <HomeIcon /> },
   { id: 'memory', labelKey: 'nav.memory', icon: <MemoryIcon /> },
   { id: 'models', labelKey: 'nav.models', icon: <ModelIcon /> },
+  { id: 'provider', labelKey: 'nav.provider', icon: <ProviderIcon /> },
   { id: 'dictionary', labelKey: 'nav.dictionary', icon: <DictionaryIcon /> },
   { id: 'settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
 ];
@@ -1450,6 +1458,9 @@ function App() {
             )}
             {activeNav === 'dictionary' && (
               <SettingsDictionary />
+            )}
+            {activeNav === 'provider' && (
+              <ProviderPanel />
             )}
             {/* Keep HomePanelV2 always mounted to preserve state on tab switch */}
             <div className={activeNav === 'home' ? '' : 'hidden'}>
