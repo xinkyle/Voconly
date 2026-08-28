@@ -56,6 +56,35 @@ export function getFullModelId(ref: ModelRef): string {
     : ref.modelId;
 }
 
+// ============== 全局模型配置 ==============
+
+/**
+ * 全局 LLM 配置
+ */
+export interface GlobalLlmConfig {
+  /** Provider ID（如 "ollama", "openai"） */
+  providerId: string;
+  /** 模型名称 */
+  model: string;
+  /** 最大输出 tokens */
+  maxTokens: number;
+  /** 温度参数 */
+  temperature: number;
+}
+
+/**
+ * 全局模型配置
+ *
+ * 将 ASR 和 LLM 模型配置从场景中剥离，实现全局共用。
+ * 所有场景使用相同的 ASR 和 LLM 模型，仅提示词不同。
+ */
+export interface GlobalModelConfig {
+  /** ASR 模型引用（全局共用） */
+  asrModel: ModelRef;
+  /** LLM 配置（全局共用） */
+  llm: GlobalLlmConfig;
+}
+
 // 模型定义
 export interface Model {
   id: string;
@@ -86,6 +115,10 @@ export interface Scene {
   modelId?: string;
   autoType?: boolean;
   enabled: boolean;
+  /** 提示词类型：内置名（如 "lightPolish", "translate"）或自定义预设名 */
+  promptType?: string;
+  /** 场景专属自定义提示词（可选，优先于 promptType） */
+  customPrompt?: string;
 }
 
 // 应用配置
@@ -95,6 +128,9 @@ export interface Scene {
 // - 预设信息: 由 presets 模块提供
 // - 用户偏好: 本配置文件仅存储用户设置（语言偏好等）
 export interface AppConfig {
+  /** 全局模型配置（ASR + LLM） */
+  globalModelConfig?: GlobalModelConfig;
+
   /// DEPRECATED: 模型列表已迁移到预设系统
   /// 此字段仅保留用于向后兼容旧配置文件
   models?: Model[];

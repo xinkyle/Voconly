@@ -53,6 +53,70 @@ impl Default for ModelRef {
     }
 }
 
+/// 全局模型配置
+///
+/// 将 ASR 和 LLM 模型配置从场景中剥离，实现全局共用。
+/// 所有场景使用相同的 ASR 和 LLM 模型，仅提示词不同。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalModelConfig {
+    /// ASR 模型引用（全局共用）
+    #[serde(default)]
+    pub asr_model: ModelRef,
+
+    /// LLM 配置（全局共用）
+    #[serde(default = "default_global_llm_config")]
+    pub llm: GlobalLlmConfig,
+}
+
+/// 全局 LLM 配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalLlmConfig {
+    /// Provider ID（如 "ollama", "openai"）
+    pub provider_id: String,
+    /// 模型名称
+    pub model: String,
+    /// 最大输出 tokens
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+    /// 温度参数
+    #[serde(default = "default_temperature")]
+    pub temperature: f32,
+}
+
+fn default_global_llm_config() -> GlobalLlmConfig {
+    GlobalLlmConfig {
+        provider_id: String::new(),
+        model: String::new(),
+        max_tokens: 1024,
+        temperature: 0.7,
+    }
+}
+
+fn default_max_tokens() -> u32 {
+    1024
+}
+
+fn default_temperature() -> f32 {
+    0.7
+}
+
+impl Default for GlobalLlmConfig {
+    fn default() -> Self {
+        default_global_llm_config()
+    }
+}
+
+impl Default for GlobalModelConfig {
+    fn default() -> Self {
+        Self {
+            asr_model: ModelRef::default(),
+            llm: GlobalLlmConfig::default(),
+        }
+    }
+}
+
 /// GGUF model configuration for transcribe-cpp backend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -300,6 +364,12 @@ pub struct Scene {
     /// 自动输入识别结果
     #[serde(default = "default_true")]
     pub auto_type: bool,
+    /// 提示词类型：内置名（如 "lightPolish", "translate"）或自定义预设名
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub prompt_type: String,
+    /// 场景专属自定义提示词（可选，优先于 promptType）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_prompt: Option<String>,
 }
 
 /// 预览窗口高度档位
@@ -328,6 +398,10 @@ pub enum PreviewHeight {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
+    /// 全局模型配置（ASR + LLM）
+    #[serde(default)]
+    pub global_model_config: GlobalModelConfig,
+
     /// DEPRECATED: 模型列表已迁移到预设系统
     /// 此字段仅保留用于向后兼容旧配置文件，新配置文件不会包含此字段
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -420,6 +494,9 @@ fn default_true() -> bool {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            // 新增：全局模型配置
+            global_model_config: GlobalModelConfig::default(),
+
             // DEPRECATED: models 字段不再初始化，由预设系统管理
             // 保留空列表以便 serde 反序列化兼容
             #[allow(deprecated)]
@@ -441,6 +518,8 @@ impl Default for AppConfig {
                     enabled: true,
                     load_strategy: LoadStrategy::Always,
                     auto_type: true,
+                    prompt_type: "lightPolish".to_string(),
+                    custom_prompt: None,
                 },
                 Scene {
                     id: "2".to_string(),
@@ -451,6 +530,8 @@ impl Default for AppConfig {
                     enabled: true,
                     load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
                     auto_type: true,
+                    prompt_type: "professionalPolish".to_string(),
+                    custom_prompt: None,
                 },
             ],
             auto_start: Some(true), // 默认开启开机自启
@@ -660,3 +741,99 @@ pub fn config_exists() -> bool {
 // Download status is now determined by filesystem scanning:
 // - ASR models: scan_available_asr_models() in presets/asr_scanner.rs
 // - LLM models: scan_available_llm_models() in llm_models/presets.rs
+
+#[cfg(test)]
+mod global_model_config_tests {
+    use super::*;
+
+    #[test]
+    fn test_global_model_config_serialization() {
+        // 创建 GlobalModelConfig 实例
+        let config = GlobalModelConfig {
+            asr_model: ModelRef::with_quantization(
+                "qwen3-asr-1.7b".to_string(),
+                "Q5_K_M".to_string(),
+            ),
+            llm: GlobalLlmConfig {
+                provider_id: "ollama".to_string(),
+                model: "qwen2.5:7b".to_string(),
+                max_tokens: 2048,
+                temperature: 0.7,
+            },
+        };
+
+        // 序列化
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        println!("Serialized GlobalModelConfig:\n{}", json);
+
+        // 反序列化
+        let deserialized: GlobalModelConfig = serde_json::from_str(&json).unwrap();
+
+        // 验证
+        assert_eq!(deserialized.asr_model.model_id, "qwen3-asr-1.7b");
+        assert_eq!(deserialized.asr_model.quantization, Some("Q5_K_M".to_string()));
+        assert_eq!(deserialized.llm.provider_id, "ollama");
+        assert_eq!(deserialized.llm.model, "qwen2.5:7b");
+        assert_eq!(deserialized.llm.max_tokens, 2048);
+        assert_eq!(deserialized.llm.temperature, 0.7);
+    }
+
+    #[test]
+    fn test_app_config_with_global_model_config() {
+        // 创建带有 GlobalModelConfig 的 AppConfig
+        let config = AppConfig {
+            global_model_config: GlobalModelConfig {
+                asr_model: ModelRef::new("sensevoice-small".to_string()),
+                llm: GlobalLlmConfig {
+                    provider_id: "openai".to_string(),
+                    model: "gpt-4".to_string(),
+                    max_tokens: 1024,
+                    temperature: 0.5,
+                },
+            },
+            ..Default::default()
+        };
+
+        // 序列化
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        println!("Serialized AppConfig:\n{}", json);
+
+        // 验证 JSON 包含 globalModelConfig
+        assert!(json.contains("globalModelConfig"));
+        assert!(json.contains("asrModel"));
+        assert!(json.contains("providerId"));
+
+        // 反序列化
+        let deserialized: AppConfig = serde_json::from_str(&json).unwrap();
+
+        // 验证
+        assert_eq!(deserialized.global_model_config.asr_model.model_id, "sensevoice-small");
+        assert_eq!(deserialized.global_model_config.llm.provider_id, "openai");
+    }
+
+    #[test]
+    fn test_backward_compatibility() {
+        // 测试旧配置文件的反序列化（不包含 globalModelConfig）
+        let old_config_json = r#"{
+            "scenes": [
+                {
+                    "id": "1",
+                    "name": "测试场景",
+                    "shortcut": "1",
+                    "model": {
+                        "modelId": "sensevoice-small"
+                    },
+                    "enabled": true
+                }
+            ]
+        }"#;
+
+        // 应该能正常解析，使用默认的 globalModelConfig
+        let config: AppConfig = serde_json::from_str(old_config_json).unwrap();
+
+        // 验证默认值
+        assert!(config.global_model_config.asr_model.model_id.is_empty());
+        assert!(config.global_model_config.llm.provider_id.is_empty());
+        assert_eq!(config.scenes.len(), 1);
+    }
+}
