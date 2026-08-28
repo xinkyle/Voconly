@@ -183,7 +183,7 @@ pub async fn llm_process_text(
         .map_err(|_| format!("LLM 请求超时（{}秒）", timeout_secs))?
 }
 
-/// 处理文本（按场景 ID，使用场景级 Profile 配置）
+/// 处理文本（按场景 ID，使用全局 LLM 配置 + 场景提示词）
 #[tauri::command]
 pub async fn llm_process_text_for_scene(
     services: State<'_, AppServices>,
@@ -197,57 +197,60 @@ pub async fn llm_process_text_for_scene(
         text.len()
     );
 
-    // 获取场景级 profile
-    let profile = {
+    // 获取全局 LLM 配置 + 场景提示词
+    let (llm_config, prompt_type, custom_prompt, provider_id) = {
         let config = services.config.lock().unwrap();
-        config
-            .llm_profiles
-            .iter()
-            .find(|p| p.scene_id == scene_id)
-            .cloned()
-    };
 
-    let profile = match profile {
-        Some(p) => {
-            info!(
-                "[LLM] Found profile for scene {}: enabled={}, provider_id={:?}, model={}",
-                scene_id, p.enabled, p.provider_id, p.model
-            );
-            p
-        }
-        None => {
-            info!(
-                "[LLM] No profile found for scene {}, LLM not enabled",
-                scene_id
-            );
+        // 获取场景配置（用于获取提示词）
+        let scene = config
+            .scenes
+            .iter()
+            .find(|s| s.id == scene_id);
+
+        let scene = match scene {
+            Some(s) => s,
+            None => {
+                info!("[LLM] Scene {} not found", scene_id);
+                return Ok(LlmResponse {
+                    success: false,
+                    text: text.clone(),
+                    error: Some("Scene not found".to_string()),
+                    tokens_used: None,
+                });
+            }
+        };
+
+        // 检查是否配置了全局 LLM
+        let global_llm = &config.global_model_config.llm;
+
+        // 如果没有配置 provider_id 或 model，返回错误
+        if global_llm.provider_id.is_empty() || global_llm.model.is_empty() {
+            info!("[LLM] Global LLM not configured for scene {}", scene_id);
             return Ok(LlmResponse {
                 success: false,
                 text: text.clone(),
-                error: Some("No LLM profile for this scene".to_string()),
+                error: Some("Global LLM not configured".to_string()),
                 tokens_used: None,
             });
         }
+
+        (
+            global_llm.clone(),
+            scene.prompt_type.clone(),
+            scene.custom_prompt.clone(),
+            global_llm.provider_id.clone(),
+        )
     };
 
-    if !profile.enabled {
-        info!("[LLM] Profile for scene {} is disabled", scene_id);
-        return Ok(LlmResponse {
-            success: false,
-            text: text.clone(),
-            error: Some("LLM disabled for this scene".to_string()),
-            tokens_used: None,
-        });
-    }
+    info!(
+        "[LLM] Global LLM config: provider_id={}, model={}, max_tokens={}, temperature={}",
+        llm_config.provider_id, llm_config.model, llm_config.max_tokens, llm_config.temperature
+    );
+    info!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
 
     // 获取 Provider 配置
     let (provider_meta, provider_instance) = {
         let config = services.config.lock().unwrap();
-
-        // 确定要使用的 provider_id
-        let provider_id = profile.provider_id.clone().unwrap_or_else(|| {
-            // 如果 profile 没有指定 provider，使用全局配置或默认
-            config.llm.provider.provider_type.to_provider_id()
-        });
 
         info!("[LLM] Using provider_id: {}", provider_id);
 
@@ -279,44 +282,61 @@ pub async fn llm_process_text_for_scene(
         (meta, instance)
     };
 
-    // 获取提示词预设（单一存储，不再按语言分）
+    // 获取提示词预设
     let presets = {
         let config = services.config.lock().unwrap();
         config.llm_prompt_presets.clone()
     };
 
-    // 根据 user_prompt_type 确定 user_prompt
-    // user_prompt_type 可能是内置类型 ("lightPolish", "translate", "professionalPolish", "meetingSecretary")
-    // 或自定义预设名称（如 "正式表达"）
-    // 如果预设为空或预设字段为空，使用 profile.user_prompt_custom
-    let user_prompt = match profile.user_prompt_type.as_str() {
-        "lightPolish" => presets.as_ref()
-            .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
-            .cloned()
-            .unwrap_or_else(|| profile.user_prompt_custom.clone()),
-        "translate" => presets.as_ref()
-            .and_then(|p| if p.translate.is_empty() { None } else { Some(&p.translate) })
-            .cloned()
-            .unwrap_or_else(|| profile.user_prompt_custom.clone()),
-        "professionalPolish" => presets.as_ref()
-            .and_then(|p| if p.professional_polish.is_empty() { None } else { Some(&p.professional_polish) })
-            .cloned()
-            .unwrap_or_else(|| profile.user_prompt_custom.clone()),
-        "meetingSecretary" => presets.as_ref()
-            .and_then(|p| if p.meeting_secretary.is_empty() { None } else { Some(&p.meeting_secretary) })
-            .cloned()
-            .unwrap_or_else(|| profile.user_prompt_custom.clone()),
-        preset_name => {
-            // 尝试从自定义预设中查找
-            presets.as_ref()
-                .and_then(|p| p.custom_presets.get(preset_name))
+    // 确定提示词（优先级：custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
+    let user_prompt = if let Some(ref custom) = custom_prompt {
+        // 1. 场景自定义提示词优先
+        info!("[LLM] Using scene custom_prompt");
+        custom.clone()
+    } else {
+        // 2. 根据 prompt_type 查找预设
+        let effective_prompt_type = if prompt_type.is_empty() {
+            // 3. 默认使用 "lightPolish"
+            "lightPolish"
+        } else {
+            &prompt_type
+        };
+
+        match effective_prompt_type {
+            "lightPolish" => presets.as_ref()
+                .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
                 .cloned()
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| profile.user_prompt_custom.clone())
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "translate" => presets.as_ref()
+                .and_then(|p| if p.translate.is_empty() { None } else { Some(&p.translate) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "professionalPolish" => presets.as_ref()
+                .and_then(|p| if p.professional_polish.is_empty() { None } else { Some(&p.professional_polish) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "meetingSecretary" => presets.as_ref()
+                .and_then(|p| if p.meeting_secretary.is_empty() { None } else { Some(&p.meeting_secretary) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            preset_name => {
+                // 尝试从自定义预设中查找
+                presets.as_ref()
+                    .and_then(|p| p.custom_presets.get(preset_name))
+                    .cloned()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| {
+                        // 未找到预设，使用默认 lightPolish
+                        presets.as_ref()
+                            .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
+                            .cloned()
+                            .unwrap_or_else(|| "{{text}}".to_string())
+                    })
+            }
         }
     };
 
-    info!("[LLM] User prompt type: {}", profile.user_prompt_type);
+    info!("[LLM] User prompt type: {}", if custom_prompt.is_some() { "custom" } else { &prompt_type });
     info!(
         "[LLM] User prompt template (with placeholder): {}",
         user_prompt
@@ -334,12 +354,12 @@ pub async fn llm_process_text_for_scene(
             enabled: true,
             base_url: provider_instance.base_url.clone(),
             api_key: provider_instance.api_key.clone(),
-            model: profile.model.clone(),
+            model: llm_config.model.clone(),
             timeout_secs: 3600, // 60分钟，大文本处理需要足够时间
         },
         user_prompt_template: user_prompt.clone(),
-        max_tokens: profile.max_tokens,
-        temperature: profile.temperature,
+        max_tokens: llm_config.max_tokens,
+        temperature: llm_config.temperature,
     };
 
     info!(
@@ -360,7 +380,7 @@ pub async fn llm_process_text_for_scene(
     // 记录开始时间
     let start_time = Instant::now();
     let text_len = text.len() as u32;
-    let model_id = profile.model.clone();
+    let model_id = llm_config.provider.model.clone();
 
     let result = tokio::time::timeout(timeout, llm_service.process_text(&text))
         .await
@@ -377,7 +397,7 @@ pub async fn llm_process_text_for_scene(
     result
 }
 
-/// 处理文本（按场景 ID，带进度事件）
+/// 处理文本（按场景 ID，使用全局 LLM 配置 + 场景提示词，带进度事件）
 /// 通过 Tauri 事件 "llm-progress" 发送进度更新
 #[tauri::command]
 pub async fn llm_process_text_for_scene_with_progress(
@@ -393,57 +413,60 @@ pub async fn llm_process_text_for_scene_with_progress(
         text.len()
     );
 
-    // 获取场景级 profile
-    let profile = {
+    // 获取全局 LLM 配置 + 场景提示词
+    let (llm_config, prompt_type, custom_prompt, provider_id) = {
         let config = services.config.lock().unwrap();
-        config
-            .llm_profiles
-            .iter()
-            .find(|p| p.scene_id == scene_id)
-            .cloned()
-    };
 
-    let profile = match profile {
-        Some(p) => {
-            info!(
-                "[LLM] Found profile for scene {}: enabled={}, provider_id={:?}, model={}",
-                scene_id, p.enabled, p.provider_id, p.model
-            );
-            p
-        }
-        None => {
-            info!(
-                "[LLM] No profile found for scene {}, LLM not enabled",
-                scene_id
-            );
+        // 获取场景配置（用于获取提示词）
+        let scene = config
+            .scenes
+            .iter()
+            .find(|s| s.id == scene_id);
+
+        let scene = match scene {
+            Some(s) => s,
+            None => {
+                info!("[LLM] Scene {} not found", scene_id);
+                return Ok(LlmResponse {
+                    success: false,
+                    text: text.clone(),
+                    error: Some("Scene not found".to_string()),
+                    tokens_used: None,
+                });
+            }
+        };
+
+        // 检查是否配置了全局 LLM
+        let global_llm = &config.global_model_config.llm;
+
+        // 如果没有配置 provider_id 或 model，返回错误
+        if global_llm.provider_id.is_empty() || global_llm.model.is_empty() {
+            info!("[LLM] Global LLM not configured for scene {}", scene_id);
             return Ok(LlmResponse {
                 success: false,
                 text: text.clone(),
-                error: Some("No LLM profile for this scene".to_string()),
+                error: Some("Global LLM not configured".to_string()),
                 tokens_used: None,
             });
         }
+
+        (
+            global_llm.clone(),
+            scene.prompt_type.clone(),
+            scene.custom_prompt.clone(),
+            global_llm.provider_id.clone(),
+        )
     };
 
-    if !profile.enabled {
-        info!("[LLM] Profile for scene {} is disabled", scene_id);
-        return Ok(LlmResponse {
-            success: false,
-            text: text.clone(),
-            error: Some("LLM disabled for this scene".to_string()),
-            tokens_used: None,
-        });
-    }
+    info!(
+        "[LLM] Global LLM config: provider_id={}, model={}, max_tokens={}, temperature={}",
+        llm_config.provider_id, llm_config.model, llm_config.max_tokens, llm_config.temperature
+    );
+    info!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
 
     // 获取 Provider 配置
     let (provider_meta, provider_instance) = {
         let config = services.config.lock().unwrap();
-
-        // 确定要使用的 provider_id
-        let provider_id = profile.provider_id.clone().unwrap_or_else(|| {
-            // 如果 profile 没有指定 provider，使用全局配置或默认
-            config.llm.provider.provider_type.to_provider_id()
-        });
 
         info!("[LLM] Using provider_id: {}", provider_id);
 
@@ -475,35 +498,50 @@ pub async fn llm_process_text_for_scene_with_progress(
         (meta, instance)
     };
 
-    // 获取提示词预设（单一存储，不再按语言分）
+    // 获取提示词预设
     let presets = {
         let config = services.config.lock().unwrap();
         config.llm_prompt_presets.clone()
     };
 
-    // 根据 user_prompt_type 确定 user_prompt
-    // user_prompt_type 可能是内置类型 ("lightPolish", "translate", "professionalPolish", "meetingSecretary")
-    // 或自定义预设名称（如 "正式表达"）
-    // 如果预设为 None（用户未保存过），使用 user_prompt_custom 作为后备
-    let user_prompt = match (&presets, profile.user_prompt_type.as_str()) {
-        (Some(p), "lightPolish") => p.light_polish.clone(),
-        (Some(p), "translate") => p.translate.clone(),
-        (Some(p), "professionalPolish") => p.professional_polish.clone(),
-        (Some(p), "meetingSecretary") => p.meeting_secretary.clone(),
-        (Some(p), preset_name) => {
-            // 尝试从自定义预设中查找
-            p.custom_presets
-                .get(preset_name)
-                .cloned()
-                .unwrap_or_else(|| profile.user_prompt_custom.clone())
-        }
-        (None, _) => {
-            // 预设为空，使用 user_prompt_custom
-            profile.user_prompt_custom.clone()
+    // 确定提示词（优先级：custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
+    let user_prompt = if let Some(ref custom) = custom_prompt {
+        // 1. 场景自定义提示词优先
+        info!("[LLM] Using scene custom_prompt");
+        custom.clone()
+    } else {
+        // 2. 根据 prompt_type 查找预设
+        let effective_prompt_type = if prompt_type.is_empty() {
+            // 3. 默认使用 "lightPolish"
+            "lightPolish"
+        } else {
+            &prompt_type
+        };
+
+        match (&presets, effective_prompt_type) {
+            (Some(p), "lightPolish") => p.light_polish.clone(),
+            (Some(p), "translate") => p.translate.clone(),
+            (Some(p), "professionalPolish") => p.professional_polish.clone(),
+            (Some(p), "meetingSecretary") => p.meeting_secretary.clone(),
+            (Some(p), preset_name) => {
+                // 尝试从自定义预设中查找
+                p.custom_presets
+                    .get(preset_name)
+                    .cloned()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| {
+                        // 未找到预设，使用默认 lightPolish
+                        p.light_polish.clone()
+                    })
+            }
+            (None, _) => {
+                // 预设为空，使用占位符
+                "{{text}}".to_string()
+            }
         }
     };
 
-    info!("[LLM] User prompt type: {}", profile.user_prompt_type);
+    info!("[LLM] User prompt type: {}", if custom_prompt.is_some() { "custom" } else { &prompt_type });
     info!(
         "[LLM] User prompt template (with placeholder): {}",
         user_prompt
@@ -520,12 +558,12 @@ pub async fn llm_process_text_for_scene_with_progress(
             enabled: true,
             base_url: provider_instance.base_url.clone(),
             api_key: provider_instance.api_key.clone(),
-            model: profile.model.clone(),
+            model: llm_config.model.clone(),
             timeout_secs: 3600, // 60分钟，大文本处理需要足够时间
         },
         user_prompt_template: user_prompt.clone(),
-        max_tokens: profile.max_tokens,
-        temperature: profile.temperature,
+        max_tokens: llm_config.max_tokens,
+        temperature: llm_config.temperature,
     };
 
     info!(
@@ -581,7 +619,7 @@ pub async fn llm_process_text_for_scene_with_progress(
     // 记录开始时间
     let start_time = Instant::now();
     let text_len = text.len() as u32;
-    let model_id = profile.model.clone();
+    let model_id = llm_config.provider.model.clone();
 
     // 调用带进度的处理方法
     let result = tokio::time::timeout(

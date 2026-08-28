@@ -663,7 +663,10 @@ function App() {
       console.log(`${'─'.repeat(60)}`);
 
       // Step 1: Show "识别中" with spinner and progress info
-      const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
+      // 使用全局 ASR 模型配置
+      const fullModelId = config?.globalModelConfig?.asrModel
+        ? getFullModelId(config.globalModelConfig.asrModel)
+        : '';
       await showFloatPanelStatus('transcribing', sceneName, undefined, {
         modelId: fullModelId,
         device,
@@ -967,21 +970,20 @@ function App() {
 
       // 检查是否是内存不足错误
       if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
-        const scene = currentSceneRef.current;
-        if (scene) {
-          const model = config?.models?.find(m => m.id === scene.model?.modelId);
-          const modelName = model?.name || scene.model?.modelId || '';
-          const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
-          const requiredMemory = memoryMatch?.[1] || '未知';
-          const availableMemory = memoryMatch?.[2] || '未知';
+        // 使用全局 ASR 模型配置
+        const asrModelId = config?.globalModelConfig?.asrModel?.modelId || '';
+        const model = config?.models?.find(m => m.id === asrModelId);
+        const modelName = model?.name || asrModelId;
+        const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
+        const requiredMemory = memoryMatch?.[1] || '未知';
+        const availableMemory = memoryMatch?.[2] || '未知';
 
-          setMemoryError({
-            visible: true,
-            modelName,
-            requiredMemory,
-            availableMemory,
-          });
-        }
+        setMemoryError({
+          visible: true,
+          modelName,
+          requiredMemory,
+          availableMemory,
+        });
       }
 
       await hideFloatPanelStatus('workflow-error');
@@ -1020,14 +1022,17 @@ function App() {
       return;
     }
 
-    const fullModelId = scene.model?.modelId ? getFullModelId(scene.model) : '';
-    const model = config?.models?.find(m => m.id === scene.model?.modelId);
+    // 使用全局 ASR 模型配置
+    const fullModelId = config?.globalModelConfig?.asrModel
+      ? getFullModelId(config.globalModelConfig.asrModel)
+      : '';
+    const model = config?.models?.find(m => m.id === config?.globalModelConfig?.asrModel?.modelId);
 
     // Check if model is currently downloading
     if (downloadStates[fullModelId]?.downloading) {
       showToast({
         type: 'info',
-        title: t('toast.modelDownloading', { name: model?.name || scene.model?.modelId }),
+        title: t('toast.modelDownloading', { name: model?.name || config?.globalModelConfig?.asrModel?.modelId }),
       });
       isProcessingShortcutRef.current = false;
       return;
@@ -1037,8 +1042,8 @@ function App() {
     const modelDownloaded = await checkModelExists(fullModelId);
     if (!modelDownloaded) {
       // Show dialog asking user if they want to download
-      setPendingModelId(scene.model?.modelId ?? '');
-      setPendingModelName(model?.name || scene.model?.modelId || '');
+      setPendingModelId(config?.globalModelConfig?.asrModel?.modelId ?? '');
+      setPendingModelName(model?.name || config?.globalModelConfig?.asrModel?.modelId || '');
       setShowModelDialog(true);
       isProcessingShortcutRef.current = false;
       return;
