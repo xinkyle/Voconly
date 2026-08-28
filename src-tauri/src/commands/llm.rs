@@ -518,25 +518,36 @@ pub async fn llm_process_text_for_scene_with_progress(
             &prompt_type
         };
 
-        match (&presets, effective_prompt_type) {
-            (Some(p), "lightPolish") => p.light_polish.clone(),
-            (Some(p), "translate") => p.translate.clone(),
-            (Some(p), "professionalPolish") => p.professional_polish.clone(),
-            (Some(p), "meetingSecretary") => p.meeting_secretary.clone(),
-            (Some(p), preset_name) => {
+        match effective_prompt_type {
+            "lightPolish" => presets.as_ref()
+                .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "translate" => presets.as_ref()
+                .and_then(|p| if p.translate.is_empty() { None } else { Some(&p.translate) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "professionalPolish" => presets.as_ref()
+                .and_then(|p| if p.professional_polish.is_empty() { None } else { Some(&p.professional_polish) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            "meetingSecretary" => presets.as_ref()
+                .and_then(|p| if p.meeting_secretary.is_empty() { None } else { Some(&p.meeting_secretary) })
+                .cloned()
+                .unwrap_or_else(|| "{{text}}".to_string()),
+            preset_name => {
                 // 尝试从自定义预设中查找
-                p.custom_presets
-                    .get(preset_name)
+                presets.as_ref()
+                    .and_then(|p| p.custom_presets.get(preset_name))
                     .cloned()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| {
                         // 未找到预设，使用默认 lightPolish
-                        p.light_polish.clone()
+                        presets.as_ref()
+                            .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
+                            .cloned()
+                            .unwrap_or_else(|| "{{text}}".to_string())
                     })
-            }
-            (None, _) => {
-                // 预设为空，使用占位符
-                "{{text}}".to_string()
             }
         }
     };
