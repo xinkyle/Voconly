@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { emitTo, listen } from './utils/tauri';
-import type { AppConfig, Scene, FloatPanelState, HistoryRecord, LlmProfile, Model, LlmErrorPayload } from './types';
+import type { AppConfig, Scene, FloatPanelState, HistoryRecord, Model, LlmErrorPayload } from './types';
 import { getFullModelId } from './types';
 import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
-import HomePanel from './components/HomePanel';
+import HomePanelV2 from './components/HomePanelV2';
 import { SettingsShortcut, SettingsSystem, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
@@ -144,9 +144,6 @@ function App() {
     requiredMemory: '',
     availableMemory: '',
   });
-
-  // Trigger model selection from App.tsx (used when download fails and user wants to select other model)
-  const [triggerSelectModelSceneId, setTriggerSelectModelSceneId] = useState<string | null>(null);
 
   // Check microphone permission - called after tutorial is complete or if tutorial was already completed
   const checkMicPermission = useCallback(async () => {
@@ -1192,55 +1189,6 @@ function App() {
     await updateTrayMenu(scenes);
   };
 
-  // Handle LLM profile save - update local config state
-  const handleLlmProfileSave = (profile: LlmProfile) => {
-    if (!config) return;
-    log.debug(`LLM profile saved: ${JSON.stringify(profile, null, 2)}`);
-
-    // Update llm_profiles in config
-    const existingIndex = config.llmProfiles?.findIndex(p => p.sceneId === profile.sceneId) ?? -1;
-    let newProfiles: LlmProfile[];
-
-    if (existingIndex >= 0 && config.llmProfiles) {
-      // Update existing profile
-      newProfiles = [...config.llmProfiles];
-      newProfiles[existingIndex] = profile;
-    } else {
-      // Add new profile
-      newProfiles = [...(config.llmProfiles || []), profile];
-    }
-
-    const newConfig = { ...config, llmProfiles: newProfiles };
-    setConfig(newConfig);
-  };
-
-  // Handle models change - update local config state
-  const handleModelsChange = (models: Model[]) => {
-    if (!config) return;
-    const newConfig = { ...config, models };
-    setConfig(newConfig);
-  };
-
-  // Handle quantization preference change
-  const handleQuantPrefChange = useCallback(async (modelId: string, quant: string) => {
-    if (!config) return;
-
-    console.log(`[DEBUG handleQuantPrefChange] modelId=${modelId}, quant=${quant}`);
-    console.log(`[DEBUG handleQuantPrefChange] Current modelQuantPrefs:`, JSON.stringify(config.modelQuantPrefs));
-
-    const updatedPrefs = {
-      ...(config.modelQuantPrefs || {}),
-      [modelId]: quant,
-    };
-
-    console.log(`[DEBUG handleQuantPrefChange] Updated prefs:`, JSON.stringify(updatedPrefs));
-
-    const newConfig = { ...config, modelQuantPrefs: updatedPrefs };
-    setConfig(newConfig);
-    await saveConfig(newConfig);
-    log.debug(`Quant preference saved: ${modelId} -> ${quant}`);
-  }, [config]);
-
   if (loading) {
     return (
       <div className="h-screen flex overflow-hidden">
@@ -1497,45 +1445,30 @@ function App() {
             {activeNav === 'dictionary' && (
               <SettingsDictionary />
             )}
-            {/* Keep HomePanel always mounted to preserve state on tab switch */}
+            {/* Keep HomePanelV2 always mounted to preserve state on tab switch */}
             <div className={activeNav === 'home' ? '' : 'hidden'}>
-              <HomePanel
+              <HomePanelV2
                 scenes={config?.scenes || []}
-                models={config?.models || []}
+                globalModelConfig={config?.globalModelConfig}
                 llmProfiles={config?.llmProfiles || []}
-                modelLanguagePrefs={config?.modelLanguagePrefs || {}}
                 modelQuantPrefs={config?.modelQuantPrefs || {}}
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
                 onDownloadCancel={handleDownloadCancel}
-                onSave={handleSaveScenes}
-                onModelsChange={handleModelsChange}
-                onModelLanguagePrefsChange={(prefs) => {
-                  // 【修复】重新加载配置，确保使用最新的 scenes 数据
-                  // 原因：config 状态可能是旧的（React 状态更新是异步的）
-                  loadConfig()
-                    .then((latestConfig) => {
-                      const newConfig = { ...latestConfig, modelLanguagePrefs: prefs };
-                      setConfig(newConfig);
-                      saveConfig(newConfig);
-                    })
-                    .catch((err) => log.error(`Failed to reload config: ${err}`));
-                }}
-                onModelQuantPrefsChange={handleQuantPrefChange}
-                onLlmProfileSave={handleLlmProfileSave}
-                tutorialCompleted={config?.tutorialCompleted}
-                onTutorialComplete={async () => {
+                onGlobalModelConfigChange={(newGlobalConfig) => {
                   if (config) {
-                    const newConfig = { ...config, tutorialCompleted: true };
+                    const newConfig = { ...config, globalModelConfig: newGlobalConfig };
                     setConfig(newConfig);
-                    await saveConfig(newConfig);
-                    // After tutorial completes, check microphone permission
-                    checkMicPermission();
+                    saveConfig(newConfig);
                   }
                 }}
-                tryRegisterShortcut={registerShortcutWithResult}
-                triggerSelectModelSceneId={triggerSelectModelSceneId}
-                onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
+                onNavigateToSettings={() => {
+                  setActiveNav('settings');
+                  setSettingsTab('shortcut');
+                }}
+                onNavigateToLlmSettings={() => {
+                  setActiveNav('models');
+                }}
               />
             </div>
             {activeNav === 'memory' && (
@@ -1618,16 +1551,8 @@ function App() {
           if (model) handleDownload(model);
         }}
         onSelectOther={() => {
-          // Find the scene that uses this model and trigger model selection dialog
-          const scene = config?.scenes?.find(s => s.model?.modelId === downloadErrorInfo?.modelId);
-          if (scene) {
-            // Switch to home tab first, then trigger model selection
-            setActiveNav('home');
-            setTriggerSelectModelSceneId(scene.id);
-          } else {
-            // No scene uses this model, go to models tab
-            setActiveNav('models');
-          }
+          // Go to models tab to select a different model
+          setActiveNav('models');
         }}
         onClose={() => {
           setShowDownloadErrorDialog(false);

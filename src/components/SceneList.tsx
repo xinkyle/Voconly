@@ -636,7 +636,6 @@ export default function SceneList({
       {showForm && (
         <SceneForm
           scene={editingScene}
-          models={models}
           onSave={handleSave}
           onCancel={handleCancel}
           checkConflict={checkConflict}

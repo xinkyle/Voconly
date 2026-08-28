@@ -138,6 +138,7 @@
   "home": {
     "title": "场景配置",
     "subtitle": "管理您的语音输入场景和快捷键设置",
+    "subtitleV2": "配置 ASR 和 LLM 模型，管理场景设置",
     "shortcut": "快捷键",
     "shortcutConflict": "快捷键 \"{{shortcut}}\" 已绑定到场景 \"{{scene}}\"",
     "voiceModel": "语音模型",
@@ -158,13 +159,22 @@
     "llmConfig": "LLM 配置",
     "addMoreScenes": "添加更多场景",
     "goToSettings": "前往设置页面创建新的语音输入场景",
+    "goToSettingsToAdd": "前往设置页面添加场景",
     "tip": "同一模型在不同场景中复用，不会重复加载至内存。",
     "llmCacheHint": "本地大模型切换时，将自动卸载旧模型以释放内存，仅保留当前使用的模型。",
     "doubleTapHint": "双击快捷键直接输出语音转录原文，跳过 LLM（大模型）处理",
     "doubleTapHintCloseTip": "关闭后将不再提示",
     "clickToSwitchPrompt": "点击切换提示词",
     "selectPromptType": "选择提示词",
-    "promptTypeSwitched": "提示词已切换"
+    "promptTypeSwitched": "提示词已切换",
+    "asrModel": "ASR 模型",
+    "llmModel": "LLM 模型",
+    "scenes": "场景列表",
+    "noScenes": "暂无场景",
+    "clickToSelectAsr": "点击选择 ASR 模型",
+    "clickToConfigureLlm": "点击配置 LLM 模型",
+    "asrModelUpdated": "ASR 模型已更新",
+    "sceneSettings": "场景设置"
   },
   "scene": {
     "quickDesc": "适合快速输入，响应速度快",
@@ -416,6 +426,7 @@
     "idleTimeout": "空闲",
     "autoUnloadAfter": "后自动卸载",
     "enableScene": "启用此场景",
+    "promptTypeHint": "选择场景使用的提示词类型，将在 LLM 后处理时应用",
     "minutes": {
       "1": "1分钟",
       "3": "3分钟",
