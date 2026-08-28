@@ -5,6 +5,7 @@ import { getProviderList, saveProviderConfig } from '../services/llm';
 import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
+import LlamaCppConfigModal from './LlamaCppConfigModal';
 import { useToast } from './ui/Toast';
 
 const log = createLogger('ProviderPanel');
@@ -130,6 +131,7 @@ export default function ProviderPanel() {
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
   const [showProviderModal, setShowProviderModal] = useState(false);
+  const [showLlamaCppModal, setShowLlamaCppModal] = useState(false);
 
   // Load providers and global config
   useEffect(() => {
@@ -188,8 +190,13 @@ export default function ProviderPanel() {
   const handleProviderConfigure = (providerId: string) => {
     const provider = providers.find((p) => p.meta.id === providerId);
     if (provider) {
-      setSelectedProvider(provider);
-      setShowProviderModal(true);
+      if (providerId === 'llama_cpp') {
+        setSelectedProvider(provider);
+        setShowLlamaCppModal(true);
+      } else {
+        setSelectedProvider(provider);
+        setShowProviderModal(true);
+      }
     }
   };
 
@@ -262,6 +269,46 @@ export default function ProviderPanel() {
               type: 'success',
               title: t('modelConfig.providerSaved'),
               description: selectedProvider.meta.label,
+            });
+          }}
+        />
+      )}
+
+      {/* Llama.cpp Config Modal */}
+      {showLlamaCppModal && selectedProvider && (
+        <LlamaCppConfigModal
+          provider={selectedProvider}
+          onClose={() => {
+            setShowLlamaCppModal(false);
+            setSelectedProvider(null);
+          }}
+          onSave={async (providerId, modelId, instance) => {
+            // 保存 Provider 实例配置
+            await saveProviderConfig(providerId, instance);
+            // 更新全局模型配置
+            const config = await loadConfig();
+            const newConfig = {
+              ...config,
+              globalModelConfig: {
+                ...config.globalModelConfig,
+                llm: {
+                  ...config.globalModelConfig.llm,
+                  providerId,
+                  model: modelId,
+                },
+              },
+            };
+            await saveConfig(newConfig);
+            setGlobalModelConfig(newConfig.globalModelConfig);
+            // 刷新 Provider 列表
+            const list = await getProviderList();
+            setProviders(list);
+            setShowLlamaCppModal(false);
+            setSelectedProvider(null);
+            showToast({
+              type: 'success',
+              title: t('modelConfig.providerSaved'),
+              description: t('provider.llamaCppLabel'),
             });
           }}
         />

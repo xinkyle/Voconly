@@ -461,7 +461,7 @@ export default function ProviderConfigModal({
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {saving ? t('common.saving') : t('common.save')}
                   </button>
@@ -487,7 +487,7 @@ export default function ProviderConfigModal({
                   <button
                     onClick={handleSave}
                     disabled={saving || (!isLocalProvider && !selectedModel)}
-                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {saving ? t('common.saving') : t('provider.saveAndSelect')}
                   </button>
@@ -497,7 +497,7 @@ export default function ProviderConfigModal({
                   <button
                     onClick={handleSave}
                     disabled={saving || (!isLocalProvider && !selectedModel)}
-                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {saving ? t('common.saving') : t('common.save')}
                   </button>
