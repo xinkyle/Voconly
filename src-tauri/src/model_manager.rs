@@ -6,7 +6,7 @@ use std::time::Instant;
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
-use crate::config::{AppConfig, DownloadSource, Model};
+use crate::config::{AppConfig, DownloadSource, Model, ModelRef};
 use crate::presets::{scan_available_asr_models, get_base_model_id, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
 use crate::utils::extract_quant_suffix;
@@ -896,10 +896,13 @@ mod tests {
                 id: "1".to_string(),
                 name: "轻度润色".to_string(),
                 shortcut: "1".to_string(),
-                model_id: "sensevoice-small".to_string(),
+                model: ModelRef::new("sensevoice-small".to_string()),
+                model_id: None,
                 enabled: true,
                 load_strategy: LoadStrategy::Always,
                 auto_type: true,
+                prompt_type: "lightPolish".to_string(),
+                custom_prompt: None,
             }],
             auto_start: Some(false),
             default_microphone: None,
@@ -1060,10 +1063,13 @@ mod tests {
                 id: "1".to_string(),
                 name: "测试场景".to_string(),
                 shortcut: "1".to_string(),
-                model_id: "sensevoice-small".to_string(),
+                model: ModelRef::new("sensevoice-small".to_string()),
+                model_id: None,
                 enabled: true,
                 load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
                 auto_type: true,
+                prompt_type: "lightPolish".to_string(),
+                custom_prompt: None,
             }],
             auto_start: Some(false),
             default_microphone: None,
