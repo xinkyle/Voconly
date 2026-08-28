@@ -1,22 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type {
   AsrModelWithStatus,
   LlmModelWithStatus,
-  ModelPreset,
   LlmModelPreset,
-  QuantVariant,
 } from '../services/config';
-import type { Model, ProviderWithConfig, LlmProviderInstance } from '../types';
+import type { Model, ProviderWithConfig, LlmProviderInstance, GlobalModelConfig } from '../types';
 import {
   getAsrModelList,
   getLlmModelList,
   getCustomAsrModelDirs,
   addCustomAsrModelDir,
   removeCustomAsrModelDir,
-  QUANT_LABELS as QUANT_LABELS_MAP,
+  loadConfig,
+  saveConfig,
+  parseModelId,
 } from '../services/config';
 import { getProviderList, saveProviderConfig, deleteProviderConfig, detectGpu } from '../services/llm';
 import { createLogger } from '../services/log';
@@ -25,7 +25,8 @@ import { subscribeToDownloadComplete, cancelModelDownload } from '../services/do
 import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
 import { Info } from 'lucide-react';
-import { sortAsrModels } from './AsrModelSelectModal';
+import AsrModelList from './AsrModelList';
+import { getFullModelId } from '../types';
 
 const log = createLogger('ModelConfigPanel');
 
@@ -49,19 +50,6 @@ function getModelSize(model: AsrModelWithStatus | LlmModelWithStatus): string {
   }
   return '';
 }
-
-// Score bar component for model quality metrics
-const ScoreBar = ({ label, score, color = 'blue' }: { label: string; score: number; color?: 'blue' | 'green' }) => (
-  <div className="flex items-center gap-2">
-    <span className="text-[11px] text-gray-500 w-10 flex-shrink-0 text-right">{label}</span>
-    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden min-w-[72px]">
-      <div
-        className={`h-full rounded-full ${color === 'blue' ? 'bg-teal-600' : 'bg-amber-300'}`}
-        style={{ width: `${(score || 0) * 100}%` }}
-      />
-    </div>
-  </div>
-);
 
 // Provider logo mapping (meta.id -> icon file name)
 const PROVIDER_LOGO_MAP: Record<string, string> = {
@@ -91,130 +79,6 @@ const getProviderLogo = (providerId: string): string | null => {
   }
   return null;
 };
-
-// ASR model logo mapping (model id prefix -> icon file name)
-const ASR_MODEL_LOGO_MAP: Record<string, string> = {
-  'whisper': 'openai.png',      // OpenAI Whisper
-  'ggml-': 'openai.png',        // GGML 格式的 Whisper 模型（如 ggml-turbo.bin）
-  'qwen': 'qwen.png',           // Alibaba Qwen/SenseVoice 系列（qwen3-asr, sensevoice 等）
-  'nemotron': 'nvidia.svg',     // NVIDIA Nemotron
-  'parakeet': 'nvidia.svg',     // NVIDIA Parakeet
-  'sensevoice': 'qwen.png',     // Alibaba SenseVoice（兼容旧版命名）
-  'moonshine': 'custom.png',    // Moonshine
-  'cohere': 'cohere-logo.svg',
-};
-
-// 推荐模型配置（根据语言场景推荐）
-// 中文场景推荐：Qwen3-ASR（中英混合）、SenseVoice（中文优）
-const ZH_RECOMMENDED_MODELS: Set<string> = new Set([
-  'Qwen3-ASR-1.7B',
-  'qwen3-asr-1.7b',
-  'sensevoice-small',
-  'SenseVoice-Small',
-]);
-// 英文场景推荐：Parakeet Unified EN、Cohere Transcribe
-const EN_RECOMMENDED_MODELS: Set<string> = new Set([
-  'parakeet-unified-en-0.6b',
-  'Parakeet-Unified-EN-0.6B',
-  'cohere-transcribe-03-2026',
-  'Cohere-Transcribe-03-2026',
-]);
-
-// Get ASR model logo path based on model id
-const getAsrModelLogo = (modelId: string): string => {
-  const lowerModelId = modelId.toLowerCase();
-  for (const [prefix, logoFile] of Object.entries(ASR_MODEL_LOGO_MAP)) {
-    if (lowerModelId.startsWith(prefix.toLowerCase())) {
-      return `/icons/${logoFile}`;
-    }
-  }
-  // 默认图标
-  return '/icons/custom.png';
-};
-
-// Default ASR models with descriptions
-const DEFAULT_ASR_MODELS: (ModelPreset & { descriptionKey: string })[] = [
-  {
-    id: 'whisper-tiny',
-    name: 'Whisper Tiny',
-    size: '75MB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperTiny',
-  },
-  {
-    id: 'whisper-base',
-    name: 'Whisper Base',
-    size: '142MB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperBase',
-  },
-  {
-    id: 'whisper-small',
-    name: 'Whisper Small',
-    size: '244MB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperSmall',
-  },
-  {
-    id: 'whisper-medium',
-    name: 'Whisper Medium',
-    size: '1.5GB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperMedium',
-  },
-  {
-    id: 'whisper-large',
-    name: 'Whisper Large',
-    size: '2.9GB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperLarge',
-  },
-  {
-    id: 'whisper-turbo',
-    name: 'Whisper Turbo',
-    size: '1.6GB',
-    modelType: 'asr',
-    backend: 'Whisper',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.whisperTurbo',
-  },
-  {
-    id: 'sensevoice-small',
-    name: 'SenseVoice Small',
-    size: '229MB',
-    modelType: 'asr',
-    backend: 'Onnx',
-    languages: ['zh', 'zh-yue', 'en', 'ja', 'ko'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.sensevoiceSmall',
-  },
-  {
-    id: 'parakeet-v3',
-    name: 'Parakeet V3',
-    size: '640MB',
-    modelType: 'asr',
-    backend: 'Onnx',
-    languages: ['zh', 'en'],
-    downloadUrls: [],
-    descriptionKey: 'models.descriptions.parakeetV3',
-  },
-];
 
 // Default LLM models
 const DEFAULT_LLM_MODELS: (LlmModelPreset & { descriptionKey: string })[] = [
@@ -261,276 +125,6 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
   </svg>
 );
-
-// Helper function to format bytes
-const formatBytes = (bytes: number): string => {
-  if (bytes >= 1024 * 1024 * 1024) {
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`;
-  } else if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(0)}MB`;
-  } else {
-    return `${(bytes / 1024).toFixed(0)}KB`;
-  }
-};
-
-// ASR Model Card Component
-interface AsrModelCardProps {
-  model: AsrModelWithStatus;
-  onDownload: () => void;
-  onCancelDownload: (quant?: string) => void;  // 取消下载，可选指定量化版本
-  t: (key: string) => string;
-  currentLanguage: string;  // 当前系统语言
-  quantVariants?: QuantVariant[];  // 可用的量化版本列表（从 catalog 获取）
-  onDownloadWithQuant?: (variant: QuantVariant) => void;  // 选择量化版本后下载
-  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>; // 各版本的下载状态
-}
-
-function AsrModelCard({
-  model,
-  onDownload,
-  onCancelDownload,
-  t,
-  currentLanguage,
-  quantVariants,
-  onDownloadWithQuant,
-  downloadStates,
-}: AsrModelCardProps) {
-  const isDownloaded = model.downloaded;
-  const knownModel = DEFAULT_ASR_MODELS.find((m) => m.id === model.preset.id);
-  const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
-  const logoPath = getAsrModelLogo(model.preset.id);
-
-  // 获取已下载版本
-  const downloadedQuants = model.downloadedQuants || model.preset.downloadedQuants || [];
-
-  // 合并版本信息：已下载的 + catalog 中的
-  const hasMultipleQuantVariants = quantVariants && quantVariants.length > 1;
-
-  // 量化版本面板展开状态（默认收起）
-  const [showQuantPanel, setShowQuantPanel] = useState(false);
-
-  // 根据当前语言决定是否显示推荐徽章
-  const shouldShowRecommendation = (): boolean => {
-    const isZhLanguage = currentLanguage.startsWith('zh');
-    if (isZhLanguage) {
-      return ZH_RECOMMENDED_MODELS.has(model.preset.id);
-    } else {
-      return EN_RECOMMENDED_MODELS.has(model.preset.id);
-    }
-  };
-  const showRecommendation = shouldShowRecommendation();
-
-  // 计算已下载版本的总大小
-  const totalDownloadedSize = downloadedQuants.reduce((sum, quant) => {
-    const variant = quantVariants?.find(v => v.quant === quant);
-    return sum + (variant?.sizeBytes || 0);
-  }, 0);
-
-  return (
-    <div
-      onClick={() => {
-        if (hasMultipleQuantVariants || isDownloaded) {
-          // 有多个量化版本或已下载：展开/收起量化面板
-          setShowQuantPanel(!showQuantPanel);
-        }
-      }}
-      className={`group relative rounded-xl border transition-all duration-200 ${
-        hasMultipleQuantVariants || isDownloaded
-          ? 'cursor-pointer'
-          : ''
-      } ${
-        isDownloaded
-          ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
-          : 'border-gray-200 bg-white'
-      }`}
-    >
-      <div className="relative px-3 py-2 z-10">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
-            {/* ASR Model Logo */}
-            {logoPath && (
-              <img
-                src={logoPath}
-                alt={model.preset.name}
-                className="w-5 h-5 object-contain flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              {/* Model Name with recommendation badge */}
-              <div className="flex items-center gap-2 text-gray-800">
-                <h3 className="font-semibold text-sm truncate">
-                  {model.preset.name}
-                  {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
-                </h3>
-                {/* Recommendation badge */}
-                {showRecommendation && (
-                  <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-600 text-white">
-                    推荐
-                  </span>
-                )}
-              </div>
-              {/* Description */}
-              <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
-              {/* Accuracy and Speed Scores */}
-              {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
-                <div className="flex items-center gap-4 mt-2">
-                  {model.preset.accuracyScore !== undefined && (
-                    <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
-                  )}
-                  {model.preset.speedScore !== undefined && (
-                    <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Status/Action */}
-          <div className="relative flex-shrink-0 z-10 min-w-[72px] text-right">
-            {isDownloaded ? (
-              // 已下载模型：显示已下载版本状态
-              <div className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg">
-                <span className="text-gray-500">
-                  {downloadedQuants.length > 0
-                    ? `${t('models.downloaded')} ${downloadedQuants.length}`
-                    : t('models.downloaded')}
-                </span>
-                {(hasMultipleQuantVariants || downloadedQuants.length > 0) && (
-                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
-                )}
-              </div>
-            ) : (
-              // 未下载：显示下载按钮
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (hasMultipleQuantVariants) {
-                    // 有多个版本：展开/收起量化面板
-                    setShowQuantPanel(!showQuantPanel);
-                  } else {
-                    // 只有一个版本：直接下载
-                    onDownload();
-                  }
-                }}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors hover:bg-gray-100 ${
-                  hasMultipleQuantVariants ? 'text-blue-600' : 'text-gray-400'
-                }`}
-              >
-                <DownloadIcon className="w-4 h-4" />
-                <span>{t('models.download')}</span>
-                {hasMultipleQuantVariants && (
-                  <span className="text-gray-400">{showQuantPanel ? '▲' : '▼'}</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 量化版本面板 - 有多个量化版本的模型，点击下载按钮后展开 */}
-        {showQuantPanel && hasMultipleQuantVariants && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="text-xs text-gray-500 mb-2">{t('models.quantVersions')}:</div>
-            <div className="space-y-1.5">
-              {quantVariants?.map((variant) => {
-                const isDownloadedVariant = downloadedQuants.includes(variant.quant);
-                const variantKey = `${model.preset.id}-${variant.quant}`;
-                const variantDownloadState = downloadStates?.[variantKey];
-                const isVariantDownloading = variantDownloadState?.downloading ?? false;
-                const variantProgress = variantDownloadState?.progress;
-
-                // 检查当前下载数量是否已达上限（最多 5 个）
-                const currentDownloadCount = Object.values(downloadStates || {}).filter(
-                  state => state.downloading
-                ).length;
-                const canStartDownload = currentDownloadCount < 5 || isVariantDownloading;
-
-                return (
-                  <div
-                    key={variant.quant}
-                    className={`relative flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                      isVariantDownloading ? '' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {/* Item progress background */}
-                    {isVariantDownloading && (
-                      <div className="absolute inset-0 overflow-hidden rounded-lg">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
-                          style={{ width: `${variantProgress?.percentage ?? 0}%` }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="relative flex items-center gap-2 z-10">
-                      {/* Display precision label with size in parentheses */}
-                      <span className="font-medium text-gray-700">
-                        {QUANT_LABELS_MAP[variant.quant]
-                          ? t(`models.quantLabels.${QUANT_LABELS_MAP[variant.quant]}`)
-                          : variant.quant}
-                        <span className="text-gray-400 font-normal ml-0.5">({formatBytes(variant.sizeBytes)})</span>
-                      </span>
-                      {variant.isRecommended && (
-                        <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
-                          {t('models.recommended')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative flex items-center gap-2 z-10">
-                      {isVariantDownloading ? (
-                        // 下载中：显示进度和取消按钮
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-blue-600">{variantProgress?.percentage || 0}%</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCancelDownload(variant.quant);  // 只取消当前版本
-                            }}
-                            className="text-xs text-red-500 hover:text-red-600 underline"
-                          >
-                            {t('models.cancel')}
-                          </button>
-                        </div>
-                      ) : isDownloadedVariant ? (
-                        <span className="text-emerald-600 font-medium">{t('models.downloaded')}</span>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!canStartDownload) {
-                              return; // 超过下载数量限制
-                            }
-                            if (onDownloadWithQuant) {
-                              onDownloadWithQuant(variant);
-                            }
-                          }}
-                          className={`px-2 py-0.5 rounded transition-colors ${
-                            canStartDownload
-                              ? 'text-blue-600 hover:bg-blue-50'
-                              : 'text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
-                          {t('models.download')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {/* 已下载版本统计 */}
-            {downloadedQuants.length > 0 && (
-              <div className="mt-2 text-xs text-gray-400">
-                {t('models.downloadedCount')}: {downloadedQuants.length},
-                {t('models.totalSize')}: {formatBytes(totalDownloadedSize)}
-              </div>
-            )}
-          </div>
-        )}
-
-              </div>
-    </div>
-  );
-}
 
 // LLM Model Card Component
 interface LlmModelCardProps {
@@ -699,6 +293,7 @@ export default function ModelConfigPanel({
   const [llmModels, setLlmModels] = useState<LlmModelWithStatus[]>([]);
   const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
   const [customDirs, setCustomDirs] = useState<string[]>([]);
+  const [globalModelConfig, setGlobalModelConfig] = useState<GlobalModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -709,16 +304,18 @@ export default function ModelConfigPanel({
     const loadData = async () => {
       setLoading(true);
       try {
-        const [asrResult, llmResult, providerResult, customDirsResult] = await Promise.all([
+        const [asrResult, llmResult, providerResult, customDirsResult, configResult] = await Promise.all([
           getAsrModelList(),
           getLlmModelList(),
           getProviderList(),
           getCustomAsrModelDirs(),
+          loadConfig(),
         ]);
         setAsrModels(asrResult);
         setLlmModels(llmResult);
         setProviders(providerResult);
         setCustomDirs(customDirsResult);
+        setGlobalModelConfig(configResult.globalModelConfig || null);
         log.info(
           `Loaded ${asrResult.length} ASR models, ${llmResult.length} LLM models, ${providerResult.length} providers, ${customDirsResult.length} custom dirs`
         );
@@ -802,23 +399,51 @@ export default function ModelConfigPanel({
   }, []);
 
   // Handlers
-  const handleAsrDownload = (model: AsrModelWithStatus) => {
-    if (onDownload) {
-      // Build a Model object from AsrModelWithStatus
-      const modelObj: Model = {
-        id: model.preset.id,
-        name: model.preset.name,
-        backend: model.preset.backend || 'Whisper',
-        size: model.preset.size,
-        downloaded: model.downloaded,
-        downloadUrls: model.preset.downloadUrls || [],
-        languages: model.preset.languages || [],
-        description: model.preset.description,
-        modelType: 'asr',
-      };
-      onDownload(modelObj);
+  // Handle ASR model selection
+  const handleAsrModelSelect = useCallback(async (modelId: string) => {
+    if (!modelId) {
+      return;
     }
-  };
+
+    const { baseId, quant } = parseModelId(modelId);
+    const newConfig: GlobalModelConfig = {
+      asrModel: {
+        modelId: baseId,
+        quantization: quant,
+      },
+      llm: globalModelConfig?.llm || {
+        providerId: '',
+        model: '',
+        maxTokens: 1024,
+        temperature: 0.3,
+      },
+    };
+
+    // Save config
+    try {
+      const config = await loadConfig();
+      await saveConfig({
+        ...config,
+        globalModelConfig: newConfig,
+      });
+
+      setGlobalModelConfig(newConfig);
+      onConfigUpdate?.();
+
+      showToast({
+        type: 'success',
+        title: t('common.saved'),
+        description: t('home.asrModelUpdated'),
+      });
+    } catch (err) {
+      log.error(`Failed to save ASR model: ${err}`);
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: String(err),
+      });
+    }
+  }, [globalModelConfig, onConfigUpdate, showToast, t]);
 
   const handleLlmDownload = (model: LlmModelWithStatus) => {
     if (onDownload) {
@@ -1020,61 +645,24 @@ export default function ModelConfigPanel({
           </div>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5">
           {/* Warning for no ASR */}
           {!hasDownloadedAsr && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
               <p className="text-sm text-amber-800">{t('modelConfig.asrRequired')}</p>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {sortAsrModels(asrModels, currentLanguage).map((model) => {
-              const quantVariants = model.quantVariants || [];
-
-              return (
-              <AsrModelCard
-                key={model.preset.id}
-                model={model}
-                onDownload={() => handleAsrDownload(model)}
-                onCancelDownload={(quant) => {
-                  if (quant) {
-                    // 取消特定量化版本的下载
-                    handleDownloadCancel(`${model.preset.id}-${quant}`);
-                  } else {
-                    // 取消所有下载（向后兼容）
-                    quantVariants.forEach(v => {
-                      handleDownloadCancel(`${model.preset.id}-${v.quant}`);
-                    });
-                    handleDownloadCancel(model.preset.id);
-                  }
-                }}
-                t={t}
-                currentLanguage={currentLanguage}
-                quantVariants={quantVariants}
-                downloadStates={downloadStates}
-                onDownloadWithQuant={(variant) => {
-                  // 根据选择的量化版本更新下载 URL
-                  const modelObj: Model = {
-                    id: `${model.preset.id}-${variant.quant}`,
-                    name: `${model.preset.name} (${variant.quant})`,
-                    backend: model.preset.backend || 'Whisper',
-                    size: model.preset.size,
-                    downloaded: model.downloaded,
-                    downloadUrls: model.preset.downloadUrls.map(url => ({
-                      ...url,
-                      url: url.url.substring(0, url.url.lastIndexOf('/') + 1) + variant.filename,
-                    })),
-                    languages: model.preset.languages || [],
-                    description: model.preset.description,
-                    modelType: 'asr',
-                  };
-                  onDownload?.(modelObj);
-                }}
-              />
-              );
-            })}
-          </div>
+          <AsrModelList
+            models={asrModels}
+            selectedModelId={globalModelConfig?.asrModel ? getFullModelId(globalModelConfig.asrModel) : ''}
+            onSelect={handleAsrModelSelect}
+            downloadStates={downloadStates}
+            onDownload={onDownload}
+            onDownloadCancel={onDownloadCancel}
+            currentLanguage={currentLanguage}
+            layout="grid"
+          />
         </div>
       </section>
 
