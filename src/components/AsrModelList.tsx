@@ -393,9 +393,7 @@ export default function AsrModelList({
             } ${
               isSelected
                 ? 'border-gray-700 bg-gray-100'
-                : isDefaultQuantDownloaded
-                  ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                  : 'border-gray-200 bg-white hover:border-gray-200'
+                : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
             {/* Progress background */}
@@ -478,14 +476,14 @@ export default function AsrModelList({
                       )}
                     </div>
                   ) : isSelected ? (
-                    // Selected: show "已选中"
+                    // Selected: show checkmark only
                     <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-gray-100">
-                      <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-gray-700">
-                        {selectedQuant
-                          ? `${t('sceneList.selected')} ${QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}`
-                          : t('sceneList.selected')}
-                      </span>
+                      <CheckIcon className="w-3.5 h-3.5 text-gray-700" />
+                      {selectedQuant && (
+                        <span className="text-gray-600">
+                          {QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}
+                        </span>
+                      )}
                       {hasMultipleQuantVariants && (
                         <span className="text-gray-400 text-[10px]">{isExpanded ? '▲' : '▼'}</span>
                       )}

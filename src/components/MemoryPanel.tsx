@@ -142,8 +142,8 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-semibold text-gray-900">{t('memory.title')}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('memory.title')}</h1>
           <button
             onClick={() => records.length > 0 && setShowClearConfirm(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"

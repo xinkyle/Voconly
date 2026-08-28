@@ -9,7 +9,7 @@ import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
 import HomePanelV2 from './components/HomePanelV2';
 import ProviderPanel from './components/ProviderPanel';
-import { SettingsShortcut, SettingsSystem, SettingsAbout, SettingsDictionary } from './components/settings';
+import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
 import { loadConfig, saveConfig } from './services/config';
@@ -108,7 +108,7 @@ const navItems: NavItem[] = [
   { id: 'settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
 ];
 
-type SettingsTab = 'shortcut' | 'system' | 'about';
+type SettingsTab = 'shortcut' | 'prompt' | 'system' | 'about';
 
 function App() {
   const { t } = useTranslation();
@@ -1299,6 +1299,7 @@ function App() {
   const renderSettingsTabs = () => {
     const tabs: { id: SettingsTab; labelKey: string }[] = [
       { id: 'shortcut', labelKey: 'settings.tabs.shortcut' },
+      { id: 'prompt', labelKey: 'settings.tabs.prompt' },
       { id: 'system', labelKey: 'settings.tabs.system' },
       { id: 'about', labelKey: 'settings.tabs.about' },
     ];
@@ -1400,7 +1401,7 @@ function App() {
           )}
 
           {/* Content Area - 可滚动区域 */}
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="flex-1 overflow-y-auto py-8 px-16">
             {activeNav === 'models' && (
               <ModelConfigPanel
                 downloadStates={downloadStates}
@@ -1435,6 +1436,9 @@ function App() {
                   });
                 }}
               />
+            )}
+            {activeNav === 'settings' && settingsTab === 'prompt' && (
+              <SettingsPrompt />
             )}
             {activeNav === 'settings' && settingsTab === 'system' && config && (
               <SettingsSystem

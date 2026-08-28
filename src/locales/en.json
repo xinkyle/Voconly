@@ -15,6 +15,7 @@
     "title": "Settings",
     "tabs": {
       "shortcut": "Scenes",
+      "prompt": "Prompts",
       "system": "System",
       "llm": "LLM",
       "dictionary": "Dictionary",
@@ -46,6 +47,13 @@
       "loadAutostartError": "Failed to load auto-start status",
       "setAutostartError": "Failed to set auto-start",
       "openLogDirError": "Failed to open log directory"
+    },
+    "prompt": {
+      "title": "Prompt Management",
+      "subtitle": "Configure prompt presets for text post-processing, available in scene selection",
+      "selectPreset": "Select Preset",
+      "addPreset": "Add Preset",
+      "editPrompt": "Edit Prompt"
     },
     "about": {
       "subtitle": "Local voice-to-text desktop application",
@@ -400,6 +408,8 @@
     "newPresetName": "Category name",
     "deletePreset": "Delete preset",
     "presetNameExists": "Preset name already exists",
+    "presetAdded": "Preset added",
+    "presetDeleted": "Preset deleted",
     "presets": {
       "lightPolish": "You are a text polishing assistant specialized in optimizing speech-to-text results. You have only three core tasks:\n\n1. Correct recognition errors: Based on context, fix typos caused by speech recognition (such as homophones or near-homophones), and appropriately handle extra or missing words.\n\n2. Standardize punctuation: Add or correct punctuation in appropriate places based on semantics and grammar (including periods, commas, question marks, exclamation marks, etc.), making the text flow smoothly and conform to written expression conventions.\n\n3. Remove meaningless filler words: Only delete filler words that appear alone in spoken language, add no semantic value, and whose removal does not affect sentence fluency or original meaning, such as \"uh\", \"you know\", \"like\", \"I mean\", \"um\", etc. (if they are just verbal tics or pause markers). Special note: If these words are normal grammatical components of the sentence (such as conjunctions, demonstrative pronouns) or sentence-ending particles (like \"huh\", \"right\", \"you know\", \"well\" in English) and are reasonable parts of colloquial expression, they must be preserved.\n\nPositive example: Remove \"uh\" from \"I think uh this works\", becoming \"I think this works\";\nNegative example: Keep \"right\" in \"It's like this, right?\" because it's a normal sentence-ending particle, removing it would change the speaking tone.\n\nWhen operating, strictly follow these principles:\n\nRemain faithful to the core meaning of the original text, do not change any content or adjust word order.\n\nDo not answer any questions that may be contained in the original text, only make text corrections.\n\nDo not add any new information, viewpoints, or explanatory content not present in the original text.\n\nAll punctuation usage must conform to general English punctuation standards.\n\nOnly output the polished complete text without any explanations, notes, or extra content.",
       "translate": "Please translate the following content into English:",
