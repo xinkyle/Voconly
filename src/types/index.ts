@@ -146,10 +146,13 @@ export interface AppConfig {
   modelQuantPrefs?: Record<string, string>;
 
   scenes: Scene[];
-  llm?: LlmConfig;  // LLM 后处理配置
-  llmProvider?: LlmProviderConfig;  // LLM 全局 Provider 配置
+  /** @deprecated 已迁移到 globalModelConfig.llm */
+  llm?: LlmConfig;
+  /** @deprecated 已迁移到 globalModelConfig.llm + llmProviders */
+  llmProvider?: LlmProviderConfig;
   llmProviders?: Record<string, LlmProviderInstance>;  // 已配置的 Provider 实例
-  llmProfiles?: LlmProfile[];  // LLM 场景级 Profile 列表
+  /** @deprecated 已迁移到 Scene.promptType 和 Scene.customPrompt */
+  llmProfiles?: LlmProfile[];
   llmPromptPresets?: UserPromptPresets;  // 提示词预设（单一存储）
   autoStart?: boolean;          // 开机自启
   defaultMicrophone?: string;   // 默认麦克风设备ID
