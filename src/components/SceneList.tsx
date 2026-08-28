@@ -78,7 +78,7 @@ function ToggleSwitch({
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
         disabled
           ? 'bg-gray-300 cursor-not-allowed opacity-60'
-          : checked ? 'bg-gray-900' : 'bg-gray-200'
+          : checked ? 'bg-gray-700' : 'bg-gray-200'
       }`}
     >
       <span
@@ -481,7 +481,7 @@ export default function SceneList({
         <h2 className="text-base font-semibold text-gray-900">{t('sceneList.title')}</h2>
         <button
           onClick={handleAdd}
-          className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-all duration-200 active:scale-95"
+          className="px-4 py-2 text-sm font-medium text-white bg-gray-700 hover:bg-gray-800 rounded-lg transition-all duration-200 active:scale-95"
         >
           {t('sceneList.addScene')}
         </button>

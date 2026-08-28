@@ -268,7 +268,7 @@ function ProviderCard({ provider, selected, onClick, onEdit }: ProviderCardProps
           ? (selected ? 'pr-12' : 'pr-8')
           : ''
       }`}>
-        {provider.meta.id === 'llama_cpp' ? 'Llama.cpp (本地模型专用)' : provider.meta.label}
+        {provider.meta.id === 'llama_cpp' ? 'Llama.cpp (本地大语言模型专用)' : provider.meta.label}
       </div>
 
       {/* Description - only for unconfigured providers */}

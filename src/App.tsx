@@ -1304,7 +1304,7 @@ function App() {
     ];
 
     return (
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center mb-4">
         <div className="inline-flex bg-gray-100/80 p-1 rounded-xl">
           {tabs.map((tab) => (
             <button
@@ -1394,7 +1394,7 @@ function App() {
         <main className="flex-1 overflow-hidden flex flex-col">
           {/* Settings Tabs */}
           {activeNav === 'settings' && (
-            <div className="flex justify-center pt-8 pb-4">
+            <div className="flex justify-center pt-8 pb-2">
               {renderSettingsTabs()}
             </div>
           )}
@@ -1483,7 +1483,7 @@ function App() {
                   setSettingsTab('shortcut');
                 }}
                 onNavigateToLlmSettings={() => {
-                  setActiveNav('models');
+                  setActiveNav('provider');
                 }}
                 tryRegisterShortcut={registerShortcutWithResult}
                 triggerSelectModelSceneId={triggerSelectModelSceneId}

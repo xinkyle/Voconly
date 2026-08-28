@@ -192,8 +192,8 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
           <button
             onClick={() => handleAutostartToggle(!autostartEnabled)}
             disabled={saving}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 ${
-              autostartEnabled ? 'bg-gray-900' : 'bg-gray-200'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 ${
+              autostartEnabled ? 'bg-gray-700' : 'bg-gray-200'
             } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span
@@ -244,8 +244,8 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
           </div>
           <button
             onClick={() => handleCheckUpdatesToggle(!checkUpdates)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 ${
-              checkUpdates ? 'bg-gray-900' : 'bg-gray-200'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 ${
+              checkUpdates ? 'bg-gray-700' : 'bg-gray-200'
             } cursor-pointer`}
           >
             <span

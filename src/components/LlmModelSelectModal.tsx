@@ -239,7 +239,7 @@ export default function LlmModelSelectModal({
                           </h3>
                           {/* Recommendation badge */}
                           {model.preset.recommended && (
-                            <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600 text-white">
+                            <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-500 text-white">
                               {t('models.recommended')}
                             </span>
                           )}

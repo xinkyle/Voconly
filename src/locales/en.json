@@ -5,8 +5,8 @@
   },
   "nav": {
     "home": "Home",
-    "memory": "History",
-    "models": "Models",
+    "memory": "History Records",
+    "models": "Local Models",
     "provider": "AI Services",
     "dictionary": "Dictionary",
     "settings": "Settings"
@@ -146,7 +146,7 @@
     "clickToChangeShortcut": "Click to change shortcut",
     "clickToSwitchModel": "Click to switch model",
     "clickToDownload": "Click to download",
-    "noModelSelected": "Please download a model first",
+    "noModelSelected": "Configure AI Service",
     "clickToSelect": "Click to select model",
     "selectModelFirst": "Please select and download a voice model first",
     "pressAnyKey": "Press...",
@@ -193,7 +193,8 @@
     }
   },
   "memory": {
-    "title": "History",
+    "title": "History Records",
+    "subtitle": "View your voice recognition history",
     "clear": "Clear",
     "totalDuration": "Recording Duration",
     "totalDurationDesc": "Total duration",
@@ -241,6 +242,7 @@
     "cloudTitle": "Cloud Provider Configuration",
     "cloudSubtitle": "Use cloud APIs for speech recognition or text processing",
     "providerSaved": "Provider configuration saved",
+    "providerSelected": "Selected",
     "providerDeleted": "Provider configuration deleted",
     "importCustomDir": "Import Folder",
     "importCustomDirTitle": "Select ASR Model Folder",
@@ -346,7 +348,7 @@
     "savedModelHint": "Saved",
     "connectionFailedHint": "Service unavailable",
     "savedModelDesc": "Click 'Test Connection' to refresh model list",
-    "llamaCppLabel": "Llama.cpp (Local Models)",
+    "llamaCppLabel": "Llama.cpp (Local LLM)",
     "contextLimit": "Context Length",
     "contextLimitDesc": "Model context window size, affects max text length (default 4096)"
   },

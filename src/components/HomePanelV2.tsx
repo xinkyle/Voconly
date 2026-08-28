@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Scene, GlobalModelConfig } from '../types';
+import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
@@ -8,7 +8,7 @@ import { translateSceneName } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
-import { getLlmPromptPresets } from '../services/llm';
+import { getProviderList, getLlmPromptPresets } from '../services/llm';
 import AsrModelSelectModal from './AsrModelSelectModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
 import { useToast } from './ui/Toast';
@@ -186,6 +186,7 @@ export default function HomePanelV2({
   const { showToast } = useToast();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
+  const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
   const [selectingSceneId, setSelectingSceneId] = useState<string | null>(null);
   const [stats, setStats] = useState<FullStats>({
     totalDuration: 0,
@@ -252,6 +253,20 @@ export default function HomePanelV2({
       }
     };
     loadAsrModels();
+  }, []);
+
+  // 加载 Provider 列表
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const result = await getProviderList();
+        setProviders(result);
+        log.info(`Loaded ${result.length} providers`);
+      } catch (err) {
+        log.error(`Failed to load providers: ${err}`);
+      }
+    };
+    loadProviders();
   }, []);
 
   // 下载完成后重新加载模型列表
@@ -495,8 +510,15 @@ export default function HomePanelV2({
 
   // 获取全局 LLM 配置信息
   const llmConfig = globalModelConfig?.llm;
-  const llmModelName = llmConfig?.model || t('home.noModelSelected');
-  const hasLlmConfig = llmConfig?.providerId && llmConfig?.model;
+  const currentProvider = providers.find(p => p.meta.id === llmConfig?.providerId);
+
+  // 优先显示 model，其次显示 provider 名称，都没有则提示配置
+  const llmModelName = llmConfig?.model
+    || (currentProvider ? currentProvider.meta.label : null)
+    || t('home.noModelSelected');
+
+  // 有 providerId 就算配置了
+  const hasLlmConfig = !!llmConfig?.providerId;
 
   const enabledScenes = localScenes.filter(s => s.enabled);
 
@@ -659,7 +681,7 @@ export default function HomePanelV2({
                 <LlmIcon className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">大语言模型</div>
+                <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">AI 文本处理</div>
                 <div className="text-[15px] font-semibold text-gray-900 truncate mb-1.5">{llmModelName}</div>
                 {/* 占位元素，保持与ASR卡片对齐 */}
                 <div className="h-[22px]" />

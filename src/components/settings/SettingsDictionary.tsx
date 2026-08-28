@@ -177,8 +177,8 @@ export default function SettingsDictionary() {
           </div>
           <button
             onClick={handleToggleEnabled}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 ${
-              enabled ? 'bg-gray-900' : 'bg-gray-200'
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 ${
+              enabled ? 'bg-gray-700' : 'bg-gray-200'
             } cursor-pointer`}
           >
             <span

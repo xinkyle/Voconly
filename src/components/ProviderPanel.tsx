@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProviderWithConfig } from '../types';
+import type { ProviderWithConfig, GlobalModelConfig } from '../types';
 import { getProviderList, saveProviderConfig, deleteProviderConfig } from '../services/llm';
+import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
@@ -47,21 +48,23 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 // Cloud Provider Card Component
 interface CloudProviderCardProps {
   provider: ProviderWithConfig;
+  isSelected: boolean;
+  onSelect: () => void;
   onConfigure: () => void;
   onEdit: () => void;
   t: (key: string) => string;
 }
 
-function CloudProviderCard({ provider, onConfigure, onEdit, t }: CloudProviderCardProps) {
+function CloudProviderCard({ provider, isSelected, onSelect, onConfigure, onEdit, t }: CloudProviderCardProps) {
   const isConfigured = provider.instance?.enabled ?? false;
   const logoPath = getProviderLogo(provider.meta.id);
 
   return (
     <div
-      onClick={onConfigure}
+      onClick={onSelect}
       className={`group relative rounded-xl border transition-all duration-200 cursor-pointer ${
-        isConfigured
-          ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-300'
+        isSelected
+          ? 'border-gray-700 bg-gray-100'
           : 'border-gray-200 bg-white hover:border-gray-300'
       }`}
     >
@@ -86,16 +89,10 @@ function CloudProviderCard({ provider, onConfigure, onEdit, t }: CloudProviderCa
           <div className="flex-shrink-0">
             {isConfigured ? (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 hover:bg-emerald-200 transition-colors"
-                >
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-700 text-white text-xs rounded-full">
                   <CheckIcon className="w-3 h-3" />
-                  <span className="text-xs font-medium">{t('models.configured')}</span>
-                </button>
+                  <span>{t('models.configured')}</span>
+                </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -110,9 +107,15 @@ function CloudProviderCard({ provider, onConfigure, onEdit, t }: CloudProviderCa
                 </button>
               </div>
             ) : (
-              <div className="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg group-hover:bg-amber-100 transition-colors">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onConfigure();
+                }}
+                className="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              >
                 {t('models.setup')}
-              </div>
+              </button>
             )}
           </div>
         </div>
@@ -125,27 +128,65 @@ export default function ProviderPanel() {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
+  const [globalModelConfig, setGlobalModelConfig] = useState<GlobalModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
   const [showProviderModal, setShowProviderModal] = useState(false);
 
-  // Load providers
+  // Load providers and global config
   useEffect(() => {
-    const loadProviders = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const providerResult = await getProviderList();
+        const [providerResult, configResult] = await Promise.all([
+          getProviderList(),
+          loadConfig(),
+        ]);
         setProviders(providerResult);
-        log.info(`Loaded ${providerResult.length} providers`);
+        setGlobalModelConfig(configResult.globalModelConfig || null);
+        log.info(`Loaded ${providerResult.length} providers, current provider: ${configResult.globalModelConfig?.llm?.providerId}`);
       } catch (err) {
         log.error(`Failed to load providers: ${err}`);
       } finally {
         setLoading(false);
       }
     };
-    loadProviders();
+    loadData();
   }, []);
 
+  // Handle provider selection - set as active provider
+  const handleProviderSelect = async (providerId: string) => {
+    try {
+      const config = await loadConfig();
+      const newConfig = {
+        ...config,
+        globalModelConfig: {
+          ...config.globalModelConfig,
+          llm: {
+            ...config.globalModelConfig.llm,
+            providerId,
+          },
+        },
+      };
+      await saveConfig(newConfig);
+      setGlobalModelConfig(newConfig.globalModelConfig);
+
+      const provider = providers.find(p => p.meta.id === providerId);
+      showToast({
+        type: 'success',
+        title: t('modelConfig.providerSelected'),
+        description: provider?.meta.label || providerId,
+      });
+    } catch (err) {
+      log.error(`Failed to select provider: ${err}`);
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+      });
+    }
+  };
+
+  // Open config modal
   const handleProviderConfigure = (providerId: string) => {
     const provider = providers.find((p) => p.meta.id === providerId);
     if (provider) {
@@ -181,6 +222,8 @@ export default function ProviderPanel() {
                 <CloudProviderCard
                   key={provider.meta.id}
                   provider={provider}
+                  isSelected={globalModelConfig?.llm?.providerId === provider.meta.id}
+                  onSelect={() => handleProviderSelect(provider.meta.id)}
                   onConfigure={() => handleProviderConfigure(provider.meta.id)}
                   onEdit={() => handleProviderConfigure(provider.meta.id)}
                   t={t}
@@ -194,6 +237,8 @@ export default function ProviderPanel() {
                 <CloudProviderCard
                   key={provider.meta.id}
                   provider={provider}
+                  isSelected={globalModelConfig?.llm?.providerId === provider.meta.id}
+                  onSelect={() => handleProviderSelect(provider.meta.id)}
                   onConfigure={() => handleProviderConfigure(provider.meta.id)}
                   onEdit={() => handleProviderConfigure(provider.meta.id)}
                   t={t}

@@ -7,7 +7,7 @@ import type {
   LlmModelWithStatus,
   LlmModelPreset,
 } from '../services/config';
-import type { Model, ProviderWithConfig, LlmProviderInstance, GlobalModelConfig } from '../types';
+import type { Model, LlmProviderInstance, GlobalModelConfig } from '../types';
 import {
   getAsrModelList,
   getLlmModelList,
@@ -18,11 +18,10 @@ import {
   saveConfig,
   parseModelId,
 } from '../services/config';
-import { getProviderList, saveProviderConfig, deleteProviderConfig, detectGpu } from '../services/llm';
+import { getProviderList, saveProviderConfig, detectGpu } from '../services/llm';
 import { createLogger } from '../services/log';
 import type { DownloadProgress, DownloadCompleteEvent } from '../services/downloader';
 import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
-import ProviderConfigModal from './ProviderConfigModal';
 import { useToast } from './ui/Toast';
 import { Info } from 'lucide-react';
 import AsrModelList from './AsrModelList';
@@ -50,35 +49,6 @@ function getModelSize(model: AsrModelWithStatus | LlmModelWithStatus): string {
   }
   return '';
 }
-
-// Provider logo mapping (meta.id -> icon file name)
-const PROVIDER_LOGO_MAP: Record<string, string> = {
-  ollama: 'ollama.png',
-  openai: 'openai.png',
-  deepseek: 'deepseek.png',
-  gemini: 'gemini.png',
-  glm: 'zhipu.png',          // 智谱 AI
-  minimax: 'minimax.png',
-  kimi: 'kimi.png',
-  qwen: 'qwen.png',
-  claude: 'anthropic.png',   // Anthropic Claude
-  groq: 'groq.png',
-  openrouter: 'openrouter.png',
-  cerebras: 'cerebras.png',
-  siliconflow: 'siliconflow.png',
-  yi: 'yi.png',
-  custom: 'custom.png',
-  llama_cpp: 'llamacpp.png',
-};
-
-// Get provider logo path
-const getProviderLogo = (providerId: string): string | null => {
-  const logoFile = PROVIDER_LOGO_MAP[providerId];
-  if (logoFile) {
-    return `/icons/${logoFile}`;
-  }
-  return null;
-};
 
 // Default LLM models
 const DEFAULT_LLM_MODELS: (LlmModelPreset & { descriptionKey: string })[] = [
@@ -197,87 +167,6 @@ function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDo
   );
 }
 
-// Cloud Provider Card Component - updated to use ProviderWithConfig
-interface CloudProviderCardProps {
-  provider: ProviderWithConfig;
-  onConfigure: () => void;
-  onEdit: () => void;
-  t: (key: string) => string;
-}
-
-function CloudProviderCard({ provider, onConfigure, onEdit, t }: CloudProviderCardProps) {
-  const isConfigured = provider.instance?.enabled ?? false;
-  const logoPath = getProviderLogo(provider.meta.id);
-
-  return (
-    <div
-      onClick={onConfigure}
-      className={`group relative rounded-xl border transition-all duration-200 cursor-pointer ${
-        isConfigured
-          ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-300'
-          : 'border-gray-200 bg-white hover:border-gray-300'
-      }`}
-    >
-      <div className="px-3 py-2">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-6">
-            {/* Provider Logo */}
-            {logoPath && (
-              <img
-                src={logoPath}
-                alt={provider.meta.label}
-                className="w-5 h-5 object-contain flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              {/* Provider Name */}
-              <h3 className="font-semibold text-sm text-gray-800 truncate">
-                {provider.meta.id === 'llama_cpp' ? t('provider.llamaCppLabel') : provider.meta.label}
-              </h3>
-              {/* Description */}
-              <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.meta.description}</p>
-            </div>
-          </div>
-
-          {/* Configure/Status Button */}
-          <div className="flex-shrink-0">
-            {isConfigured ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
-                  }}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 hover:bg-emerald-200 transition-colors"
-                >
-                  <CheckIcon className="w-3 h-3" />
-                  <span className="text-xs font-medium">{t('models.configured')}</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
-                  }}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={t('common.edit')}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <div className="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg group-hover:bg-amber-100 transition-colors">
-                {t('models.setup')}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ModelConfigPanel({
   downloadStates = {},
   onDownload,
@@ -291,12 +180,9 @@ export default function ModelConfigPanel({
   // State
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
   const [llmModels, setLlmModels] = useState<LlmModelWithStatus[]>([]);
-  const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
   const [customDirs, setCustomDirs] = useState<string[]>([]);
   const [globalModelConfig, setGlobalModelConfig] = useState<GlobalModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
-  const [showProviderModal, setShowProviderModal] = useState(false);
   const [showCustomDirModal, setShowCustomDirModal] = useState(false);
 
   // Load data
@@ -304,20 +190,18 @@ export default function ModelConfigPanel({
     const loadData = async () => {
       setLoading(true);
       try {
-        const [asrResult, llmResult, providerResult, customDirsResult, configResult] = await Promise.all([
+        const [asrResult, llmResult, customDirsResult, configResult] = await Promise.all([
           getAsrModelList(),
           getLlmModelList(),
-          getProviderList(),
           getCustomAsrModelDirs(),
           loadConfig(),
         ]);
         setAsrModels(asrResult);
         setLlmModels(llmResult);
-        setProviders(providerResult);
         setCustomDirs(customDirsResult);
         setGlobalModelConfig(configResult.globalModelConfig || null);
         log.info(
-          `Loaded ${asrResult.length} ASR models, ${llmResult.length} LLM models, ${providerResult.length} providers, ${customDirsResult.length} custom dirs`
+          `Loaded ${asrResult.length} ASR models, ${llmResult.length} LLM models, ${customDirsResult.length} custom dirs`
         );
       } catch (err) {
         log.error(`Failed to load model data: ${err}`);
@@ -346,7 +230,6 @@ export default function ModelConfigPanel({
           if (!mounted) return;
           setAsrModels(asrResult);
           setLlmModels(llmResult);
-          setProviders(providerList);
 
           // Auto-configure llama.cpp provider if an LLM model was downloaded and llama.cpp is not configured
           if (isLlmDownload) {
@@ -378,12 +261,6 @@ export default function ModelConfigPanel({
 
                 await saveProviderConfig('llama_cpp', instance);
                 log.info(`[ModelConfig] llama.cpp auto-configured successfully`);
-
-                // Refresh provider list
-                const updatedProviders = await getProviderList();
-                if (mounted) {
-                  setProviders(updatedProviders);
-                }
               } catch (err) {
                 log.error(`[ModelConfig] Failed to auto-configure llama.cpp: ${err}`);
               }
@@ -548,14 +425,6 @@ export default function ModelConfigPanel({
     }
   };
 
-  const handleProviderConfigure = (providerId: string) => {
-    const provider = providers.find((p) => p.meta.id === providerId);
-    if (provider) {
-      setSelectedProvider(provider);
-      setShowProviderModal(true);
-    }
-  };
-
   // Check if any ASR model is downloaded
   const hasDownloadedAsr = asrModels.some((m) => m.downloaded);
 
@@ -590,7 +459,7 @@ export default function ModelConfigPanel({
                   <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.asrTitle')}</h2>
                   {hasDownloadedAsr ? (
                     <>
-                      <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-900 text-white rounded-full">
+                      <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-gray-700 text-white rounded-full">
                         <CheckIcon className="w-3 h-3" />
                         {t('models.ready')}
                       </span>
@@ -704,92 +573,6 @@ export default function ModelConfigPanel({
           )}
         </div>
       </section>
-
-      {/* Section 3: LLM Providers - Local & Cloud */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.llmProvidersTitle')}</h2>
-              <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.llmProvidersSubtitle')}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Local LLM (llama_cpp) first */}
-            {providers
-              .filter((provider) => provider.meta.id === 'llama_cpp')
-              .map((provider) => (
-                <CloudProviderCard
-                  key={provider.meta.id}
-                  provider={provider}
-                  onConfigure={() => handleProviderConfigure(provider.meta.id)}
-                  onEdit={() => handleProviderConfigure(provider.meta.id)}
-                  t={t}
-                />
-              ))}
-
-            {/* Cloud providers */}
-            {providers
-              .filter((provider) => provider.meta.id !== 'llama_cpp')
-              .map((provider) => (
-                <CloudProviderCard
-                  key={provider.meta.id}
-                  provider={provider}
-                  onConfigure={() => handleProviderConfigure(provider.meta.id)}
-                  onEdit={() => handleProviderConfigure(provider.meta.id)}
-                  t={t}
-                />
-              ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Provider Config Modal */}
-      {showProviderModal && selectedProvider && (
-        <ProviderConfigModal
-          provider={selectedProvider}
-          onClose={() => {
-            setShowProviderModal(false);
-            setSelectedProvider(null);
-          }}
-          onSave={async (providerId, instance) => {
-            // Save to backend first
-            await saveProviderConfig(providerId, instance);
-            // Refresh provider list after save
-            const list = await getProviderList();
-            setProviders(list);
-            setShowProviderModal(false);
-            setSelectedProvider(null);
-            showToast({
-              type: 'success',
-              title: t('modelConfig.providerSaved'),
-              description: selectedProvider.meta.label,
-            });
-          }}
-          onDelete={async (providerId) => {
-            // Delete from backend first
-            await deleteProviderConfig(providerId);
-            // Refresh provider list after delete
-            const list = await getProviderList();
-            setProviders(list);
-            setShowProviderModal(false);
-            setSelectedProvider(null);
-            showToast({
-              type: 'info',
-              title: t('modelConfig.providerDeleted'),
-              description: selectedProvider.meta.label,
-            });
-          }}
-        />
-      )}
 
       {/* Custom Directory Management Modal */}
       {showCustomDirModal && (

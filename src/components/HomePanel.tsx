@@ -267,7 +267,7 @@ function ToggleSwitch({
       } ${
         disabled
           ? 'bg-gray-300 cursor-not-allowed opacity-60'
-          : checked ? 'bg-gray-900' : 'bg-gray-200'
+          : checked ? 'bg-gray-700' : 'bg-gray-200'
       }`}
     >
       <span

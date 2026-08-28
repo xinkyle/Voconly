@@ -392,7 +392,7 @@ export default function AsrModelList({
               canSelect || canExpand ? 'cursor-pointer' : ''
             } ${
               isSelected
-                ? 'border-gray-900 bg-gray-50'
+                ? 'border-gray-700 bg-gray-100'
                 : isDefaultQuantDownloaded
                   ? 'border-gray-200 bg-gray-50 hover:border-gray-300'
                   : 'border-gray-200 bg-white hover:border-gray-200'
@@ -432,7 +432,7 @@ export default function AsrModelList({
                       )}
                       {/* Recommendation badge */}
                       {showRecommendation && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-600 text-white">
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-500 text-white">
                           {t('models.recommended')}
                         </span>
                       )}
@@ -565,7 +565,7 @@ export default function AsrModelList({
                                 : variant.quant}
                             </span>
                             {variant.isRecommended && (
-                              <span className="px-1 py-0.5 text-[10px] font-medium bg-green-50 text-green-600 rounded">
+                              <span className="px-1 py-0.5 text-[10px] font-medium bg-emerald-500 text-white rounded">
                                 {t('models.recommended')}
                               </span>
                             )}

@@ -526,7 +526,7 @@ export default function LlmConfigModal({
                   <span className={`text-sm font-medium truncate ${providerMeta?.instance?.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
                     {providerMeta
                       ? providerMeta.meta.id === 'llama_cpp'
-                        ? 'Llama.cpp (本地模型专用)'
+                        ? 'Llama.cpp (本地大语言模型专用)'
                         : providerMeta.meta.label
                       : t('provider.clickToSelectProvider')}
                   </span>
