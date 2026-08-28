@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderWithConfig, LlmProviderInstance } from '../types';
-import { getProviderList, saveProviderConfig, deleteProviderConfig } from '../services/llm';
+import { getProviderList, saveProviderConfig } from '../services/llm';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
 
@@ -58,19 +58,6 @@ export default function ProviderSelectModal({
       onSelect(providerId, instance);
     } catch (err) {
       log.error(`Failed to save provider config: ${err}`);
-      throw err;
-    }
-  };
-
-  // Handle delete provider config
-  const handleDeleteProvider = async (providerId: string) => {
-    try {
-      await deleteProviderConfig(providerId);
-      // Refresh provider list
-      await loadProviders();
-      setConfigProvider(null);
-    } catch (err) {
-      log.error(`Failed to delete provider config: ${err}`);
       throw err;
     }
   };
@@ -201,7 +188,6 @@ export default function ProviderSelectModal({
           provider={configProvider}
           onClose={() => setConfigProvider(null)}
           onSave={handleSaveProvider}
-          onDelete={handleDeleteProvider}
         />
       )}
     </>

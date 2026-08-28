@@ -307,6 +307,7 @@
   },
   "provider": {
     "configure": "Configure {{name}}",
+    "configureApi": "Configure {{name}} API",
     "apiAddress": "API Address",
     "apiAddressNotEditable": "This provider does not support custom API address",
     "apiKey": "API Key",
@@ -335,6 +336,10 @@
     "currentProvider": "Current Provider",
     "clickToSelectProvider": "Click to select Provider",
     "selectModel": "Select Model",
+    "noModelsFound": "No available models found",
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "saveAndSelect": "Save & Select",
     "downloaded": "Downloaded",
     "download": "Download",
     "delete": "Delete",

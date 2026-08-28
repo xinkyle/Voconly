@@ -4,6 +4,7 @@ import type { LlmProviderInstance, ProviderWithConfig, GpuInfo } from '../types'
 import {
   checkProviderConnection,
   detectGpu,
+  fetchProviderModels,
 } from '../services/llm';
 import { createLogger } from '../services/log';
 
@@ -13,30 +14,29 @@ interface ProviderConfigModalProps {
   provider: ProviderWithConfig;
   onClose: () => void;
   onSave: (providerId: string, instance: LlmProviderInstance) => Promise<void>;
-  onDelete: (providerId: string) => Promise<void>;
 }
 
 export default function ProviderConfigModal({
   provider,
   onClose,
   onSave,
-  onDelete,
 }: ProviderConfigModalProps) {
   const { t } = useTranslation();
   const meta = provider.meta;
   const existingInstance = provider.instance;
   const isLlamaCpp = meta.id === 'llama_cpp';
 
-  // Form state (for HTTP-based providers)
-  const [baseUrl, setBaseUrl] = useState(existingInstance?.baseUrl || meta.baseUrl);
-  const [apiKey, setApiKey] = useState(existingInstance?.apiKey || '');
-  const [enabled, setEnabled] = useState(existingInstance?.enabled ?? true);
+  // 是否已配置（有 apiKey 和 defaultModel）
+  const isConfigured = existingInstance?.apiKey && existingInstance?.defaultModel;
 
-  // GPU configuration state
+  // Form state
+  const [apiKey, setApiKey] = useState(existingInstance?.apiKey || '');
+  const [selectedModel, setSelectedModel] = useState(existingInstance?.defaultModel || '');
+
+  // GPU configuration state (for llama.cpp)
   const [gpuInfo, setGpuInfo] = useState<GpuInfo | null>(null);
-  // 初始化：用户已配置则用用户值，否则先用临时值等待 GPU 检测
   const [nGpuLayers, setNGpuLayers] = useState<number>(
-    existingInstance?.nGpuLayers ?? -999  // -999 表示"待检测"
+    existingInstance?.nGpuLayers ?? -1
   );
 
   // Context limit state（本地 Provider 配置）
@@ -47,68 +47,53 @@ export default function ProviderConfigModal({
 
   // UI state
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(isConfigured ? 'success' : null);
   const [testError, setTestError] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>(
+    existingInstance?.defaultModel ? [existingInstance.defaultModel] : []
+  );
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // API key validation error
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
-  // GPU layers 实际显示值（-999 表示检测中，显示 -1 作为临时值）
-  const effectiveGpuLayers = nGpuLayers === -999 ? -1 : nGpuLayers;
-  const isGpuDetecting = nGpuLayers === -999;
-
-  // Load GPU info for llama.cpp
+  // 已配置时，自动加载模型列表
   useEffect(() => {
-    if (isLlamaCpp) {
-      loadGpuInfo();
+    if (isConfigured && !isLlamaCpp) {
+      loadModelsFromProvider();
     }
-  }, [isLlamaCpp]);
+  }, [isConfigured, isLlamaCpp]);
 
-  // For HTTP-based providers: auto-test connection if already configured
+  // llama.cpp 时检测 GPU
   useEffect(() => {
-    if (!isLlamaCpp && existingInstance?.enabled && existingInstance.baseUrl) {
-      const autoTestConnection = async () => {
-        setTesting(true);
-        try {
-          const result = await checkProviderConnection(
-            meta.id,
-            existingInstance.baseUrl,
-            meta.requiresApiKey ? existingInstance.apiKey : undefined
-          );
-          if (result.available) {
-            setTestResult('success');
-          } else {
-            setTestResult(null);
-          }
-        } catch (err) {
-          log.error(`Auto-test connection failed: ${err}`);
-          setTestResult(null);
-        } finally {
-          setTesting(false);
-        }
-      };
-      autoTestConnection();
+    if (isLlamaCpp && isConfigured) {
+      detectGpu().then(info => {
+        setGpuInfo(info);
+        log.debug(`GPU detected: available=${info.available}, type=${info.gpuType}`);
+      }).catch(err => {
+        log.error(`Failed to detect GPU: ${err}`);
+      });
     }
-  }, [isLlamaCpp, existingInstance, meta.id, meta.requiresApiKey]);
+  }, [isLlamaCpp, isConfigured]);
 
-  const loadGpuInfo = async () => {
+  // 从 Provider 加载模型列表
+  const loadModelsFromProvider = async () => {
+    if (!existingInstance?.apiKey) return;
+
+    setTesting(true);
     try {
-      const info = await detectGpu();
-      setGpuInfo(info);
-      log.debug(`GPU detected: available=${info.available}, type=${info.gpuType}`);
-
-      if (existingInstance?.nGpuLayers === undefined || existingInstance?.nGpuLayers === null) {
-        setNGpuLayers(-1);
-        log.debug(`Auto-set GPU layers to -1 (try GPU first)`);
+      const models = await fetchProviderModels(
+        meta.id,
+        meta.baseUrl,
+        existingInstance.apiKey
+      );
+      if (models && models.length > 0) {
+        setAvailableModels(models);
       }
     } catch (err) {
-      log.error(`Failed to detect GPU: ${err}`);
-      if (existingInstance?.nGpuLayers === undefined || existingInstance?.nGpuLayers === null) {
-        setNGpuLayers(-1);
-        log.debug(`GPU detection failed, defaulting to -1 (try GPU)`);
-      }
+      log.error(`Failed to load models: ${err}`);
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -141,24 +126,31 @@ export default function ProviderConfigModal({
     setApiKey(value);
     setTestResult(null);
     setTestError(null);
+    setAvailableModels([]);
+    setSelectedModel('');
     const error = validateApiKey(value);
     setApiKeyError(error);
   };
 
-  // Handle base URL change
-  const handleBaseUrlChange = (value: string) => {
-    setBaseUrl(value);
-    setTestResult(null);
-    setTestError(null);
-  };
+  // Test connection and fetch models
+  const handleConnect = async () => {
+    // Validate
+    if (!isLlamaCpp && meta.requiresApiKey && !apiKey.trim()) {
+      setApiKeyError(t('provider.apiKeyRequired'));
+      return;
+    }
 
-  // Test connection (for HTTP-based providers)
-  const handleTestConnection = async () => {
+    if (apiKeyError) {
+      return;
+    }
+
     setTesting(true);
     setTestResult(null);
     setTestError(null);
+    setAvailableModels([]);
 
     try {
+      const baseUrl = meta.baseUrl;
       const result = await checkProviderConnection(
         meta.id,
         baseUrl,
@@ -167,6 +159,14 @@ export default function ProviderConfigModal({
 
       if (result.available) {
         setTestResult('success');
+        // 保存获取到的模型列表
+        if (result.models && result.models.length > 0) {
+          setAvailableModels(result.models);
+          // 默认选择第一个模型
+          if (!selectedModel && result.models[0]) {
+            setSelectedModel(result.models[0]);
+          }
+        }
       } else {
         setTestResult('error');
         setTestError(result.error || t('provider.connectionFailed'));
@@ -180,16 +180,28 @@ export default function ProviderConfigModal({
   };
 
   // Test connection for llama.cpp
-  const handleTestLlamaCpp = async () => {
+  const handleConnectLlamaCpp = async () => {
     setTesting(true);
     setTestResult(null);
     setTestError(null);
+    setAvailableModels([]);
 
     try {
+      // 先检测 GPU
+      const info = await detectGpu();
+      setGpuInfo(info);
+      log.debug(`GPU detected: available=${info.available}, type=${info.gpuType}`);
+
       const result = await checkProviderConnection(meta.id, '', undefined);
 
       if (result.available) {
         setTestResult('success');
+        if (result.models && result.models.length > 0) {
+          setAvailableModels(result.models);
+          if (!selectedModel && result.models[0]) {
+            setSelectedModel(result.models[0]);
+          }
+        }
       } else {
         setTestResult('error');
         setTestError(result.error || t('provider.connectionFailed'));
@@ -202,15 +214,16 @@ export default function ProviderConfigModal({
     }
   };
 
+  // Refresh model list (for already configured providers)
+  const handleRefreshModels = async () => {
+    if (!apiKey.trim()) return;
+    await loadModelsFromProvider();
+  };
+
   // Save config
   const handleSave = async () => {
-    // Validate
-    if (!isLlamaCpp && meta.requiresApiKey && !apiKey.trim()) {
-      setApiKeyError(t('provider.apiKeyRequired'));
-      return;
-    }
-
-    if (apiKeyError) {
+    // 本地 provider 不需要选择模型
+    if (!isLocalProvider && !selectedModel) {
       return;
     }
 
@@ -218,11 +231,11 @@ export default function ProviderConfigModal({
     try {
       const instance: LlmProviderInstance = {
         metaId: meta.id,
-        enabled,
-        baseUrl: isLlamaCpp ? '' : baseUrl,
+        enabled: true,
+        baseUrl: isLlamaCpp ? '' : meta.baseUrl,
         apiKey: isLlamaCpp ? undefined : apiKey || undefined,
-        defaultModel: undefined,
-        nGpuLayers: isLlamaCpp ? (nGpuLayers === -999 ? -1 : nGpuLayers) : undefined,
+        defaultModel: isLocalProvider ? undefined : selectedModel,
+        nGpuLayers: isLlamaCpp ? nGpuLayers : undefined,
         contextLimit: isLocalProvider ? contextLimit : undefined,
       };
 
@@ -231,24 +244,6 @@ export default function ProviderConfigModal({
       log.error(`Failed to save: ${err}`);
     } finally {
       setSaving(false);
-    }
-  };
-
-  // Delete config
-  const handleDelete = async () => {
-    if (!existingInstance) return;
-
-    if (!confirm(t('provider.confirmDelete', { name: meta.label }))) {
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      await onDelete(meta.id);
-    } catch (err) {
-      log.error(`Failed to delete: ${err}`);
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -267,9 +262,8 @@ export default function ProviderConfigModal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div>
               <h3 className="text-base font-semibold text-gray-900">
-                {t('provider.configure', { name: meta.label })}
+                {t('provider.configureApi', { name: meta.label })}
               </h3>
-              <p className="text-sm text-gray-500 mt-0.5">{meta.description}</p>
             </div>
             <button
               onClick={onClose}
@@ -282,8 +276,8 @@ export default function ProviderConfigModal({
           </div>
 
           {/* Form */}
-          <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-            {/* Llama.cpp specific: GPU configuration only */}
+          <div className="px-6 py-4 space-y-4">
+            {/* Llama.cpp specific: GPU configuration */}
             {isLlamaCpp && (
               <>
                 {/* GPU Configuration */}
@@ -293,17 +287,13 @@ export default function ProviderConfigModal({
                   </label>
                   <div className="flex items-center gap-3">
                     <select
-                      value={effectiveGpuLayers}
+                      value={nGpuLayers}
                       onChange={(e) => setNGpuLayers(parseInt(e.target.value))}
-                      disabled={isGpuDetecting}
-                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:opacity-50"
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                     >
                       <option value={0}>{t('provider.gpuModeCpu')}</option>
                       <option value={-1}>{t('provider.gpuModeGpu')}</option>
                     </select>
-                    {isGpuDetecting && (
-                      <span className="text-xs text-gray-400">{t('provider.detectingGpu')}</span>
-                    )}
                     {gpuInfo && (
                       <span className={`text-xs ${gpuInfo.available ? 'text-green-600' : 'text-gray-400'}`}>
                         {gpuInfo.available
@@ -312,11 +302,6 @@ export default function ProviderConfigModal({
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {effectiveGpuLayers === 0
-                      ? t('provider.gpuModeCpuDesc')
-                      : t('provider.gpuModeAllDesc')}
-                  </p>
                 </div>
 
                 {/* Context Limit Configuration */}
@@ -333,66 +318,39 @@ export default function ProviderConfigModal({
                     step={512}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {t('provider.contextLimitDesc')}
-                  </p>
                 </div>
 
-                {/* Test connection button for llama.cpp */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleTestLlamaCpp}
-                    disabled={testing}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {testing ? t('provider.testing') : t('provider.checkModels')}
-                  </button>
-
-                  {testResult === 'success' && (
-                    <span className="text-sm text-green-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      {t('provider.connectionSuccess')}
-                    </span>
-                  )}
-                  {testResult === 'error' && (
-                    <span className="text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      {testError || t('provider.connectionFailed')}
-                    </span>
-                  )}
-                </div>
+                {/* Connection status */}
+                {testResult && (
+                  <div className={`flex items-center gap-2 p-3 rounded-lg ${testResult === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+                    {testResult === 'success' ? (
+                      <>
+                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm text-green-700">{t('provider.connectionSuccess')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm text-red-700">{testError || t('provider.connectionFailed')}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
-            {/* HTTP-based providers: Base URL */}
+            {/* HTTP-based providers */}
             {!isLlamaCpp && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('provider.apiAddress')}
-                  </label>
-                  <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={(e) => handleBaseUrlChange(e.target.value)}
-                    disabled={!meta.allowBaseUrlEdit}
-                    placeholder={meta.baseUrl}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  {!meta.allowBaseUrlEdit && (
-                    <p className="mt-1 text-xs text-gray-400">{t('provider.apiAddressNotEditable')}</p>
-                  )}
-                </div>
-
                 {/* API Key */}
                 {(meta.requiresApiKey || meta.id === 'custom') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {meta.requiresApiKey ? t('provider.apiKey') : t('provider.apiKeyOptional')}
+                      {t('provider.apiKey')}
                     </label>
                     <input
                       type="password"
@@ -403,9 +361,6 @@ export default function ProviderConfigModal({
                     />
                     {apiKeyError && (
                       <p className="mt-1 text-xs text-red-500">{apiKeyError}</p>
-                    )}
-                    {!meta.requiresApiKey && (
-                      <p className="mt-1 text-xs text-gray-400">{t('provider.apiKeyOptionalDesc')}</p>
                     )}
                   </div>
                 )}
@@ -425,90 +380,130 @@ export default function ProviderConfigModal({
                       step={512}
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      {t('provider.contextLimitDesc')}
-                    </p>
                   </div>
                 )}
 
-                {/* Test connection */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleTestConnection}
-                    disabled={testing || !baseUrl || (meta.requiresApiKey && !apiKey)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {testing ? t('provider.testing') : t('provider.testConnection')}
-                  </button>
+                {/* Model selection - show after successful connection OR if already configured */}
+                {testResult === 'success' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {t('provider.selectModel')}
+                      </label>
+                      {/* 已配置时显示刷新按钮 */}
+                      {isConfigured && (
+                        <button
+                          onClick={handleRefreshModels}
+                          disabled={testing}
+                          className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                        >
+                          <svg className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          {t('llmConfig.refreshModels')}
+                        </button>
+                      )}
+                    </div>
+                    {availableModels.length > 0 ? (
+                      <select
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                      >
+                        {availableModels.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-sm text-gray-500 py-2">
+                        {testing ? t('common.loading') : t('provider.noModelsFound')}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                  {/* Test result */}
-                  {testResult === 'success' && (
-                    <span className="text-sm text-green-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      {t('provider.connectionSuccess')}
-                    </span>
-                  )}
-                  {testResult === 'error' && (
-                    <span className="text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      {testError || t('provider.connectionFailed')}
-                    </span>
-                  )}
-                </div>
+                {/* Connection error */}
+                {testResult === 'error' && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50">
+                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm text-red-700">{testError || t('provider.connectionFailed')}</span>
+                  </div>
+                )}
               </>
             )}
-
-            {/* Enable toggle */}
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm font-medium text-gray-700">{t('provider.enableProvider')}</span>
-              <button
-                onClick={() => setEnabled(!enabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  enabled ? 'bg-gray-900' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50">
-            {/* Delete button */}
-            {existingInstance && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
-              >
-                {deleting ? t('common.deleting') : t('provider.deleteConfig')}
-              </button>
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {t('common.cancel')}
+            </button>
+
+            {/* Llama.cpp: Connect or Save button */}
+            {isLlamaCpp && (
+              <>
+                {testResult !== 'success' ? (
+                  <button
+                    onClick={handleConnectLlamaCpp}
+                    disabled={testing || saving}
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {testing ? t('provider.connecting') : t('provider.connect')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? t('common.saving') : t('common.save')}
+                  </button>
+                )}
+              </>
             )}
 
-            {/* Right side buttons */}
-            <div className="flex items-center gap-3 ml-auto">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || (!isLlamaCpp && meta.requiresApiKey && !apiKey.trim())}
-                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {saving ? t('common.saving') : t('common.save')}
-              </button>
-            </div>
+            {/* HTTP providers */}
+            {!isLlamaCpp && (
+              <>
+                {/* 未配置：显示连接按钮 */}
+                {!isConfigured && testResult !== 'success' && (
+                  <button
+                    onClick={handleConnect}
+                    disabled={testing || (meta.requiresApiKey && !apiKey.trim())}
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {testing ? t('provider.connecting') : t('provider.connect')}
+                  </button>
+                )}
+                {/* 首次配置成功：显示保存并选择 */}
+                {!isConfigured && testResult === 'success' && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || (!isLocalProvider && !selectedModel)}
+                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? t('common.saving') : t('provider.saveAndSelect')}
+                  </button>
+                )}
+                {/* 已配置：显示保存 */}
+                {isConfigured && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || (!isLocalProvider && !selectedModel)}
+                    className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? t('common.saving') : t('common.save')}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

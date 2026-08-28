@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderWithConfig, GlobalModelConfig } from '../types';
-import { getProviderList, saveProviderConfig, deleteProviderConfig } from '../services/llm';
+import { getProviderList, saveProviderConfig } from '../services/llm';
 import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
@@ -256,21 +256,11 @@ export default function ProviderPanel() {
             setProviders(list);
             setShowProviderModal(false);
             setSelectedProvider(null);
+            // Auto-select the configured provider
+            await handleProviderSelect(providerId);
             showToast({
               type: 'success',
               title: t('modelConfig.providerSaved'),
-              description: selectedProvider.meta.label,
-            });
-          }}
-          onDelete={async (providerId) => {
-            await deleteProviderConfig(providerId);
-            const list = await getProviderList();
-            setProviders(list);
-            setShowProviderModal(false);
-            setSelectedProvider(null);
-            showToast({
-              type: 'info',
-              title: t('modelConfig.providerDeleted'),
               description: selectedProvider.meta.label,
             });
           }}

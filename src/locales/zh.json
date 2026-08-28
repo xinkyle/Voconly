@@ -307,6 +307,7 @@
   },
   "provider": {
     "configure": "配置 {{name}}",
+    "configureApi": "配置 {{name}} API",
     "apiAddress": "API 地址",
     "apiAddressNotEditable": "此 Provider 不支持修改 API 地址",
     "apiKey": "API Key",
@@ -335,6 +336,10 @@
     "currentProvider": "当前 Provider",
     "clickToSelectProvider": "点击选择 Provider",
     "selectModel": "选择模型",
+    "noModelsFound": "未找到可用模型",
+    "connect": "连接",
+    "connecting": "连接中...",
+    "saveAndSelect": "保存并选择",
     "downloaded": "已下载",
     "download": "下载",
     "delete": "删除",
