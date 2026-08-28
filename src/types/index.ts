@@ -128,8 +128,8 @@ export interface Scene {
 // - 预设信息: 由 presets 模块提供
 // - 用户偏好: 本配置文件仅存储用户设置（语言偏好等）
 export interface AppConfig {
-  /** 全局模型配置（ASR + LLM） */
-  globalModelConfig?: GlobalModelConfig;
+  /** 全局模型配置（ASR + LLM） - 后端有默认值，不会为空 */
+  globalModelConfig: GlobalModelConfig;
 
   /// DEPRECATED: 模型列表已迁移到预设系统
   /// 此字段仅保留用于向后兼容旧配置文件
