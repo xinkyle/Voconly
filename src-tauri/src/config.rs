@@ -599,7 +599,22 @@ pub fn load_config() -> Result<AppConfig, String> {
         .map_err(|e| format!("Failed to parse config file: {}", e))?;
 
     // 数据迁移：将旧的 model_id 字段迁移到新的 model 字段
-    migrate_scene_model_refs(&mut config);
+    let migrated_model_refs = migrate_scene_model_refs(&mut config);
+
+    // 数据迁移：将旧的 llm_profiles[].userPromptType 迁移到 scenes[].promptType
+    let migrated_prompt_types = migrate_scene_prompt_types(&mut config);
+
+    // 数据迁移：补全全局 LLM 配置（从 llm_providers 中选择第一个启用的）
+    let migrated_llm_config = migrate_global_llm_config(&mut config);
+
+    // 如果发生了迁移，保存配置文件
+    if migrated_model_refs || migrated_prompt_types || migrated_llm_config {
+        log::info!("[Config] Migration occurred, saving updated config");
+        let config_content = serde_json::to_string_pretty(&config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        fs::write(&config_path, config_content)
+            .map_err(|e| format!("Failed to write config file: {}", e))?;
+    }
 
     // Restore default scenes if scenes array is empty
     if config.scenes.is_empty() {
@@ -621,7 +636,10 @@ pub fn load_config() -> Result<AppConfig, String> {
 /// - 如果 `model.model_id` 为空但 `model_id` 存在，解析 `model_id` 并迁移
 /// - 解析时尝试提取量化后缀（如 Q5_K_M）
 /// - 迁移后清空 `model_id` 字段
-fn migrate_scene_model_refs(config: &mut AppConfig) {
+///
+/// 返回 `true` 表示发生了迁移，`false` 表示无变化
+fn migrate_scene_model_refs(config: &mut AppConfig) -> bool {
+    let mut migrated = false;
     for scene in &mut config.scenes {
         // 如果 model.model_id 为空但有旧的 model_id 字段，进行迁移
         if scene.model.model_id.is_empty() {
@@ -643,6 +661,7 @@ fn migrate_scene_model_refs(config: &mut AppConfig) {
 
                     // 清空旧字段
                     scene.model_id = None;
+                    migrated = true;
                 }
             }
         } else {
@@ -650,6 +669,106 @@ fn migrate_scene_model_refs(config: &mut AppConfig) {
             scene.model_id = None;
         }
     }
+    migrated
+}
+
+/// 迁移场景提示词类型
+///
+/// 将旧的 `llm_profiles[].user_prompt_type` 迁移到 `scenes[].prompt_type`。
+/// 迁移规则：
+/// - 遍历所有场景，如果 `prompt_type` 为空：
+///   - 在 `llm_profiles` 中查找 `scene_id` 匹配的 profile
+///   - 如果找到，将 `user_prompt_type` 复制到 `prompt_type`
+///   - 如果没找到，根据场景名称设置默认值
+///
+/// 返回 `true` 表示发生了迁移，`false` 表示无变化
+fn migrate_scene_prompt_types(config: &mut AppConfig) -> bool {
+    #[allow(deprecated)]
+    let profiles = &config.llm_profiles;
+    let mut migrated = false;
+
+    for scene in &mut config.scenes {
+        // 如果 prompt_type 为空，尝试从 llm_profiles 迁移
+        if scene.prompt_type.is_empty() {
+            // 在 llm_profiles 中查找匹配的 profile
+            let matched_profile = profiles.iter().find(|p| p.scene_id == scene.id);
+
+            if let Some(profile) = matched_profile {
+                if !profile.user_prompt_type.is_empty() {
+                    scene.prompt_type = profile.user_prompt_type.clone();
+                    log::info!(
+                        "[Config] Migrated scene '{}' prompt_type from llm_profiles: '{}'",
+                        scene.id, scene.prompt_type
+                    );
+                    migrated = true;
+                }
+            } else {
+                // 没找到匹配的 profile，根据场景名称设置默认值
+                let default_type = match scene.name.as_str() {
+                    "轻度润色" => "lightPolish",
+                    "专业润色" => "professionalPolish",
+                    "翻译" => "translate",
+                    _ => "lightPolish",
+                };
+                scene.prompt_type = default_type.to_string();
+                log::info!(
+                    "[Config] Set default prompt_type for scene '{}': '{}' (name: '{}')",
+                    scene.id, scene.prompt_type, scene.name
+                );
+                migrated = true;
+            }
+        }
+    }
+    migrated
+}
+
+/// 补全全局 LLM 配置
+///
+/// 如果 `global_model_config.llm.provider_id` 或 `model` 为空，
+/// 从 `llm_providers` 中找到第一个启用的 provider 进行补全。
+///
+/// 返回 `true` 表示发生了迁移，`false` 表示无变化
+fn migrate_global_llm_config(config: &mut AppConfig) -> bool {
+    let llm = &mut config.global_model_config.llm;
+    let mut migrated = false;
+
+    // 如果 provider_id 或 model 为空，尝试从 llm_providers 补全
+    if llm.provider_id.is_empty() || llm.model.is_empty() {
+        // 从 llm_providers 中找到第一个启用的 provider
+        let first_enabled = config
+            .llm_providers
+            .values()
+            .find(|provider| provider.enabled);
+
+        if let Some(provider) = first_enabled {
+            // 补全 provider_id
+            if llm.provider_id.is_empty() {
+                llm.provider_id = provider.meta_id.clone();
+                log::info!(
+                    "[Config] Migrated global LLM provider_id from llm_providers: '{}'",
+                    llm.provider_id
+                );
+                migrated = true;
+            }
+
+            // 补全 model（如果 provider 有 default_model）
+            if llm.model.is_empty() {
+                if let Some(default_model) = &provider.default_model {
+                    llm.model = default_model.clone();
+                    log::info!(
+                        "[Config] Migrated global LLM model from llm_providers: '{}'",
+                        llm.model
+                    );
+                    migrated = true;
+                }
+            }
+        } else {
+            log::info!(
+                "[Config] No enabled llm_provider found, skipping global LLM config migration"
+            );
+        }
+    }
+    migrated
 }
 
 /// Save configuration to file (internal helper function)

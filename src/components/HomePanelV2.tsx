@@ -506,7 +506,7 @@ export default function HomePanelV2({
 
   // 获取全局 ASR 模型信息
   const asrModelId = globalModelConfig?.asrModel ? getFullModelId(globalModelConfig.asrModel) : '';
-  const asrModelName = asrModelId ? getModelName(asrModelId, asrModels) : t('home.noModelSelected');
+  const asrModelName = asrModelId ? getModelName(asrModelId, asrModels) : t('home.noAsrModelSelected');
 
   // 获取全局 LLM 配置信息
   const llmConfig = globalModelConfig?.llm;
@@ -621,8 +621,8 @@ export default function HomePanelV2({
                 <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">语音识别模型</div>
                 <div className="text-[15px] font-semibold text-gray-900 truncate mb-1.5">{asrModelName}</div>
                 {/* 模型大小和精度 */}
-                {asrModelId && (
-                  <div className="flex items-center gap-1.5">
+                {asrModelId ? (
+                  <div className="flex items-center gap-1.5 h-[22px]">
                     {(() => {
                       const quant = getModelQuant(asrModelId, asrModels, t);
                       const size = getModelSize(asrModelId, asrModels);
@@ -650,6 +650,8 @@ export default function HomePanelV2({
                       return null;
                     })()}
                   </div>
+                ) : (
+                  <div className="h-[22px]" />
                 )}
               </div>
             </div>

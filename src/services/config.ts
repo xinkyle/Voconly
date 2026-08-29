@@ -47,6 +47,10 @@ interface RustScene {
   loadStrategy: RustLoadStrategy;
   autoType: boolean;
   enabled: boolean;
+  /** 提示词类型：内置名（如 "lightPolish", "translate"）或自定义预设名 */
+  promptType?: string;
+  /** 场景专属自定义提示词 */
+  customPrompt?: string;
 }
 
 // Rust UserDictionary 类型
@@ -180,6 +184,8 @@ function convertSceneFromRust(rust: RustScene): Scene {
     modelId: rust.modelId, // 保留旧字段用于向后兼容
     autoType: rust.autoType ?? true,
     enabled: rust.enabled,
+    promptType: rust.promptType,
+    customPrompt: rust.customPrompt,
   };
 }
 
@@ -220,6 +226,8 @@ function convertSceneToRust(scene: Scene): RustScene {
     loadStrategy: { type: 'Always' },
     autoType: scene.autoType ?? true,
     enabled: scene.enabled,
+    promptType: scene.promptType,
+    customPrompt: scene.customPrompt,
   };
 }
 

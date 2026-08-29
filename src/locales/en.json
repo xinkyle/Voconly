@@ -155,6 +155,7 @@
     "clickToSwitchModel": "Click to switch model",
     "clickToDownload": "Click to download",
     "noModelSelected": "Configure AI Service",
+    "noAsrModelSelected": "Select Voice Model",
     "clickToSelect": "Click to select model",
     "selectModelFirst": "Please select and download a voice model first",
     "pressAnyKey": "Press...",
@@ -484,7 +485,8 @@
     "expand": "Expand",
     "collapse": "Collapse",
     "downloadComplete": "{{name}} download complete",
-    "switchTo": "Switch"
+    "switchTo": "Switch",
+    "selectPrompt": "Select Prompt"
   },
   "memoryStatus": {
     "title": "Resident Models in Memory",

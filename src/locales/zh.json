@@ -155,6 +155,7 @@
     "clickToSwitchModel": "点击切换模型",
     "clickToDownload": "点击下载",
     "noModelSelected": "请配置 AI 服务",
+    "noAsrModelSelected": "选择语音模型",
     "clickToSelect": "点击选择模型",
     "selectModelFirst": "请先选择并下载语音模型",
     "pressAnyKey": "请按...",
@@ -484,7 +485,8 @@
     "expand": "展开",
     "collapse": "收起",
     "downloadComplete": "{{name}} 下载完成",
-    "switchTo": "切换"
+    "switchTo": "切换",
+    "selectPrompt": "选择提示词"
   },
   "memoryStatus": {
     "title": "当前驻留内存的模型",
