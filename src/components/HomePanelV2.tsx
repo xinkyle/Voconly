@@ -204,8 +204,7 @@ export default function HomePanelV2({
   const tryRegisterShortcutRef = useRef(tryRegisterShortcut);
   const onScenesSaveRef = useRef(onScenesSave);
 
-  // 提示词类型选择状态
-  const [selectingPromptTypeSceneId, setSelectingPromptTypeSceneId] = useState<string | null>(null);
+  // 自定义预设
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
 
   // 快捷键错误弹窗状态
@@ -443,67 +442,6 @@ export default function HomePanelV2({
     };
   }, []);
 
-  // 处理提示词类型点击
-  const handlePromptTypeClick = useCallback((sceneId: string) => {
-    setSelectingPromptTypeSceneId(sceneId);
-  }, []);
-
-  // 处理提示词类型选择
-  const handlePromptTypeSelect = useCallback(async (sceneId: string, promptType: string) => {
-    setSelectingPromptTypeSceneId(null);
-
-    const scene = localScenes.find(s => s.id === sceneId);
-    if (!scene) return;
-
-    const builtinTypes = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'];
-    const isBuiltinType = builtinTypes.includes(promptType);
-
-    // 如果没有变化，直接返回
-    if (scene.promptType === promptType && isBuiltinType) {
-      return;
-    }
-
-    try {
-      // 更新场景的提示词类型
-      const updatedScene = {
-        ...scene,
-        promptType: promptType,
-        customPrompt: isBuiltinType ? undefined : (customPresets[promptType] || ''),
-      };
-      const newScenes = localScenes.map(s => (s.id === sceneId ? updatedScene : s));
-
-      // 保存配置
-      const config = await loadConfig();
-      await saveConfig({
-        ...config,
-        scenes: newScenes,
-      });
-
-      setLocalScenes(newScenes);
-
-      const builtinTypeI18nKey: Record<string, string> = {
-        lightPolish: 'lightPolish',
-        translate: 'translate',
-        professionalPolish: 'professionalPolish',
-        meetingSecretary: 'meetingSecretary',
-      };
-      const toastDesc = isBuiltinType ? t('llmConfig.promptTypes.' + builtinTypeI18nKey[promptType]) : promptType;
-
-      showToast({
-        type: 'success',
-        title: t('home.promptTypeSwitched'),
-        description: toastDesc,
-      });
-    } catch (error) {
-      log.error(`Failed to save prompt type: ${error}`);
-      showToast({
-        type: 'error',
-        title: t('common.error'),
-        description: String(error),
-      });
-    }
-  }, [localScenes, customPresets, showToast, t]);
-
   // 获取全局 ASR 模型信息
   const asrModelId = globalModelConfig?.asrModel ? getFullModelId(globalModelConfig.asrModel) : '';
   const asrModelName = asrModelId ? getModelName(asrModelId, asrModels) : t('home.noAsrModelSelected');
@@ -523,270 +461,142 @@ export default function HomePanelV2({
   const enabledScenes = localScenes.filter(s => s.enabled);
 
   return (
-    <div className="min-h-[400px]">
-      {/* 品牌 */}
-      <header className="mb-6">
+    <div className="min-h-[400px] flex flex-col">
+      {/* 头部区域：品牌 + 模型状态 */}
+      <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Voconly</h1>
         <p className="text-sm text-gray-400 mt-1">语音转文字，高效转录</p>
+
+        {/* 模型状态栏 */}
+        <div className="flex items-center gap-1 mt-4 text-xs text-gray-400">
+          <button
+            onClick={() => setSelectingSceneId('global')}
+            className="inline-flex items-center gap-1.5 hover:text-gray-600 transition-colors"
+          >
+            <AsrIcon className="w-3.5 h-3.5" />
+            <span>{asrModelName}</span>
+            {globalModelConfig?.asrModel?.modelId && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+          <span className="mx-1.5 text-gray-300">·</span>
+          <button
+            onClick={onNavigateToLlmSettings}
+            className="inline-flex items-center gap-1.5 hover:text-gray-600 transition-colors"
+          >
+            <LlmIcon className="w-3.5 h-3.5" />
+            <span>{llmModelName}</span>
+            {hasLlmConfig && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* 统计卡片 */}
-      <section className="mb-8">
-        <div className="grid grid-cols-4 gap-3">
+      {/* 场景快捷键 - 主角区域 */}
+      <section className="flex-1 flex flex-col justify-center">
+        <div className="-mx-4 px-4 py-10" style={{ background: 'radial-gradient(ellipse at center, rgba(243, 244, 246, 0.7) 0%, rgba(243, 244, 246, 0.4) 50%, transparent 90%)' }}>
+          <div className="text-center mb-8">
+            <h2 className="text-sm font-medium text-gray-400 mb-2">场景快捷键</h2>
+            <p className="text-xs text-gray-400">按下快捷键开始语音输入，再次按下结束识别</p>
+          </div>
+
+          {enabledScenes.length > 0 ? (
+            <div className="flex flex-wrap gap-6 justify-center">
+              {enabledScenes.map((scene) => {
+                const promptType = scene.promptType || 'lightPolish';
+                const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
+                const isListening = listeningSceneId === scene.id;
+
+                return (
+                  <button
+                    key={scene.id}
+                    className="group relative flex flex-col items-center bg-white border border-gray-100 rounded-2xl p-12 text-center transition-all duration-200 hover:border-gray-200 hover:shadow-lg min-w-[260px] w-[280px]"
+                    onClick={() => handleShortcutClick(scene.id)}
+                  >
+                    {/* 键帽样式快捷键 */}
+                    <div className="relative mb-5">
+                      <div
+                        className={`w-20 h-20 rounded-xl font-mono text-2xl font-bold flex items-center justify-center transition-all duration-150 ${
+                          isListening
+                            ? 'bg-amber-400 text-amber-900 shadow-lg shadow-amber-200 animate-pulse'
+                            : 'bg-gray-800 text-white shadow-lg group-hover:bg-gray-900 group-hover:shadow-xl group-hover:-translate-y-0.5'
+                        }`}
+                        style={{
+                          boxShadow: isListening
+                            ? '0 8px 0 0 rgb(217 119 6), 0 12px 24px -4px rgba(217, 119, 6, 0.4)'
+                            : '0 8px 0 0 rgb(31 41 55), 0 12px 24px -4px rgba(0, 0, 0, 0.15)'
+                        }}
+                      >
+                        {isListening ? (
+                          <span className="text-base">...</span>
+                        ) : (
+                          formatShortcut(scene.shortcut)
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 场景名称 */}
+                    <div className="text-sm font-medium text-gray-900">
+                      {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets)}
+                    </div>
+
+                    {/* 场景描述 */}
+                    {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
+                      <div className="text-xs text-gray-400 mt-1.5 line-clamp-1">
+                        {t(`llmConfig.promptTypeDescs.${promptType}`)}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white/60 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center py-12">
+              <div className="text-sm font-medium text-gray-400 mb-1">暂无启用的场景</div>
+              <div className="text-xs text-gray-400">请前往设置添加场景</div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 统计卡片 - 底部紧凑区域 */}
+      <section className="mt-8 pt-6 border-t border-gray-100">
+        <div className="grid grid-cols-4 gap-2">
           {/* 总时长 */}
-          <div className="bg-gray-100 rounded-xl p-5 border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-600 mb-3">
-              <ClockIcon className="w-4 h-4" />
-              <span className="text-xs font-medium">{t('memory.totalDuration')}</span>
-            </div>
-            <div className="text-xl font-bold text-gray-900 mb-1">
-              {formatDuration(stats.totalDuration)}
-            </div>
-            <div className="text-xs text-gray-500">
-              {stats.activeDays > 0 ? t('memory.activeDays', { count: stats.activeDays }) : t('memory.totalDurationDesc')}
+          <div className="text-center">
+            <div className="text-xs text-gray-400 mb-1">{t('memory.totalDuration')}</div>
+            <div className="text-base font-semibold text-gray-700">{formatDuration(stats.totalDuration)}</div>
+            <div className="text-xs text-gray-400">
+              {stats.activeDays > 0 ? `${stats.activeDays} 天` : '—'}
             </div>
           </div>
 
           {/* 总字数 */}
-          <div className="bg-gray-100 rounded-xl p-5 border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-600 mb-3">
-              <TextIcon className="w-4 h-4" />
-              <span className="text-xs font-medium">{t('memory.totalWords')}</span>
-            </div>
-            <div className="text-xl font-bold text-gray-900 mb-1">
-              {(stats.totalWords ?? 0).toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-500">
-              {stats.activeDays > 0 ? t('memory.avgWordsPerDay', { count: avgStats.avgWordsPerDay.toLocaleString() }) : t('memory.totalWordsDesc')}
+          <div className="text-center">
+            <div className="text-xs text-gray-400 mb-1">{t('memory.totalWords')}</div>
+            <div className="text-base font-semibold text-gray-700">{(stats.totalWords ?? 0).toLocaleString()}</div>
+            <div className="text-xs text-gray-400">
+              {stats.activeDays > 0 ? `日均 ${avgStats.avgWordsPerDay.toLocaleString()}` : '—'}
             </div>
           </div>
 
           {/* 总记录 */}
-          <div className="bg-gray-100 rounded-xl p-5 border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-600 mb-3">
-              <MicIcon className="w-4 h-4" />
-              <span className="text-xs font-medium">{t('memory.totalCount')}</span>
-            </div>
-            <div className="text-xl font-bold text-gray-900 mb-1">
-              {stats.totalCount}
-            </div>
-            <div className="text-xs text-gray-500">
-              {stats.activeDays > 0 ? t('memory.avgRecordsPerDay', { count: avgStats.avgRecordsPerDay }) : t('memory.totalCountDesc')}
+          <div className="text-center">
+            <div className="text-xs text-gray-400 mb-1">{t('memory.totalCount')}</div>
+            <div className="text-base font-semibold text-gray-700">{stats.totalCount}</div>
+            <div className="text-xs text-gray-400">
+              {stats.activeDays > 0 ? `日均 ${avgStats.avgRecordsPerDay}` : '—'}
             </div>
           </div>
 
           {/* 今日 */}
-          <div className="bg-gray-100 rounded-xl p-5 border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-600 mb-3">
-              <CalendarIcon className="w-4 h-4" />
-              <span className="text-xs font-medium">{t('memory.todayCount')}</span>
-            </div>
-            <div className="text-xl font-bold text-gray-900 mb-1">
-              {stats.todayCount}
-            </div>
-            <div className="text-xs text-gray-500">{t('memory.todayCountDesc')}</div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400 mb-1">{t('memory.todayCount')}</div>
+            <div className="text-base font-semibold text-gray-700">{stats.todayCount}</div>
+            <div className="text-xs text-gray-400">今日</div>
           </div>
         </div>
-      </section>
-
-      {/* 模型配置 */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-1 h-1 rounded-full bg-gray-300" />
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">模型配置</h2>
-        </div>
-
-        <div className="grid grid-cols-2 gap-5">
-          {/* ASR */}
-          <button
-            onClick={() => setSelectingSceneId('global')}
-            className="group relative bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl p-5 text-left transition-all duration-200 hover:shadow-sm"
-          >
-            {/* 状态指示器 */}
-            {globalModelConfig?.asrModel?.modelId && (
-              <div className="absolute top-3.5 right-3.5">
-                <span className="block w-2 h-2 rounded-full bg-emerald-500" />
-              </div>
-            )}
-
-            <div className="flex items-center gap-3.5">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                globalModelConfig?.asrModel?.modelId
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
-              }`}>
-                <AsrIcon className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">语音识别模型</div>
-                <div className="text-[15px] font-semibold text-gray-900 truncate mb-1.5">{asrModelName}</div>
-                {/* 模型大小和精度 */}
-                {asrModelId ? (
-                  <div className="flex items-center gap-1.5 h-[22px]">
-                    {(() => {
-                      const quant = getModelQuant(asrModelId, asrModels, t);
-                      const size = getModelSize(asrModelId, asrModels);
-                      if (quant && size) {
-                        return (
-                          <>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-xl bg-gray-50 text-gray-600 text-[11px] font-medium border border-gray-200">
-                              {quant}
-                            </span>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-[11px] text-gray-500">{size}</span>
-                          </>
-                        );
-                      }
-                      if (quant) {
-                        return (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-xl bg-gray-50 text-gray-600 text-[11px] font-medium border border-gray-200">
-                            {quant}
-                          </span>
-                        );
-                      }
-                      if (size) {
-                        return <span className="text-[11px] text-gray-500">{size}</span>;
-                      }
-                      return null;
-                    })()}
-                  </div>
-                ) : (
-                  <div className="h-[22px]" />
-                )}
-              </div>
-            </div>
-
-            {/* 箭头 */}
-            <svg className="absolute bottom-4 right-4 w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-
-          {/* LLM */}
-          <button
-            onClick={onNavigateToLlmSettings}
-            className="group relative bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl p-5 text-left transition-all duration-200 hover:shadow-sm"
-          >
-            {/* 状态指示器 */}
-            {hasLlmConfig && (
-              <div className="absolute top-3.5 right-3.5">
-                <span className="block w-2 h-2 rounded-full bg-emerald-500" />
-              </div>
-            )}
-
-            <div className="flex items-center gap-3.5">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                hasLlmConfig
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
-              }`}>
-                <LlmIcon className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">AI 文本处理</div>
-                <div className="text-[15px] font-semibold text-gray-900 truncate mb-1.5">{llmModelName}</div>
-                {/* 占位元素，保持与ASR卡片对齐 */}
-                <div className="h-[22px]" />
-              </div>
-            </div>
-
-            {/* 箭头 */}
-            <svg className="absolute bottom-4 right-4 w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      </section>
-
-      {/* 场景快捷键 */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-1 h-1 rounded-full bg-gray-300" />
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">场景快捷键</h2>
-        </div>
-
-        {enabledScenes.length > 0 ? (
-          <div className="space-y-3">
-            {enabledScenes.map((scene) => {
-              const promptType = scene.promptType || 'lightPolish';
-              const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
-              const isListening = listeningSceneId === scene.id;
-
-              return (
-                <button
-                  key={scene.id}
-                  className="group w-full flex items-start gap-4 bg-gray-100 border border-gray-200 rounded-xl px-5 py-4 text-left transition-all duration-200 hover:border-gray-300 hover:shadow-sm"
-                >
-                  {/* 快捷键 */}
-                  <div
-                    className="flex-shrink-0 w-20 cursor-pointer pt-0.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShortcutClick(scene.id);
-                    }}
-                  >
-                    <span className={`inline-flex items-center justify-center w-full px-2.5 py-2 rounded-lg font-mono text-xs font-semibold transition-colors ${
-                      isListening
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
-                    }`}>
-                      {isListening ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                          <span>...</span>
-                        </div>
-                      ) : (
-                        formatShortcut(scene.shortcut)
-                      )}
-                    </span>
-                  </div>
-
-                  {/* 场景名称和描述 */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[15px] font-medium text-gray-900">
-                      {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets)}
-                    </span>
-                    {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {t(`llmConfig.promptTypeDescs.${promptType}`)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* 模式标签 */}
-                  <div
-                    className="flex-shrink-0 cursor-pointer pt-0.5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (hasLlm) {
-                        handlePromptTypeClick(scene.id);
-                      }
-                    }}
-                  >
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors border bg-gray-50 text-gray-600 border-gray-200`}>
-                      {!hasLlm ? (
-                        <>
-                          <MicIcon className="w-3.5 h-3.5" />
-                          纯 ASR
-                        </>
-                      ) : (
-                        <>
-                          <LlmIcon className="w-3.5 h-3.5" />
-                          {getPromptTypeLabel(promptType, t)}
-                        </>
-                      )}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center py-12">
-            <div className="text-sm font-medium text-gray-500 mb-1">暂无启用的场景</div>
-            <div className="text-xs text-gray-400">请前往设置添加场景</div>
-          </div>
-        )}
       </section>
 
       {/* ASR 模型选择弹窗 */}
@@ -804,84 +614,6 @@ export default function HomePanelV2({
           onQuantPrefChange={() => {}}
         />
       )}
-
-      {/* 提示词类型选择弹窗 */}
-      {selectingPromptTypeSceneId && (() => {
-        const scene = localScenes.find(s => s.id === selectingPromptTypeSceneId);
-        const currentPromptType = scene?.promptType || 'lightPolish';
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-            onClick={() => setSelectingPromptTypeSceneId(null)}
-          >
-            <div
-              className="bg-white rounded-xl p-4 w-[280px] shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium text-gray-900 text-sm">{t('home.selectPromptType')}</h4>
-                <button
-                  onClick={() => setSelectingPromptTypeSceneId(null)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="space-y-1">
-                {/* 内置预设 */}
-                {(['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handlePromptTypeSelect(selectingPromptTypeSceneId, type)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ${
-                      currentPromptType === type
-                        ? 'bg-gray-900 text-white'
-                        : 'hover:bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{getPromptTypeLabel(type, t)}</span>
-                    {currentPromptType === type && (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-
-                {/* 自定义预设 */}
-                {customPresets && Object.keys(customPresets).length > 0 && (
-                  <>
-                    <div className="border-t border-gray-100 my-2" />
-                    {Object.entries(customPresets).map(([presetName]) => {
-                      const isSelected = currentPromptType === presetName;
-                      return (
-                        <button
-                          key={presetName}
-                          onClick={() => handlePromptTypeSelect(selectingPromptTypeSceneId, presetName)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 ${
-                            isSelected
-                              ? 'bg-gray-900 text-white'
-                              : 'hover:bg-blue-50 text-blue-700'
-                          }`}
-                        >
-                          <span className="text-sm font-medium">{presetName}</span>
-                          {isSelected && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* 快捷键错误弹窗 */}
       {shortcutError && (
