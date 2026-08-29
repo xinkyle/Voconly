@@ -1209,6 +1209,19 @@ function App() {
     await updateTrayMenu(scenes);
   };
 
+  const handleQuantPrefChange = useCallback(async (modelId: string, quant: string) => {
+    if (!config) return;
+
+    const updatedPrefs = {
+      ...(config.modelQuantPrefs || {}),
+      [modelId]: quant,
+    };
+
+    const newConfig = { ...config, modelQuantPrefs: updatedPrefs };
+    setConfig(newConfig);
+    await saveConfig(newConfig);
+  }, [config]);
+
   if (loading) {
     return (
       <div className="h-screen flex overflow-hidden">
@@ -1412,14 +1425,14 @@ function App() {
               <ModelConfigPanel
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
-                onDownloadCancel={(modelId) => {
-                  log.info(`Download cancel requested for ${modelId}`);
-                }}
+                onDownloadCancel={handleDownloadCancel}
                 onConfigUpdate={async () => {
                   const latestConfig = await loadConfig();
                   setConfig(latestConfig);
                   log.info('Config reloaded after custom dir update');
                 }}
+                modelQuantPrefs={config?.modelQuantPrefs || {}}
+                onQuantPrefChange={handleQuantPrefChange}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'shortcut' && (
@@ -1486,6 +1499,7 @@ function App() {
                 triggerSelectModelSceneId={triggerSelectModelSceneId}
                 onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
                 onScenesSave={handleSaveScenes}
+                onQuantPrefChange={handleQuantPrefChange}
               />
             </div>
             {activeNav === 'memory' && (

@@ -81,6 +81,8 @@ interface ModelConfigPanelProps {
   onDownload?: (model: Model) => void;
   onDownloadCancel?: (modelId: string) => void;
   onConfigUpdate?: () => void; // 通知父组件重新加载配置
+  modelQuantPrefs?: Record<string, string>;
+  onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
 }
 
 // Icons
@@ -172,6 +174,8 @@ export default function ModelConfigPanel({
   onDownload,
   onDownloadCancel,
   onConfigUpdate,
+  modelQuantPrefs,
+  onQuantPrefChange,
 }: ModelConfigPanelProps) {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -531,6 +535,8 @@ export default function ModelConfigPanel({
             onDownloadCancel={onDownloadCancel}
             currentLanguage={currentLanguage}
             layout="grid"
+            modelQuantPrefs={modelQuantPrefs}
+            onQuantPrefChange={onQuantPrefChange}
           />
         </div>
       </section>

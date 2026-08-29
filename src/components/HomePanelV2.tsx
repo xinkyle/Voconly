@@ -165,6 +165,7 @@ interface HomePanelV2Props {
   triggerSelectModelSceneId?: string | null;
   onTriggerSelectModelCleared?: () => void;
   onScenesSave?: (scenes: Scene[]) => void;
+  onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
 }
 
 export default function HomePanelV2({
@@ -181,6 +182,7 @@ export default function HomePanelV2({
   triggerSelectModelSceneId: _triggerSelectModelSceneId,
   onTriggerSelectModelCleared: _onTriggerSelectModelCleared,
   onScenesSave,
+  onQuantPrefChange,
 }: HomePanelV2Props) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -444,7 +446,9 @@ export default function HomePanelV2({
 
   // 获取全局 ASR 模型信息
   const asrModelId = globalModelConfig?.asrModel ? getFullModelId(globalModelConfig.asrModel) : '';
-  const asrModelName = asrModelId ? getModelName(asrModelId, asrModels) : t('home.noAsrModelSelected');
+  const asrModelBaseName = asrModelId ? getModelName(asrModelId, asrModels) : t('home.noAsrModelSelected');
+  const asrModelQuant = asrModelId ? getModelQuant(asrModelId, asrModels, t) : null;
+  const asrModelName = asrModelQuant ? `${asrModelBaseName} (${asrModelQuant})` : asrModelBaseName;
 
   // 获取全局 LLM 配置信息
   const llmConfig = globalModelConfig?.llm;
@@ -463,28 +467,27 @@ export default function HomePanelV2({
   return (
     <div className="min-h-[400px] flex flex-col">
       {/* 头部区域：品牌 + 模型状态 */}
-      <header className="mb-8">
+      <header className="mb-2">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Voconly</h1>
         <p className="text-sm text-gray-400 mt-1">语音转文字，高效转录</p>
 
         {/* 模型状态栏 */}
-        <div className="flex items-center gap-1 mt-4 text-xs text-gray-400">
+        <div className="flex items-center gap-2 mt-4">
           <button
             onClick={() => setSelectingSceneId('global')}
-            className="inline-flex items-center gap-1.5 hover:text-gray-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
-            <AsrIcon className="w-3.5 h-3.5" />
+            <AsrIcon className="w-3 h-3" />
             <span>{asrModelName}</span>
             {globalModelConfig?.asrModel?.modelId && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             )}
           </button>
-          <span className="mx-1.5 text-gray-300">·</span>
           <button
             onClick={onNavigateToLlmSettings}
-            className="inline-flex items-center gap-1.5 hover:text-gray-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
-            <LlmIcon className="w-3.5 h-3.5" />
+            <LlmIcon className="w-3 h-3" />
             <span>{llmModelName}</span>
             {hasLlmConfig && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -502,7 +505,7 @@ export default function HomePanelV2({
           </div>
 
           {enabledScenes.length > 0 ? (
-            <div className="flex flex-wrap gap-6 justify-center">
+            <div className="flex flex-wrap gap-10 justify-center">
               {enabledScenes.map((scene) => {
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
@@ -560,41 +563,41 @@ export default function HomePanelV2({
         </div>
       </section>
 
-      {/* 统计卡片 - 底部紧凑区域 */}
+      {/* 统计卡片 - 底部区域 */}
       <section className="mt-8 pt-6 border-t border-gray-100">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-3">
           {/* 总时长 */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 mb-1">{t('memory.totalDuration')}</div>
-            <div className="text-base font-semibold text-gray-700">{formatDuration(stats.totalDuration)}</div>
-            <div className="text-xs text-gray-400">
-              {stats.activeDays > 0 ? `${stats.activeDays} 天` : '—'}
+          <div className="bg-gray-100 rounded-xl p-3 text-center">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalDuration')}</div>
+            <div className="text-lg font-bold text-gray-900">{formatDuration(stats.totalDuration)}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {stats.activeDays > 0 ? `共 ${stats.activeDays} 天` : '—'}
             </div>
           </div>
 
           {/* 总字数 */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 mb-1">{t('memory.totalWords')}</div>
-            <div className="text-base font-semibold text-gray-700">{(stats.totalWords ?? 0).toLocaleString()}</div>
-            <div className="text-xs text-gray-400">
+          <div className="bg-gray-100 rounded-xl p-3 text-center">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalWords')}</div>
+            <div className="text-lg font-bold text-gray-900">{(stats.totalWords ?? 0).toLocaleString()}</div>
+            <div className="text-xs text-gray-500 mt-1">
               {stats.activeDays > 0 ? `日均 ${avgStats.avgWordsPerDay.toLocaleString()}` : '—'}
             </div>
           </div>
 
           {/* 总记录 */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 mb-1">{t('memory.totalCount')}</div>
-            <div className="text-base font-semibold text-gray-700">{stats.totalCount}</div>
-            <div className="text-xs text-gray-400">
+          <div className="bg-gray-100 rounded-xl p-3 text-center">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalCount')}</div>
+            <div className="text-lg font-bold text-gray-900">{stats.totalCount}</div>
+            <div className="text-xs text-gray-500 mt-1">
               {stats.activeDays > 0 ? `日均 ${avgStats.avgRecordsPerDay}` : '—'}
             </div>
           </div>
 
           {/* 今日 */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 mb-1">{t('memory.todayCount')}</div>
-            <div className="text-base font-semibold text-gray-700">{stats.todayCount}</div>
-            <div className="text-xs text-gray-400">今日</div>
+          <div className="bg-gray-100 rounded-xl p-3 text-center">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.todayCount')}</div>
+            <div className="text-lg font-bold text-gray-900">{stats.todayCount}</div>
+            <div className="text-xs text-gray-500 mt-1">今日记录</div>
           </div>
         </div>
       </section>
@@ -611,7 +614,7 @@ export default function HomePanelV2({
           onDownloadCancel={onDownloadCancel}
           currentLanguage="zh"
           modelQuantPrefs={modelQuantPrefs}
-          onQuantPrefChange={() => {}}
+          onQuantPrefChange={onQuantPrefChange}
         />
       )}
 
