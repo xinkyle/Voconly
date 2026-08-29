@@ -466,7 +466,7 @@ export default function HomePanelV2({
     <div className="min-h-[400px] flex flex-col">
       {/* 头部区域：品牌 + 模型状态 */}
       <header className="mb-2">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Voconly</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-gray-900">Voconly</h1>
         <p className="text-sm text-gray-400 mt-1">语音转文字，高效转录</p>
 
         {/* 模型状态栏 */}
@@ -498,7 +498,7 @@ export default function HomePanelV2({
       <section className="flex-1 flex flex-col justify-center">
         <div className="-mx-4 px-4 py-10" style={{ background: 'radial-gradient(ellipse at center, rgba(243, 244, 246, 0.7) 0%, rgba(243, 244, 246, 0.4) 50%, transparent 90%)' }}>
           <div className="text-center mb-8">
-            <h2 className="text-sm font-medium text-gray-400 mb-2">场景快捷键</h2>
+            <h2 className="text-base font-medium text-gray-500 mb-2">场景快捷键</h2>
             <p className="text-xs text-gray-400">按下快捷键开始语音输入，再次按下结束识别</p>
           </div>
 
@@ -566,7 +566,7 @@ export default function HomePanelV2({
         <div className="grid grid-cols-4 gap-3">
           {/* 总时长 */}
           <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalDuration')}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalDuration')}</div>
             <div className="text-lg font-bold text-gray-900">{formatDuration(stats.totalDuration)}</div>
             <div className="text-xs text-gray-500 mt-1">
               {stats.activeDays > 0 ? `共 ${stats.activeDays} 天` : '—'}
@@ -575,7 +575,7 @@ export default function HomePanelV2({
 
           {/* 总字数 */}
           <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalWords')}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalWords')}</div>
             <div className="text-lg font-bold text-gray-900">{(stats.totalWords ?? 0).toLocaleString()}</div>
             <div className="text-xs text-gray-500 mt-1">
               {stats.activeDays > 0 ? `日均 ${avgStats.avgWordsPerDay.toLocaleString()}` : '—'}
@@ -584,7 +584,7 @@ export default function HomePanelV2({
 
           {/* 总记录 */}
           <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalCount')}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalCount')}</div>
             <div className="text-lg font-bold text-gray-900">{stats.totalCount}</div>
             <div className="text-xs text-gray-500 mt-1">
               {stats.activeDays > 0 ? `日均 ${avgStats.avgRecordsPerDay}` : '—'}
@@ -593,7 +593,7 @@ export default function HomePanelV2({
 
           {/* 今日 */}
           <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-2">{t('memory.todayCount')}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.todayCount')}</div>
             <div className="text-lg font-bold text-gray-900">{stats.todayCount}</div>
             <div className="text-xs text-gray-500 mt-1">今日记录</div>
           </div>
