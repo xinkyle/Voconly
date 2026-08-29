@@ -488,7 +488,6 @@ export default function ModelConfigPanel({
                               </button>
                             </div>
                             <div className="border-t border-gray-200 pt-2 mt-2">
-                              <p className="text-gray-600 mb-1">{t('modelConfig.asrQuantizationPriority')}</p>
                               <p className="text-gray-500">{t('modelConfig.asrDownloadHint')}</p>
                             </div>
                           </div>

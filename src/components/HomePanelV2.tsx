@@ -454,10 +454,8 @@ export default function HomePanelV2({
   const llmConfig = globalModelConfig?.llm;
   const currentProvider = providers.find(p => p.meta.id === llmConfig?.providerId);
 
-  // 优先显示 model，其次显示 provider 名称，都没有则提示配置
-  const llmModelName = llmConfig?.model
-    || (currentProvider ? currentProvider.meta.label : null)
-    || t('home.noModelSelected');
+  // 显示 provider 名称，没有则提示配置
+  const llmModelName = currentProvider ? currentProvider.meta.label : t('home.noModelSelected');
 
   // 有 providerId 就算配置了
   const hasLlmConfig = !!llmConfig?.providerId;

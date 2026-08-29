@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProviderWithConfig, GlobalModelConfig } from '../types';
+import type { ProviderWithConfig, GlobalModelConfig, AppConfig } from '../types';
 import { getProviderList, saveProviderConfig } from '../services/llm';
 import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
@@ -123,7 +123,12 @@ function CloudProviderCard({ provider, isSelected, onSelect, onConfigure, onEdit
   );
 }
 
-export default function ProviderPanel() {
+interface ProviderPanelProps {
+  /** Callback when config changes (e.g., provider selection) */
+  onConfigChange?: (config: AppConfig) => void;
+}
+
+export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
@@ -154,8 +159,17 @@ export default function ProviderPanel() {
     loadData();
   }, []);
 
-  // Handle provider selection - set as active provider
+  // Handle provider selection - check if configured first
   const handleProviderSelect = async (providerId: string) => {
+    const provider = providers.find(p => p.meta.id === providerId);
+
+    // If provider is not configured, open config modal instead
+    if (!provider?.instance?.enabled) {
+      handleProviderConfigure(providerId);
+      return;
+    }
+
+    // Provider is configured - set as active provider
     try {
       const config = await loadConfig();
       const newConfig = {
@@ -165,13 +179,16 @@ export default function ProviderPanel() {
           llm: {
             ...config.globalModelConfig.llm,
             providerId,
+            // Use the provider's default model
+            model: provider?.instance?.defaultModel || '',
           },
         },
       };
       await saveConfig(newConfig);
       setGlobalModelConfig(newConfig.globalModelConfig);
+      // Notify parent component
+      onConfigChange?.(newConfig);
 
-      const provider = providers.find(p => p.meta.id === providerId);
       showToast({
         type: 'success',
         title: t('modelConfig.providerSelected'),
@@ -263,8 +280,23 @@ export default function ProviderPanel() {
             setProviders(list);
             setShowProviderModal(false);
             setSelectedProvider(null);
-            // Auto-select the configured provider
-            await handleProviderSelect(providerId);
+            // Update global config with the new provider and its default model
+            const config = await loadConfig();
+            const newConfig = {
+              ...config,
+              globalModelConfig: {
+                ...config.globalModelConfig,
+                llm: {
+                  ...config.globalModelConfig.llm,
+                  providerId,
+                  model: instance.defaultModel || '',
+                },
+              },
+            };
+            await saveConfig(newConfig);
+            setGlobalModelConfig(newConfig.globalModelConfig);
+            // Notify parent component
+            onConfigChange?.(newConfig);
             showToast({
               type: 'success',
               title: t('modelConfig.providerSaved'),
@@ -300,6 +332,8 @@ export default function ProviderPanel() {
             };
             await saveConfig(newConfig);
             setGlobalModelConfig(newConfig.globalModelConfig);
+            // Notify parent component
+            onConfigChange?.(newConfig);
             // 刷新 Provider 列表
             const list = await getProviderList();
             setProviders(list);

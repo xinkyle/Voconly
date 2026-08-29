@@ -1470,7 +1470,11 @@ function App() {
               <SettingsDictionary />
             )}
             {activeNav === 'provider' && (
-              <ProviderPanel />
+              <ProviderPanel
+                onConfigChange={(newConfig) => {
+                  setConfig(newConfig);
+                }}
+              />
             )}
             {/* Keep HomePanelV2 always mounted to preserve state on tab switch */}
             <div className={activeNav === 'home' ? '' : 'hidden'}>
