@@ -52,6 +52,15 @@ const getSceneDisplayName = (scene: Scene | null, t: (key: string) => string, cu
   return getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets);
 };
 
+// Helper: Get default presets from i18n
+const getDefaultPresets = (t: (key: string) => string): import('./types').UserPromptPresets => ({
+  lightPolish: t('llmConfig.presets.lightPolish'),
+  translate: t('llmConfig.presets.translate'),
+  professionalPolish: t('llmConfig.presets.professionalPolish'),
+  meetingSecretary: t('llmConfig.presets.meetingSecretary'),
+  customPresets: {},
+});
+
 // 初始化性能缓存（从后端加载）
 initPerformanceCache().catch((e) => log.error(`Failed to init performance cache: ${e}`));
 initLlmPerformanceCache().catch((e) => log.error(`Failed to init LLM performance cache: ${e}`));
@@ -777,7 +786,40 @@ function App() {
       // 只有配置了 LLM 且未双击跳过才调用处理流程
       if (hasLlmProfile && !shouldSkipLlm) {
         try {
-          const response = await processTextForSceneWithProgress(scene.id, recognizedText);
+          // 获取提示词（前端合并逻辑）
+          const defaultPresets = getDefaultPresets(t);
+          const savedPresets = config?.llmPromptPresets;
+
+          // 合并提示词预设
+          const mergedPresets = {
+            ...defaultPresets,
+            customPresets: savedPresets?.customPresets || {},
+          };
+          // 逐个检查内置预设，只有非空才使用存储的值
+          const builtinKeys = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'] as const;
+          for (const key of builtinKeys) {
+            if (savedPresets?.[key] && savedPresets[key].trim()) {
+              mergedPresets[key] = savedPresets[key];
+            }
+          }
+
+          // 确定最终提示词（优先级：customPrompt > promptType 预设 > 默认 lightPolish）
+          let finalPrompt: string | undefined;
+          if (currentScene?.customPrompt) {
+            finalPrompt = currentScene.customPrompt;
+          } else {
+            const promptType = currentScene?.promptType || 'lightPolish';
+            if (promptType === 'lightPolish' || promptType === 'translate' || promptType === 'professionalPolish' || promptType === 'meetingSecretary') {
+              finalPrompt = mergedPresets[promptType];
+            } else {
+              // 自定义预设
+              finalPrompt = mergedPresets.customPresets[promptType] || mergedPresets.lightPolish;
+            }
+          }
+
+          log.debug(`[LLM] Final prompt: ${finalPrompt?.substring(0, 100)}...`);
+
+          const response = await processTextForSceneWithProgress(scene.id, recognizedText, finalPrompt);
           if (response.success) {
             llmResult = { processed: true, text: response.text };
           } else {

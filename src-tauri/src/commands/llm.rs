@@ -255,12 +255,14 @@ pub async fn llm_process_text(
 }
 
 /// 处理文本（按场景 ID，使用全局 LLM 配置 + 场景提示词）
+/// 如果前端传递了 prompt，直接使用；否则从场景配置中查找提示词
 #[tauri::command]
 pub async fn llm_process_text_for_scene(
     services: State<'_, AppServices>,
     llm_performance: State<'_, LlmPerformanceState>,
     scene_id: String,
     text: String,
+    prompt: Option<String>,
 ) -> Result<LlmResponse, String> {
     info!(
         "[LLM] Processing text for scene: {}, {} chars",
@@ -359,8 +361,12 @@ pub async fn llm_process_text_for_scene(
         config.llm_prompt_presets.clone()
     };
 
-    // 确定提示词（优先级：custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
-    let user_prompt = if let Some(ref custom) = custom_prompt {
+    // 确定提示词（优先级：前端传递的 prompt > custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
+    let user_prompt = if let Some(frontend_prompt) = prompt {
+        // 0. 前端传递的提示词最高优先级
+        info!("[LLM] Using prompt from frontend");
+        frontend_prompt
+    } else if let Some(ref custom) = custom_prompt {
         // 1. 场景自定义提示词优先
         info!("[LLM] Using scene custom_prompt");
         custom.clone()
@@ -470,6 +476,7 @@ pub async fn llm_process_text_for_scene(
 
 /// 处理文本（按场景 ID，使用全局 LLM 配置 + 场景提示词，带进度事件）
 /// 通过 Tauri 事件 "llm-progress" 发送进度更新
+/// 如果前端传递了 prompt，直接使用；否则从场景配置中查找提示词
 #[tauri::command]
 pub async fn llm_process_text_for_scene_with_progress(
     app: AppHandle,
@@ -477,6 +484,7 @@ pub async fn llm_process_text_for_scene_with_progress(
     llm_performance: State<'_, LlmPerformanceState>,
     scene_id: String,
     text: String,
+    prompt: Option<String>,
 ) -> Result<LlmResponse, String> {
     info!(
         "[LLM] Processing text for scene with progress: {}, {} chars",
@@ -575,8 +583,12 @@ pub async fn llm_process_text_for_scene_with_progress(
         config.llm_prompt_presets.clone()
     };
 
-    // 确定提示词（优先级：custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
-    let user_prompt = if let Some(ref custom) = custom_prompt {
+    // 确定提示词（优先级：前端传递的 prompt > custom_prompt > prompt_type 预设 > 默认 "lightPolish"）
+    let user_prompt = if let Some(frontend_prompt) = prompt {
+        // 0. 前端传递的提示词最高优先级
+        info!("[LLM] Using prompt from frontend");
+        frontend_prompt
+    } else if let Some(ref custom) = custom_prompt {
         // 1. 场景自定义提示词优先
         info!("[LLM] Using scene custom_prompt");
         custom.clone()

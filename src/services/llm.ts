@@ -135,13 +135,15 @@ export async function processTextSimple(text: string): Promise<string> {
  * 按场景处理文本（使用场景级 Profile 配置）
  * @param sceneId 场景 ID
  * @param text 要处理的文本
+ * @param prompt 可选的提示词（如果提供，优先使用）
  * @returns LLM 处理结果
  */
 export async function processTextForScene(
   sceneId: string,
-  text: string
+  text: string,
+  prompt?: string
 ): Promise<LlmResponse> {
-  return invoke<LlmResponse>('llm_process_text_for_scene', { sceneId, text });
+  return invoke<LlmResponse>('llm_process_text_for_scene', { sceneId, text, prompt });
 }
 
 /**
@@ -149,14 +151,16 @@ export async function processTextForScene(
  * 通过监听 llm-progress 事件获取实时进度
  * @param sceneId 场景 ID
  * @param text 要处理的文本
+ * @param prompt 可选的提示词（如果提供，优先使用）
  * @returns LLM 处理结果
  */
 export async function processTextForSceneWithProgress(
   sceneId: string,
-  text: string
+  text: string,
+  prompt?: string
 ): Promise<LlmResponse> {
-  log.debug(`processTextForSceneWithProgress: sceneId=${sceneId}, text length=${text.length}`);
-  return invoke<LlmResponse>('llm_process_text_for_scene_with_progress', { sceneId, text });
+  log.debug(`processTextForSceneWithProgress: sceneId=${sceneId}, text length=${text.length}, hasPrompt=${!!prompt}`);
+  return invoke<LlmResponse>('llm_process_text_for_scene_with_progress', { sceneId, text, prompt });
 }
 
 /**
