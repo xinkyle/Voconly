@@ -107,7 +107,8 @@ export interface Model {
 // 场景定义
 export interface Scene {
   id: string;
-  name: string;
+  /** 场景名称（从 promptType 对应的提示词预设获取，此字段仅用于向后兼容） */
+  name?: string;
   shortcut: string;
   /** 模型引用（新格式：包含 modelId 和 quantization） */
   model: ModelRef;

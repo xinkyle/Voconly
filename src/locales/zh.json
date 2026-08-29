@@ -15,7 +15,7 @@
     "title": "设置",
     "tabs": {
       "shortcut": "场景配置",
-      "prompt": "提示词",
+      "prompt": "场景提示词",
       "system": "系统",
       "llm": "LLM",
       "dictionary": "词典",
@@ -49,8 +49,8 @@
       "openLogDirError": "打开日志目录失败"
     },
     "prompt": {
-      "title": "提示词管理",
-      "subtitle": "配置文本后处理的提示词预设，可在场景中选择使用",
+      "title": "场景提示词管理",
+      "subtitle": "管理 LLM 后处理场景使用的提示词预设，可在场景中快速选择",
       "selectPreset": "选择预设",
       "addPreset": "添加预设",
       "editPrompt": "编辑提示词"
@@ -393,7 +393,7 @@
     "noModelsError": "无法获取模型列表",
     "foundModelsFrom": "{{provider}}: {{count}} 个模型",
     "noModelsTip": "{{provider}} 无可用模型",
-    "userPrompt": "用户提示词",
+    "scenePrompt": "场景提示词",
     "refreshModels": "刷新模型列表",
     "modelsRefreshed": "模型列表已更新",
     "refreshFailed": "刷新失败",

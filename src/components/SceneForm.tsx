@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene } from '../types';
 import { getLlmPromptPresets } from '../services/llm';
 import { createLogger } from '../services/log';
+import { getSceneNameFromPromptType } from '../utils/i18n';
 
 const log = createLogger('SceneForm');
 
@@ -12,7 +13,6 @@ interface SceneFormProps {
   onCancel: () => void;
   existingShortcuts?: string[];
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
-  sceneNames?: Record<string, string>;
 }
 
 // 内置提示词类型
@@ -29,15 +29,13 @@ export default function SceneForm({
   onCancel,
   existingShortcuts = [],
   checkConflict,
-  sceneNames = {},
 }: SceneFormProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState(scene?.name || '');
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
   const [enabled, setEnabled] = useState(scene?.enabled ?? true);
   const [promptType, setPromptType] = useState(scene?.promptType || 'lightPolish');
   const [customPrompt, setCustomPrompt] = useState(scene?.customPrompt || '');
-  const [errors, setErrors] = useState<{ name?: string; shortcut?: string; conflict?: string }>({});
+  const [errors, setErrors] = useState<{ shortcut?: string; conflict?: string }>({});
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
 
@@ -58,7 +56,6 @@ export default function SceneForm({
 
   useEffect(() => {
     if (scene) {
-      setName(scene.name);
       setShortcut(scene.shortcut);
       setEnabled(scene.enabled);
       setPromptType(scene.promptType || 'lightPolish');
@@ -67,11 +64,7 @@ export default function SceneForm({
   }, [scene]);
 
   const validate = (): boolean => {
-    const newErrors: { name?: string; shortcut?: string; conflict?: string } = {};
-
-    if (!name.trim()) {
-      newErrors.name = t('sceneForm.sceneNameRequired');
-    }
+    const newErrors: { shortcut?: string; conflict?: string } = {};
 
     if (!shortcut.trim()) {
       newErrors.shortcut = t('sceneForm.shortcutRequired');
@@ -89,8 +82,7 @@ export default function SceneForm({
         (s) => s === shortcut.trim() && (scene?.shortcut !== shortcut.trim())
       );
       if (hasConflict) {
-        const conflictName = sceneNames[shortcut.trim()] || t('sceneList.title');
-        newErrors.conflict = t('sceneForm.shortcutConflict', { shortcut: shortcut.trim(), name: conflictName });
+        newErrors.conflict = t('sceneForm.shortcutConflictLocal');
       }
     }
 
@@ -118,9 +110,12 @@ export default function SceneForm({
       return;
     }
 
+    // 从 promptType 推导场景名称
+    const sceneName = getSceneNameFromPromptType(promptType, promptType === 'custom' ? customPrompt : undefined, t, customPresets);
+
     const sceneData: Scene = {
       id: scene?.id || Date.now().toString(),
-      name: name.trim(),
+      name: sceneName, // 保存推导出的名称
       shortcut: shortcut.trim(),
       model: scene?.model || { modelId: '', quantization: undefined },
       enabled,
@@ -154,26 +149,6 @@ export default function SceneForm({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Scene Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              {t('sceneForm.sceneName')}
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('sceneForm.sceneNamePlaceholder')}
-              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 ${
-                errors.name ? 'border-red-300' : 'border-gray-200'
-              }`}
-            />
-            {errors.name && (
-              <p className="mt-1.5 text-sm text-red-500">{errors.name}</p>
-            )}
-          </div>
-
           {/* Shortcut */}
           <div>
             <label htmlFor="shortcut" className="block text-sm font-medium text-gray-700 mb-2">
@@ -207,7 +182,7 @@ export default function SceneForm({
           {/* Prompt Type Selection */}
           <div>
             <label htmlFor="promptType" className="block text-sm font-medium text-gray-700 mb-2">
-              {t('llmConfig.userPrompt')}
+              {t('llmConfig.scenePrompt')}
             </label>
             <select
               id="promptType"

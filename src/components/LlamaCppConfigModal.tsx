@@ -20,9 +20,6 @@ export default function LlamaCppConfigModal({
   const { t } = useTranslation();
   const existingInstance = provider.instance;
 
-  // 是否已配置
-  const isConfigured = existingInstance?.enabled && existingInstance?.defaultModel;
-
   // Form state
   const [selectedModel, setSelectedModel] = useState(existingInstance?.defaultModel || '');
   const [nGpuLayers, setNGpuLayers] = useState<number>(

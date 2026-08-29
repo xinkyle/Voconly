@@ -216,7 +216,7 @@ function convertModelToRust(model: Model): RustModel {
 function convertSceneToRust(scene: Scene): RustScene {
   return {
     id: scene.id,
-    name: scene.name,
+    name: scene.name || scene.promptType || 'Unknown', // name 可选，从 promptType 回退
     shortcut: scene.shortcut,
     model: {
       modelId: scene.model?.modelId ?? '',

@@ -3,6 +3,67 @@
  */
 
 /**
+ * 内置提示词类型到 i18n key 的映射
+ */
+export const BUILTIN_PROMPT_TYPE_LABELS: Record<string, string> = {
+  lightPolish: 'llmConfig.promptTypes.lightPolish',
+  translate: 'llmConfig.promptTypes.translate',
+  professionalPolish: 'llmConfig.promptTypes.professionalPolish',
+  meetingSecretary: 'llmConfig.promptTypes.meetingSecretary',
+};
+
+/**
+ * 获取提示词类型的显示名称
+ * @param promptType 提示词类型（内置或自定义预设名）
+ * @param t 翻译函数
+ * @param customPresets 自定义预设列表（可选）
+ * @returns 显示名称
+ */
+export function getPromptTypeLabel(
+  promptType: string | undefined,
+  t: (key: string) => string,
+  customPresets?: Record<string, string>
+): string {
+  if (!promptType) return '';
+
+  // 内置类型
+  const i18nKey = BUILTIN_PROMPT_TYPE_LABELS[promptType];
+  if (i18nKey) {
+    return t(i18nKey);
+  }
+
+  // 自定义预设 - 直接返回预设名称
+  if (customPresets && promptType in customPresets) {
+    return promptType;
+  }
+
+  // 未知类型，返回原值
+  return promptType;
+}
+
+/**
+ * 获取场景名称（从 promptType 推导）
+ * @param promptType 提示词类型
+ * @param customPrompt 自定义提示词（如果有）
+ * @param t 翻译函数
+ * @param customPresets 自定义预设列表
+ * @returns 场景名称
+ */
+export function getSceneNameFromPromptType(
+  promptType: string | undefined,
+  customPrompt: string | undefined,
+  t: (key: string) => string,
+  customPresets?: Record<string, string>
+): string {
+  // 自定义提示词优先
+  if (customPrompt) {
+    return t('llmConfig.promptTypes.custom');
+  }
+
+  return getPromptTypeLabel(promptType, t, customPresets) || '';
+}
+
+/**
  * Default scene names (Chinese) from backend config
  * Used to detect and translate default names
  */

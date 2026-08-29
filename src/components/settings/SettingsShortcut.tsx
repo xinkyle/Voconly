@@ -1,9 +1,8 @@
 import SceneList from '../SceneList';
-import type { Scene, Model } from '../../types';
+import type { Scene } from '../../types';
 
 interface SettingsShortcutProps {
   scenes: Scene[];
-  models: Model[];
   onSave: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
@@ -11,7 +10,6 @@ interface SettingsShortcutProps {
 
 export default function SettingsShortcut({
   scenes,
-  models,
   onSave,
   checkConflict,
   tryRegisterShortcut,
@@ -19,7 +17,6 @@ export default function SettingsShortcut({
   return (
     <SceneList
       scenes={scenes}
-      models={models}
       onSave={onSave}
       checkConflict={checkConflict}
       tryRegisterShortcut={tryRegisterShortcut}

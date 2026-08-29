@@ -4,7 +4,7 @@ import type { LlmProfile, UserPromptType, UserPromptPresets, Scene, LlmProviderI
 import type { DownloadProgress } from '../services/downloader';
 import { getLlmProfile, saveLlmProfile, getProviderList, getLlmPromptPresets, saveLlmPromptPresets, saveProviderConfig } from '../services/llm';
 import { createLogger } from '../services/log';
-import { translateSceneName } from '../utils/i18n';
+import { getSceneNameFromPromptType } from '../utils/i18n';
 import ProviderSelectModal from './ProviderSelectModal';
 import LlmModelSelectModal from './LlmModelSelectModal';
 
@@ -479,7 +479,7 @@ export default function LlmConfigModal({
           <div>
             <h2 className="text-base font-semibold text-gray-900">{t('llmConfig.title')}</h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              {t('llmConfig.scene')}: {translateSceneName(scene.name, t)}
+              {t('llmConfig.scene')}: {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, presets?.customPresets)}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -561,7 +561,7 @@ export default function LlmConfigModal({
             {/* User Prompt Type Buttons */}
             <div className={!enabled ? 'opacity-50 pointer-events-none' : ''}>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('llmConfig.userPrompt')}
+                {t('llmConfig.scenePrompt')}
               </label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {/* 内置预设按钮 */}

@@ -4,7 +4,7 @@ import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
-import { translateSceneName } from '../utils/i18n';
+import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
@@ -744,7 +744,7 @@ export default function HomePanelV2({
                   {/* 场景名称和描述 */}
                   <div className="flex-1 min-w-0">
                     <span className="text-[15px] font-medium text-gray-900">
-                      {translateSceneName(scene.name, t)}
+                      {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets)}
                     </span>
                     {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
                       <p className="text-xs text-gray-500 mt-0.5">

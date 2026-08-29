@@ -15,7 +15,7 @@
     "title": "Settings",
     "tabs": {
       "shortcut": "Scenes",
-      "prompt": "Prompts",
+      "prompt": "Scene Prompts",
       "system": "System",
       "llm": "LLM",
       "dictionary": "Dictionary",
@@ -49,8 +49,8 @@
       "openLogDirError": "Failed to open log directory"
     },
     "prompt": {
-      "title": "Prompt Management",
-      "subtitle": "Configure prompt presets for text post-processing, available in scene selection",
+      "title": "Scene Prompt Management",
+      "subtitle": "Manage prompt presets for LLM post-processing scenes, quickly selectable in scene settings",
       "selectPreset": "Select Preset",
       "addPreset": "Add Preset",
       "editPrompt": "Edit Prompt"
@@ -393,7 +393,7 @@
     "noModelsError": "Unable to get model list",
     "foundModelsFrom": "{{provider}}: {{count}} models",
     "noModelsTip": "{{provider}} has no models",
-    "userPrompt": "User Prompt",
+    "scenePrompt": "Scene Prompt",
     "refreshModels": "Refresh model list",
     "modelsRefreshed": "Model list updated",
     "refreshFailed": "Refresh failed",

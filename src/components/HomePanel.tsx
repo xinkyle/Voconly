@@ -4,7 +4,7 @@ import type { Scene, Model, LlmProfile } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
-import { translateSceneName } from '../utils/i18n';
+import { getSceneNameFromPromptType } from '../utils/i18n';
 import { unloadModel, loadModel } from '../services/whisper';
 import { getAsrModelList, type AsrModelWithStatus, loadConfig, saveConfig, isModelDownloaded, parseModelId, QUANT_LABELS } from '../services/config';
 import { saveLlmProfile, getLlmPromptPresets } from '../services/llm';
@@ -509,10 +509,10 @@ function SceneCard({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className={`text-sm font-semibold truncate ${scene.enabled ? 'text-gray-900' : 'text-gray-500'}`}>
-              {translateSceneName(scene.name, t)}
+              {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets)}
             </h3>
             <p className={`text-xs truncate ${scene.enabled ? 'text-gray-400' : 'text-gray-400'}`}>
-              {getSceneDescription(scene.name, t)}
+              {getSceneDescription(getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets), t)}
             </p>
           </div>
           {/* LLM Config Button and Prompt Type - 同一行 */}
@@ -1224,7 +1224,9 @@ export default function HomePanel({
       );
 
       if (otherScenesUsingModel.length > 0) {
-        const otherSceneNames = otherScenesUsingModel.map(s => s.name).join('、');
+        const otherSceneNames = otherScenesUsingModel.map(s =>
+          getSceneNameFromPromptType(s.promptType, s.customPrompt, t, customPresets)
+        ).join('、');
         showToast({
           type: 'info',
           title: '场景已禁用',

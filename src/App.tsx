@@ -35,7 +35,7 @@ import { checkModelExists } from './services/downloader';
 import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
-import { translateSceneName, countWords } from './utils/i18n';
+import { countWords, getSceneNameFromPromptType } from './utils/i18n';
 import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
@@ -45,6 +45,12 @@ import { eventManager } from './services/eventManager';
 
 // 创建日志记录器
 const log = createLogger('App');
+
+// 辅助函数：获取场景名称（从 promptType 推导）
+const getSceneDisplayName = (scene: Scene | null, t: (key: string) => string, customPresets?: Record<string, string>): string => {
+  if (!scene) return '';
+  return getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets);
+};
 
 // 初始化性能缓存（从后端加载）
 initPerformanceCache().catch((e) => log.error(`Failed to init performance cache: ${e}`));
@@ -478,7 +484,7 @@ function App() {
       log.debug(`onRecordingStopped callback triggered, audioData duration: ${audioData?.duration}`);
       // Recording stopped, now run the transcription workflow
       const scene = currentSceneRef.current;
-      log.debug(`currentSceneRef: ${scene ? scene.name : 'null'}`);
+      log.debug(`currentSceneRef: ${scene ? getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets) : 'null'}`);
       if (scene) {
         await runVoiceWorkflow(scene, audioData);
       } else {
@@ -626,9 +632,9 @@ function App() {
       return;
     }
     isWorkflowRunningRef.current = true;
-    log.debug(`Starting workflow for scene: ${scene.name}`);
+    log.debug(`Starting workflow for scene: ${getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets)}`);
 
-    const sceneName = scene.name;
+    const sceneName = getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets);
     let recognizedText = '';
 
     // Time tracking
@@ -1080,7 +1086,7 @@ function App() {
       log.info('[HANDLE_SHORTCUT] Stopping recording with optimistic UI...');
       // 1. Immediately show "transcribing" UI (Optimistic UI)
       // 传入基本的 progressInfo 确保进度条能正确初始化，后续 workflow 会更新精确预估
-      showFloatPanelStatus('transcribing', translateSceneName(scene.name, t), undefined, {
+      showFloatPanelStatus('transcribing', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
         modelId: fullModelId,
         device: 'GPU',
         audioDuration: 0,
@@ -1101,7 +1107,7 @@ function App() {
       log.info('[HANDLE_SHORTCUT] Starting recording with optimistic UI...');
       // 1. Immediately show float panel (Optimistic UI)
       // 【修复】传入配置中的 segment_transcribe 值,确保状态指示器正确显示
-      showFloatPanelStatus('recording', translateSceneName(scene.name, t), undefined, {
+      showFloatPanelStatus('recording', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
         segmentTranscribe: config?.segmentTranscribe ?? true,  // 使用配置值,默认 true
       });
 
@@ -1419,7 +1425,6 @@ function App() {
             {activeNav === 'settings' && settingsTab === 'shortcut' && (
               <SettingsShortcut
                 scenes={config?.scenes || []}
-                models={config?.models || []}
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
