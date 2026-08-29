@@ -288,15 +288,16 @@ fn compute_stats_from_history(conn: &Connection) -> Result<StatsData, String> {
     let today = get_today_date_string();
 
     // 一次查询获取所有统计
+    // 注意：timestamp 是毫秒级，需要除以 1000 转换为秒，才能正确使用 unixepoch
     let stats: StatsData = conn
         .query_row(
             "SELECT
                 COALESCE(SUM(duration), 0) as total_duration,
                 COALESCE(SUM(word_count), 0) as total_words,
                 COUNT(*) as total_count,
-                SUM(CASE WHEN DATE(timestamp, 'unixepoch', 'localtime') = ?1 THEN 1 ELSE 0 END) as today_count,
-                COUNT(DISTINCT DATE(timestamp, 'unixepoch', 'localtime')) as active_days,
-                MIN(DATE(timestamp, 'unixepoch', 'localtime')) as first_record_date
+                SUM(CASE WHEN DATE(timestamp/1000, 'unixepoch', 'localtime') = ?1 THEN 1 ELSE 0 END) as today_count,
+                COUNT(DISTINCT DATE(timestamp/1000, 'unixepoch', 'localtime')) as active_days,
+                MIN(DATE(timestamp/1000, 'unixepoch', 'localtime')) as first_record_date
             FROM history",
             params![today],
             |row| {
