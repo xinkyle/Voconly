@@ -481,6 +481,10 @@
     "pressKey": "Press key",
     "llmConfig": "LLM Config",
     "deleteScene": "Delete scene",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete Scene",
+    "deleteConfirmMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "defaultSceneName": "Unnamed Scene",
     "confirmDelete": "Are you sure you want to delete this scene?",
     "modelResident": "Keep model in memory",
     "on": "On",
@@ -492,7 +496,9 @@
     "collapse": "Collapse",
     "downloadComplete": "{{name}} download complete",
     "switchTo": "Switch",
-    "selectPrompt": "Select Prompt"
+    "selectPrompt": "Select Prompt",
+    "moveUp": "Move up, homepage shows first two scenes",
+    "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage."
   },
   "memoryStatus": {
     "title": "Resident Models in Memory",

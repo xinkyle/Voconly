@@ -481,6 +481,10 @@
     "pressKey": "请按键",
     "llmConfig": "LLM 配置",
     "deleteScene": "删除场景",
+    "delete": "删除",
+    "deleteConfirmTitle": "删除场景",
+    "deleteConfirmMessage": "确定要删除「{{name}}」场景吗？此操作无法撤销。",
+    "defaultSceneName": "未命名场景",
     "confirmDelete": "确定要删除这个场景吗？",
     "modelResident": "模型常驻内存",
     "on": "开启",
@@ -492,7 +496,9 @@
     "collapse": "收起",
     "downloadComplete": "{{name}} 下载完成",
     "switchTo": "切换",
-    "selectPrompt": "选择提示词"
+    "selectPrompt": "选择提示词",
+    "moveUp": "上移，首页将展示前两个场景",
+    "hint": "首页仅展示列表前两位的场景。点击「上移」按钮调整位置，即可将其显示在首页。其他场景虽不在首页展示，但仍可通过快捷键正常使用。"
   },
   "memoryStatus": {
     "title": "当前驻留内存的模型",

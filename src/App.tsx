@@ -1424,28 +1424,28 @@ function App() {
           data-tauri-drag-region
         >
           {/* 窗口控制按钮 */}
-          <div className="flex">
+          <div className="flex gap-1 pr-3">
             <button
               onClick={handleMinimize}
-              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
               </svg>
             </button>
             <button
               onClick={handleMaximize}
-              className="w-12 h-9 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
               </svg>
             </button>
             <button
               onClick={handleClose}
-              className="w-12 h-9 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
+              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>

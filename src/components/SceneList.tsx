@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene } from '../types';
 import SceneForm from './SceneForm';
 import ShortcutErrorModal from './ShortcutErrorModal';
+import ConfirmModal from './ui/ConfirmModal';
 import { extractShortcutFromEvent } from '../utils/keyboard';
 import { getSceneNameFromPromptType, getPromptTypeLabel } from '../utils/i18n';
 import { getLlmPromptPresets } from '../services/llm';
@@ -44,6 +45,27 @@ export default function SceneList({
     errorType: 'unsupported' | 'occupied' | 'unknown';
     errorMessage: string;
   } | null>(null);
+
+  // For delete confirm modal
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    sceneId: string;
+    sceneName: string;
+  } | null>(null);
+
+  // Move scene handlers (替代拖拽)
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return; // 已经是第一个
+
+    const newScenes = [...localScenes];
+    const temp = newScenes[index - 1];
+    newScenes[index - 1] = newScenes[index];
+    newScenes[index] = temp;
+
+    setLocalScenes(newScenes);
+    if (onSave) {
+      onSave(newScenes);
+    }
+  };
 
   // Ref for the listening timeout
   const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,16 +142,25 @@ export default function SceneList({
   };
 
   const handleDelete = (sceneId: string) => {
-    if (!confirm(t('sceneList.confirmDelete'))) {
-      return;
-    }
+    const scene = localScenes.find(s => s.id === sceneId);
+    if (!scene) return;
 
-    const newScenes = localScenes.filter((s) => s.id !== sceneId);
+    const sceneName = getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets) || t('sceneList.defaultSceneName');
+
+    setDeleteConfirm({ sceneId, sceneName });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+
+    const newScenes = localScenes.filter((s) => s.id !== deleteConfirm.sceneId);
     setLocalScenes(newScenes);
 
     if (onSave) {
       onSave(newScenes);
     }
+
+    setDeleteConfirm(null);
   };
 
   // Handle shortcut key capture
@@ -246,7 +277,7 @@ export default function SceneList({
         </div>
       ) : (
         <div className="space-y-3">
-          {localScenes.map((scene) => {
+          {localScenes.map((scene, index) => {
             const isListening = listeningShortcut === scene.id;
             // 检查该场景是否启用了 LLM
             // 判断依据：全局 LLM 已配置 且 场景有提示词配置
@@ -298,6 +329,19 @@ export default function SceneList({
                     )}
                   </div>
 
+                  {/* Move Up Button */}
+                  {index > 0 && (
+                    <button
+                      onClick={() => handleMoveUp(index)}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                      title={t('sceneList.moveUp')}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                  )}
+
                   {/* Edit Button */}
                   <button
                     onClick={() => handleEditName(scene)}
@@ -327,6 +371,22 @@ export default function SceneList({
           })}
         </div>
       )}
+
+      {/* Hint text */}
+      <div className="mt-6 p-4 bg-gray-100 border border-gray-200 rounded-xl">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-gray-700">
+              {t('sceneList.hint')}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -354,6 +414,17 @@ export default function SceneList({
           onClose={() => setShortcutError(null)}
         />
       )}
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        title={t('sceneList.deleteConfirmTitle')}
+        message={t('sceneList.deleteConfirmMessage', { name: deleteConfirm?.sceneName || '' })}
+        confirmText={t('sceneList.delete')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </>
   );
 }

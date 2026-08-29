@@ -460,14 +460,15 @@ export default function HomePanelV2({
   // 有 providerId 就算配置了
   const hasLlmConfig = !!llmConfig?.providerId;
 
-  const enabledScenes = localScenes.filter(s => s.enabled);
+  // 只显示前两个启用的场景（首页展示限制）
+  const enabledScenes = localScenes.filter(s => s.enabled).slice(0, 2);
 
   return (
     <div className="min-h-[400px] flex flex-col">
       {/* 头部区域：品牌 + 模型状态 */}
       <header className="mb-2">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900">Voconly</h1>
-        <p className="text-sm text-gray-400 mt-1">语音转文字，高效转录</p>
+        <p className="text-sm text-gray-400 mt-1">说出你的想法，让 AI 优化你的表达</p>
 
         {/* 模型状态栏 */}
         <div className="flex items-center gap-2 mt-4">
