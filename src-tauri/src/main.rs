@@ -1729,13 +1729,10 @@ fn main() {
             commands::transcribe::cleanup_all_resources,
             commands::model::load_model_by_id,
             commands::model::unload_model,
-            commands::model::get_loaded_models,
             commands::model::is_model_loaded,
-            commands::model::get_loaded_model_count,
             commands::model::scan_asr_models,
             commands::model::scan_llm_models,
             commands::model::get_asr_model_list,
-            commands::model::get_memory_status,
             // Custom ASR model directory commands
             commands::model::get_custom_asr_model_dirs,
             commands::model::add_custom_asr_model_dir,

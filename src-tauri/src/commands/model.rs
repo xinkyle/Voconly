@@ -28,12 +28,6 @@ pub struct UnloadModelResponse {
     pub model_id: String,
 }
 
-/// Get loaded models response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetLoadedModelsResponse {
-    /// List of loaded models
-    pub models: Vec<LoadedModelInfo>,
-}
 
 /// ASR 模型列表响应（预设 + 状态）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,25 +125,6 @@ pub async fn unload_model(
     Ok(UnloadModelResponse { success, model_id })
 }
 
-/// Get list of currently loaded models
-#[tauri::command]
-pub async fn get_loaded_models(
-    services: tauri::State<'_, AppServices>,
-) -> Result<GetLoadedModelsResponse, String> {
-    let model_manager = services
-        .model_manager
-        .lock()
-        .map_err(|e| format!("Failed to lock model manager: {}", e))?;
-
-    let mgr = model_manager
-        .as_ref()
-        .ok_or("Model manager not initialized")?;
-
-    let models = mgr.get_loaded_models();
-    info!("Loaded models count: {}", models.len());
-
-    Ok(GetLoadedModelsResponse { models })
-}
 
 /// Check if a specific model is loaded
 #[tauri::command]
@@ -169,22 +144,6 @@ pub async fn is_model_loaded(
     Ok(mgr.is_loaded(&model_id))
 }
 
-/// Get number of loaded models
-#[tauri::command]
-pub async fn get_loaded_model_count(
-    services: tauri::State<'_, AppServices>,
-) -> Result<usize, String> {
-    let model_manager = services
-        .model_manager
-        .lock()
-        .map_err(|e| format!("Failed to lock model manager: {}", e))?;
-
-    let mgr = model_manager
-        .as_ref()
-        .ok_or("Model manager not initialized")?;
-
-    Ok(mgr.loaded_count())
-}
 
 /// Scan available ASR models from storage directory
 ///
@@ -470,64 +429,6 @@ pub fn update_asr_model_capabilities(
     }
 }
 
-/// 内存状态响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MemoryStatusResponse {
-    /// 已加载的 ASR 模型列表
-    pub asr_models: Vec<LoadedModelInfo>,
-    /// 当前缓存的 LLM 模型（名称和大小）
-    pub llm_model: Option<LlmModelMemoryInfo>,
-    /// 总内存占用（MB）
-    pub total_memory_mb: u64,
-}
-
-/// LLM 模型内存信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LlmModelMemoryInfo {
-    pub name: String,
-    pub size_mb: u64,
-}
-
-/// 获取内存状态
-#[tauri::command]
-pub async fn get_memory_status(
-    services: tauri::State<'_, AppServices>,
-) -> Result<MemoryStatusResponse, String> {
-    let model_manager = services
-        .model_manager
-        .lock()
-        .map_err(|e| format!("Failed to lock model manager: {}", e))?;
-
-    let mgr = model_manager
-        .as_ref()
-        .ok_or("Model manager not initialized")?;
-
-    // 获取已加载的 ASR 模型
-    let asr_models = mgr.get_loaded_models();
-
-    // 计算 ASR 模型总内存
-    let asr_memory_mb: u64 = asr_models.iter().map(|m| m.memory_mb).sum();
-
-    // 获取 LLM 模型信息
-    let llm_model = crate::llm::get_cached_llm_model_info()
-        .map(|(name, size_mb)| LlmModelMemoryInfo { name, size_mb });
-
-    let llm_memory_mb = llm_model.as_ref().map(|m| m.size_mb).unwrap_or(0);
-
-    // 总内存占用
-    let total_memory_mb = asr_memory_mb + llm_memory_mb;
-
-    // info!("[MemoryStatus] ASR: {}MB, LLM: {}MB, Total: {}MB",
-    //     asr_memory_mb, llm_memory_mb, total_memory_mb);
-
-    Ok(MemoryStatusResponse {
-        asr_models,
-        llm_model,
-        total_memory_mb,
-    })
-}
 
 /// 获取用户自定义 ASR 模型文件夹路径列表
 #[tauri::command]

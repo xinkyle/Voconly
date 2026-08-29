@@ -39,26 +39,6 @@ interface UnloadModelResult {
   modelId: string;
 }
 
-interface LoadedModelInfo {
-  modelId: string;
-  backendType: string;
-  memoryMb: number;
-  /// 模型文件大小（MB），可能为 0 如果无法获取
-  sizeMb: number;
-  loadedAtSecs: number;
-  lastUsedSecs: number;
-}
-
-interface LlmModelMemoryInfo {
-  name: string;
-  sizeMb: number;
-}
-
-interface MemoryStatusResponse {
-  asrModels: LoadedModelInfo[];
-  llmModel: LlmModelMemoryInfo | null;
-  totalMemoryMb: number;
-}
 
 /**
  * Transcribe audio using local transcribe-rs backend
@@ -143,28 +123,12 @@ export async function unloadModel(modelId: string): Promise<UnloadModelResult> {
 }
 
 /**
- * Get list of currently loaded models
- * @returns Array of loaded model info
- */
-export async function getLoadedModels(): Promise<LoadedModelInfo[]> {
-  return invoke<LoadedModelInfo[]>('get_loaded_models');
-}
-
-/**
  * Check if a specific model is loaded
  * @param modelId Model ID to check
  * @returns true if model is loaded
  */
 export async function isModelLoaded(modelId: string): Promise<boolean> {
   return invoke<boolean>('is_model_loaded', { modelId });
-}
-
-/**
- * Get count of loaded models
- * @returns Number of loaded models
- */
-export async function getLoadedModelCount(): Promise<number> {
-  return invoke<number>('get_loaded_model_count');
 }
 
 /**
@@ -208,22 +172,12 @@ export async function transcribe(_audioPath: string, _modelId: string): Promise<
   throw new Error('Use transcribeAudio instead');
 }
 
-/**
- * Get memory status of loaded models
- * @returns Memory status including ASR models, LLM model, and usage info
- */
-export async function getMemoryStatus(): Promise<MemoryStatusResponse> {
-  return invoke<MemoryStatusResponse>('get_memory_status');
-}
-
 export default {
   transcribeAudio,
   transcribeAudioBlob,
   loadModel,
   unloadModel,
-  getLoadedModels,
   isModelLoaded,
-  getLoadedModelCount,
   getModelDownloadPath,
   checkModelExists,
   getAvailableModels,
