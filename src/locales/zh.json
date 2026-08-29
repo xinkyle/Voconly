@@ -405,6 +405,12 @@
       "meetingSecretary": "会议秘书",
       "custom": "自定义"
     },
+    "promptTypeDescs": {
+      "lightPolish": "修正错别字和标点，保持原意",
+      "translate": "将语音翻译成目标语言",
+      "professionalPolish": "转化为正式、规范的书面表达，优化措辞与句式",
+      "meetingSecretary": "整理会议纪要，提取要点"
+    },
     "promptPlaceholder": "输入用户提示词...",
     "promptTip": "语音识别文本将自动追加到提示词末尾",
     "providerRequired": "启用 LLM 时必须选择一个 Provider",

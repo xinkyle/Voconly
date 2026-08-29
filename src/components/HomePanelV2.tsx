@@ -715,11 +715,11 @@ export default function HomePanelV2({
               return (
                 <button
                   key={scene.id}
-                  className="group w-full flex items-center gap-4 bg-gray-100 border border-gray-200 rounded-xl px-5 py-4 text-left transition-all duration-200 hover:border-gray-300 hover:shadow-sm"
+                  className="group w-full flex items-start gap-4 bg-gray-100 border border-gray-200 rounded-xl px-5 py-4 text-left transition-all duration-200 hover:border-gray-300 hover:shadow-sm"
                 >
                   {/* 快捷键 */}
                   <div
-                    className="flex-shrink-0 w-20 cursor-pointer"
+                    className="flex-shrink-0 w-20 cursor-pointer pt-0.5"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleShortcutClick(scene.id);
@@ -741,16 +741,21 @@ export default function HomePanelV2({
                     </span>
                   </div>
 
-                  {/* 场景名称 */}
+                  {/* 场景名称和描述 */}
                   <div className="flex-1 min-w-0">
                     <span className="text-[15px] font-medium text-gray-900">
                       {translateSceneName(scene.name, t)}
                     </span>
+                    {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {t(`llmConfig.promptTypeDescs.${promptType}`)}
+                      </p>
+                    )}
                   </div>
 
                   {/* 模式标签 */}
                   <div
-                    className="flex-shrink-0 cursor-pointer"
+                    className="flex-shrink-0 cursor-pointer pt-0.5"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (hasLlm) {

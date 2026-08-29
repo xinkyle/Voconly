@@ -405,6 +405,12 @@
       "meetingSecretary": "Meeting Secretary",
       "custom": "Custom"
     },
+    "promptTypeDescs": {
+      "lightPolish": "Fix typos and punctuation, keep original meaning",
+      "translate": "Translate speech to target language",
+      "professionalPolish": "Convert to formal written expression, improve wording",
+      "meetingSecretary": "Organize meeting notes and extract key points"
+    },
     "promptPlaceholder": "Enter user prompt...",
     "promptTip": "Speech recognition text will be automatically appended to the end of the prompt",
     "providerRequired": "A Provider must be selected when LLM is enabled",
