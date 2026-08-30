@@ -12,7 +12,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 // 创建日志记录器
 const log = createLogger('FloatPanel');
 
-type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing' | 'loading-model';
+type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing';
 
 interface FloatPanelState {
   visible: boolean;
@@ -60,8 +60,6 @@ function getStatusConfig(status: RecorderStatus, t: (key: string) => string, ski
       return { text: t('transcribe.status.transcribing'), dotClass: 'transcribing' };
     case 'typing':
       return { text: t('transcribe.status.typing'), dotClass: 'typing' };
-    case 'loading-model':
-      return { text: t('transcribe.status.loadingModel'), dotClass: 'transcribing' };
     default:
       return { text: t('transcribe.status.idle'), dotClass: 'idle' };
   }

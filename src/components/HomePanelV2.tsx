@@ -396,7 +396,7 @@ export default function HomePanelV2({
     };
   }, [globalModelConfig?.asrModel]);
 
-  // 监听模型加载开始事件
+  // 监听模型加载开始事件（转录时自动加载）
   useEffect(() => {
     let mounted = true;
 

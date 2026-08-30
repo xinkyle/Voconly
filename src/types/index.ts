@@ -179,7 +179,7 @@ export interface MicrophoneDevice {
 }
 
 // 录音状态
-export type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing' | 'loading-model';
+export type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing';
 
 // 悬浮面板状态 (使用 camelCase 匹配后端)
 export interface FloatPanelState {

@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 /// Transcribe request parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -406,6 +406,7 @@ pub fn transcribe_samples_internal(
     services: &AppServices,
     samples: &[f32],
     scene_id: &str,
+    app_handle: Option<&AppHandle>,
 ) -> Result<String, String> {
     info!(
         "[Transcribe] Internal transcribing {} samples for scene: {}",
@@ -424,10 +425,44 @@ pub fn transcribe_samples_internal(
             .as_mut()
             .ok_or("Model manager not initialized")?;
 
+        // 获取全局 ASR 模型 ID
+        let model_id = mgr.get_global_asr_model()?;
+
+        // 检查模型是否已加载（用于发送事件）
+        let was_loaded = mgr.is_loaded(&model_id);
+
+        // 如果模型未加载，发送加载开始事件
+        if !was_loaded {
+            info!("[Transcribe] Model {} not loaded, sending loading event", model_id);
+            if let Some(handle) = app_handle {
+                let _ = handle.emit("asr-model-loading", &serde_json::json!({ "modelId": model_id }));
+            }
+        }
+
         // 获取或加载模型（返回 Arc<LoadedModel>）
-        let model = mgr
-            .get_or_load_model(scene_id)
-            .map_err(|e| format!("Failed to get model: {}", e))?;
+        let model = match mgr.get_or_load_model(scene_id) {
+            Ok(m) => m,
+            Err(e) => {
+                // 加载失败，发送失败事件
+                if !was_loaded {
+                    if let Some(handle) = app_handle {
+                        let _ = handle.emit("asr-model-load-failed", &serde_json::json!({
+                            "modelId": model_id,
+                            "error": &e
+                        }));
+                    }
+                }
+                return Err(format!("Failed to get model: {}", e));
+            }
+        };
+
+        // 加载成功，发送加载完成事件
+        if !was_loaded {
+            info!("[Transcribe] Model {} loaded successfully", model_id);
+            if let Some(handle) = app_handle {
+                let _ = handle.emit("asr-model-loaded", &serde_json::json!({ "modelId": model_id }));
+            }
+        }
 
         // 更新最后使用时间
         model.touch();

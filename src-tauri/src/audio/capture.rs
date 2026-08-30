@@ -629,6 +629,7 @@ fn run_consumer(
                     &services,
                     &samples,
                     &scene_id,
+                    Some(&app_handle),
                 ) {
                     Ok(text) => text,
                     Err(e) => {
@@ -740,6 +741,7 @@ fn run_consumer(
                         &services,
                         &segment_samples,
                         &task.scene_id,
+                        Some(&app),
                     );
 
                     match result {
