@@ -192,7 +192,7 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
       showToast({
         type: 'success',
         title: t('modelConfig.providerSelected'),
-        description: provider?.meta.label || providerId,
+        description: providerId === 'llama_cpp' ? '本地大模型' : (provider?.meta.label || providerId),
       });
     } catch (err) {
       log.error(`Failed to select provider: ${err}`);

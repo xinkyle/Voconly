@@ -582,16 +582,13 @@ export default function ModelConfigPanel({
       {/* Custom Directory Management Modal */}
       {showCustomDirModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden min-h-[320px] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">{t('modelConfig.customDirModalTitle')}</h3>
-                <p className="text-sm text-gray-500 mt-0.5">{t('modelConfig.customDirModalDesc')}</p>
-              </div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">{t('modelConfig.customDirModalTitle')}</h3>
               <button
                 onClick={() => setShowCustomDirModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -600,45 +597,47 @@ export default function ModelConfigPanel({
             </div>
 
             {/* Content */}
-            <div className="px-5 py-4">
+            <div className="px-4 py-3 flex-1">
+              <p className="text-sm text-gray-500 mb-3">{t('modelConfig.customDirModalDesc')}</p>
+
               {/* Add button */}
               <button
                 onClick={handleImportCustomDir}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-700 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="font-medium">{t('modelConfig.addCustomDir')}</span>
+                <span>{t('modelConfig.addCustomDir')}</span>
               </button>
 
               {/* Directory list */}
-              <div className="mt-4">
+              <div className="mt-3">
                 {customDirs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="text-center py-10 text-gray-400">
+                    <svg className="w-10 h-10 mx-auto mb-2 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                     </svg>
                     <p className="text-sm">{t('modelConfig.noCustomDirs')}</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {customDirs.map((dirPath) => (
                       <div
                         key={dirPath}
-                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl group hover:bg-gray-100 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors"
                       >
-                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
                         <span className="flex-1 text-sm text-gray-700 truncate" title={dirPath}>{dirPath}</span>
                         <button
                           onClick={() => handleRemoveCustomDir(dirPath)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                           title={t('modelConfig.removeCustomDir')}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
                       </div>
@@ -649,10 +648,10 @@ export default function ModelConfigPanel({
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
+            <div className="px-4 py-3 border-t border-gray-100 flex justify-center">
               <button
                 onClick={() => setShowCustomDirModal(false)}
-                className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                className="px-8 py-2 bg-gray-900 text-white text-sm rounded-lg font-medium hover:bg-gray-800 transition-colors"
               >
                 {t('common.close')}
               </button>

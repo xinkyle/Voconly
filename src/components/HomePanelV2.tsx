@@ -454,8 +454,22 @@ export default function HomePanelV2({
   const llmConfig = globalModelConfig?.llm;
   const currentProvider = providers.find(p => p.meta.id === llmConfig?.providerId);
 
-  // 显示 provider 名称，没有则提示配置
-  const llmModelName = currentProvider ? currentProvider.meta.label : t('home.noModelSelected');
+  // 获取 Provider 友好显示名称
+  const getProviderDisplayName = (providerId: string): string => {
+    // llama.cpp 显示为"本地大模型"，更易于理解
+    if (providerId === 'llama_cpp') {
+      return '本地大模型';
+    }
+    // 其他 Provider 使用原有 label
+    return currentProvider?.meta.label || providerId;
+  };
+
+  // 显示格式：provider名称 - 模型名称
+  const llmModelName = currentProvider && llmConfig?.model
+    ? `${getProviderDisplayName(currentProvider.meta.id)} - ${llmConfig.model}`
+    : currentProvider
+      ? getProviderDisplayName(currentProvider.meta.id)
+      : t('home.noModelSelected');
 
   // 有 providerId 就算配置了
   const hasLlmConfig = !!llmConfig?.providerId;
@@ -476,7 +490,7 @@ export default function HomePanelV2({
             onClick={() => setSelectingSceneId('global')}
             className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
-            <AsrIcon className="w-3 h-3" />
+            <AsrIcon className="w-3 h-3 text-gray-800" />
             <span>{asrModelName}</span>
             {globalModelConfig?.asrModel?.modelId && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -486,7 +500,7 @@ export default function HomePanelV2({
             onClick={onNavigateToLlmSettings}
             className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
-            <LlmIcon className="w-3 h-3" />
+            <LlmIcon className="w-3 h-3 text-gray-800" />
             <span>{llmModelName}</span>
             {hasLlmConfig && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
