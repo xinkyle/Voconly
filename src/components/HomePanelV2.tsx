@@ -6,7 +6,7 @@ import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
-import { switchAsrModel } from '../services/whisper';
+import { switchAsrModel, isModelLoaded } from '../services/whisper';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
 import { getProviderList, getLlmPromptPresets } from '../services/llm';
@@ -191,6 +191,7 @@ export default function HomePanelV2({
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
   const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
   const [selectingSceneId, setSelectingSceneId] = useState<string | null>(null);
+  const [asrLoading, setAsrLoading] = useState(false); // ASR 模型加载中状态
   const [stats, setStats] = useState<FullStats>({
     totalDuration: 0,
     totalWords: 0,
@@ -294,6 +295,67 @@ export default function HomePanelV2({
     setLocalScenes(scenes);
   }, [scenes]);
 
+  // 检测 ASR 模型加载状态（应用启动时）
+  useEffect(() => {
+    let mounted = true;
+
+    const checkModelLoadStatus = async () => {
+      const modelId = globalModelConfig?.asrModel
+        ? getFullModelId(globalModelConfig.asrModel)
+        : '';
+
+      if (!modelId) {
+        // 未配置模型，不显示加载状态
+        setAsrLoading(false);
+        return;
+      }
+
+      // 初始设为加载中，后端可能在预加载
+      setAsrLoading(true);
+
+      try {
+        // 检查模型是否已加载
+        const loaded = await isModelLoaded(modelId);
+        if (mounted) {
+          setAsrLoading(!loaded);
+          if (loaded) {
+            log.info(`ASR model ${modelId} is already loaded`);
+          } else {
+            log.info(`ASR model ${modelId} is not loaded yet`);
+            // 如果未加载，等待一段时间后再次检查（后端可能正在预加载）
+            setTimeout(async () => {
+              if (!mounted) return;
+              try {
+                const reloaded = await isModelLoaded(modelId);
+                if (mounted) {
+                  setAsrLoading(!reloaded);
+                  if (reloaded) {
+                    log.info(`ASR model ${modelId} loaded after retry`);
+                  }
+                }
+              } catch (e) {
+                log.warn(`Failed to recheck model load status: ${e}`);
+                if (mounted) setAsrLoading(false);
+              }
+            }, 2000);
+          }
+        }
+      } catch (err) {
+        log.error(`Failed to check model load status: ${err}`);
+        if (mounted) setAsrLoading(false);
+      }
+    };
+
+    // 只有在有配置时才检查
+    if (globalModelConfig?.asrModel?.modelId) {
+      checkModelLoadStatus();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [globalModelConfig?.asrModel]);
+
   // 更新 refs
   useEffect(() => {
     localScenesRef.current = localScenes;
@@ -354,8 +416,11 @@ export default function HomePanelV2({
         globalModelConfig: newConfig,
       });
 
-      // 切换模型（卸载旧模型 + 加载新模型）
+      // 开始加载模型，设置加载中状态
+      setAsrLoading(true);
       log.info(`Switching ASR model from ${oldModelId} to ${modelId}`);
+
+      // 切换模型（卸载旧模型 + 加载新模型）
       const result = await switchAsrModel(oldModelId, modelId);
 
       if (result.success) {
@@ -384,6 +449,9 @@ export default function HomePanelV2({
         title: t('common.error'),
         description: String(err),
       });
+    } finally {
+      // 加载完成（无论成功失败），清除加载中状态
+      setAsrLoading(false);
     }
 
     setSelectingSceneId(null);
@@ -513,7 +581,17 @@ export default function HomePanelV2({
             <AsrIcon className="w-3 h-3 text-gray-800" />
             <span>{asrModelName}</span>
             {globalModelConfig?.asrModel?.modelId && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              asrLoading ? (
+                // 加载中：三个点依次闪烁的动画
+                <span className="inline-flex items-center gap-0.5">
+                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '200ms' }} />
+                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '400ms' }} />
+                </span>
+              ) : (
+                // 已加载：绿点
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              )
             )}
           </button>
           <button

@@ -177,3 +177,19 @@
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
 }
+
+/* Loading dots animation - sequential pulse */
+@keyframes loadingDot {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.animate-loading-dot {
+  animation: loadingDot 1.2s ease-in-out infinite;
+}
