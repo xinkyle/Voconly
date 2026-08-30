@@ -1729,6 +1729,7 @@ fn main() {
             commands::transcribe::cleanup_all_resources,
             commands::model::load_model_by_id,
             commands::model::unload_model,
+            commands::model::switch_asr_model,
             commands::model::is_model_loaded,
             commands::model::scan_asr_models,
             commands::model::scan_llm_models,

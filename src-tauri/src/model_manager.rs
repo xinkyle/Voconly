@@ -446,25 +446,28 @@ impl ModelManager {
         LoadStrategy::default()
     }
 
-    /// 获取所有场景正在使用的模型ID集合
-    fn get_models_in_use_by_scenes(&self) -> std::collections::HashSet<String> {
-        let config = match self.config.lock() {
-            Ok(c) => c,
-            Err(_) => return std::collections::HashSet::new(),
-        };
-        config
-            .scenes
-            .iter()
-            .filter(|s| s.enabled) // 只统计启用的场景
-            .map(|s| s.model.full_id())
-            .collect()
+    /// 获取当前正在使用的模型ID集合
+    ///
+    /// 使用全局 ASR 模型（GlobalModelConfig.asr_model）。
+    /// 所有场景共用同一个 ASR 模型。
+    fn get_models_in_use(&self) -> std::collections::HashSet<String> {
+        let mut in_use = std::collections::HashSet::new();
+
+        // 添加全局 ASR 模型
+        if let Ok(model_id) = self.get_global_asr_model() {
+            if !model_id.is_empty() {
+                in_use.insert(model_id);
+            }
+        }
+
+        in_use
     }
 
     /// 清理未被任何场景使用的模型
     ///
     /// 当切换模型时调用，释放不再需要的内存
     pub fn cleanup_unused_models(&mut self) {
-        let models_in_use = self.get_models_in_use_by_scenes();
+        let models_in_use = self.get_models_in_use();
         let mut models_to_remove: Vec<(String, u64)> = Vec::new();
 
         for (model_id, model) in &self.loaded_models {

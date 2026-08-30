@@ -6,6 +6,7 @@ import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
+import { switchAsrModel } from '../services/whisper';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
 import { getProviderList, getLlmPromptPresets } from '../services/llm';
@@ -326,6 +327,11 @@ export default function HomePanelV2({
       return;
     }
 
+    // 获取旧模型 ID（用于卸载）
+    const oldModelId = globalModelConfig.asrModel
+      ? getFullModelId(globalModelConfig.asrModel)
+      : null;
+
     const { baseId, quant } = parseModelId(modelId);
     const newConfig: GlobalModelConfig = {
       asrModel: {
@@ -348,15 +354,29 @@ export default function HomePanelV2({
         globalModelConfig: newConfig,
       });
 
+      // 切换模型（卸载旧模型 + 加载新模型）
+      log.info(`Switching ASR model from ${oldModelId} to ${modelId}`);
+      const result = await switchAsrModel(oldModelId, modelId);
+
+      if (result.success) {
+        log.info(`ASR model switched successfully: ${modelId}`);
+        showToast({
+          type: 'success',
+          title: t('common.saved'),
+          description: t('home.asrModelUpdated'),
+        });
+      } else {
+        log.warn(`ASR model switch failed: ${result.error}`);
+        showToast({
+          type: 'warning',
+          title: t('common.saved'),
+          description: result.error || '模型加载失败，但配置已保存',
+        });
+      }
+
       if (onGlobalModelConfigChange) {
         onGlobalModelConfigChange(newConfig);
       }
-
-      showToast({
-        type: 'success',
-        title: t('common.saved'),
-        description: t('home.asrModelUpdated'),
-      });
     } catch (err) {
       log.error(`Failed to save ASR model: ${err}`);
       showToast({

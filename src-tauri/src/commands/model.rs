@@ -4,7 +4,7 @@ use crate::llm_models::{scan_available_llm_models, LlmModelPreset};
 use crate::model_manager::LoadedModelInfo;
 use crate::presets::{get_asr_presets, scan_available_asr_models, ModelPreset};
 use crate::utils::downloader::{get_llm_model_path, get_model_storage_dir};
-use log::{error, info};
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -26,6 +26,19 @@ pub struct UnloadModelResponse {
     pub success: bool,
     /// Model ID
     pub model_id: String,
+}
+
+/// Switch ASR model response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwitchAsrModelResponse {
+    /// Whether switching was successful
+    pub success: bool,
+    /// Old model ID (if unloaded)
+    pub old_model_id: Option<String>,
+    /// New model ID
+    pub new_model_id: String,
+    /// Error message if failed
+    pub error: Option<String>,
 }
 
 
@@ -123,6 +136,81 @@ pub async fn unload_model(
     }
 
     Ok(UnloadModelResponse { success, model_id })
+}
+
+/// Switch ASR model (unload old model + load new model)
+///
+/// This function:
+/// 1. Unloads the old model from memory (if different from new model)
+/// 2. Loads the new model into memory
+/// 3. Returns the result
+#[tauri::command]
+pub async fn switch_asr_model(
+    services: tauri::State<'_, AppServices>,
+    old_model_id: Option<String>,
+    new_model_id: String,
+) -> Result<SwitchAsrModelResponse, String> {
+    info!(
+        "[SwitchAsrModel] Switching from {:?} to {}",
+        old_model_id, new_model_id
+    );
+
+    // 1. Unload old model (if exists and different from new model)
+    if let Some(ref old_id) = old_model_id {
+        if !old_id.is_empty() && *old_id != new_model_id {
+            let mut model_manager = services
+                .model_manager
+                .lock()
+                .map_err(|e| format!("Failed to lock model manager: {}", e))?;
+
+            if let Some(mgr) = model_manager.as_mut() {
+                if mgr.is_loaded(old_id) {
+                    info!("[SwitchAsrModel] Unloading old model: {}", old_id);
+                    mgr.unload_model(old_id);
+                }
+            }
+        }
+    }
+
+    // 2. Load new model
+    let load_result = load_model_by_id(services, new_model_id.clone(), Some(false)).await;
+
+    match load_result {
+        Ok(response) => {
+            if response.success {
+                info!(
+                    "[SwitchAsrModel] Successfully switched to model: {}",
+                    new_model_id
+                );
+                Ok(SwitchAsrModelResponse {
+                    success: true,
+                    old_model_id,
+                    new_model_id,
+                    error: None,
+                })
+            } else {
+                warn!(
+                    "[SwitchAsrModel] Failed to load new model: {:?}",
+                    response.error
+                );
+                Ok(SwitchAsrModelResponse {
+                    success: false,
+                    old_model_id,
+                    new_model_id,
+                    error: response.error,
+                })
+            }
+        }
+        Err(e) => {
+            error!("[SwitchAsrModel] Error loading model: {}", e);
+            Ok(SwitchAsrModelResponse {
+                success: false,
+                old_model_id,
+                new_model_id,
+                error: Some(e),
+            })
+        }
+    }
 }
 
 

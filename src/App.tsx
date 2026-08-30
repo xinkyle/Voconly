@@ -1097,17 +1097,6 @@ function App() {
       return;
     }
 
-    // Check if model is downloaded
-    const modelDownloaded = await checkModelExists(fullModelId);
-    if (!modelDownloaded) {
-      // Show dialog asking user if they want to download
-      setPendingModelId(config?.globalModelConfig?.asrModel?.modelId ?? '');
-      setPendingModelName(model?.name || config?.globalModelConfig?.asrModel?.modelId || '');
-      setShowModelDialog(true);
-      isProcessingShortcutRef.current = false;
-      return;
-    }
-
     // Update ref for use in callbacks
     currentSceneRef.current = scene;
     // 存储 skipLlm 标记，用于 workflow 中判断
@@ -1160,7 +1149,19 @@ function App() {
       skipLlmRef.current = false;
       log.info('[Streaming] Segment transcription ENABLED for this session (always active)');
 
-      // 2. Then start recording
+      // 2. Check if model exists (async, after showing panel for instant feedback)
+      const modelDownloaded = await checkModelExists(fullModelId);
+      if (!modelDownloaded) {
+        // Model not found, hide panel and show download dialog
+        hideFloatPanelStatus('model-not-found');
+        setPendingModelId(config?.globalModelConfig?.asrModel?.modelId ?? '');
+        setPendingModelName(model?.name || config?.globalModelConfig?.asrModel?.modelId || '');
+        setShowModelDialog(true);
+        isProcessingShortcutRef.current = false;
+        return;
+      }
+
+      // 3. Then start recording
       const success = await currentRecorder.start(scene.id);
       if (success) {
         // 3. 注册 ESC 取消快捷键（录音成功后）

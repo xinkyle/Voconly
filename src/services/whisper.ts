@@ -39,6 +39,13 @@ interface UnloadModelResult {
   modelId: string;
 }
 
+interface SwitchAsrModelResult {
+  success: boolean;
+  oldModelId: string | null;
+  newModelId: string;
+  error: string | null;
+}
+
 
 /**
  * Transcribe audio using local transcribe-rs backend
@@ -120,6 +127,19 @@ export async function loadModel(modelId: string, skipMemoryCheck?: boolean): Pro
  */
 export async function unloadModel(modelId: string): Promise<UnloadModelResult> {
   return invoke<UnloadModelResult>('unload_model', { modelId });
+}
+
+/**
+ * Switch ASR model (unload old model + load new model)
+ * @param oldModelId Old model ID to unload (null if no old model)
+ * @param newModelId New model ID to load
+ * @returns Result indicating success or failure
+ */
+export async function switchAsrModel(
+  oldModelId: string | null,
+  newModelId: string
+): Promise<SwitchAsrModelResult> {
+  return invoke<SwitchAsrModelResult>('switch_asr_model', { oldModelId, newModelId });
 }
 
 /**

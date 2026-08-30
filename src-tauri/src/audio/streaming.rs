@@ -101,14 +101,26 @@ pub fn run_stream_worker(
 
         // 【诊断日志】锁获取成功
         info!("[StreamingWorker] ✅ ModelManager 锁已获取，耗时: {}ms", lock_start.elapsed().as_millis());
-        let manager = manager_guard
-            .as_mut()
-            .expect("[StreamingWorker] ModelManager not available");
+        let manager = match manager_guard.as_mut() {
+            Some(m) => m,
+            None => {
+                error!("[StreamingWorker] ModelManager not available");
+                emit_streaming_error(&app_handle, "ModelManager not available");
+                stream_active.store(false, Ordering::Relaxed);
+                return;
+            }
+        };
 
         // 获取模型（返回 Arc<LoadedModel>）
-        let model = manager
-            .get_or_load_model(&scene_id)
-            .expect("[StreamingWorker] Failed to load model");
+        let model = match manager.get_or_load_model(&scene_id) {
+            Ok(m) => m,
+            Err(e) => {
+                error!("[StreamingWorker] Failed to load model: {}", e);
+                emit_streaming_error(&app_handle, &e);
+                stream_active.store(false, Ordering::Relaxed);
+                return;
+            }
+        };
 
         // 锁在这里释放！Arc<LoadedModel> 不依赖锁的生命周期
         info!("[StreamingWorker] 🔓 模型已获取，锁即将释放，持有时间: {}ms", lock_start.elapsed().as_millis());
@@ -247,6 +259,32 @@ pub fn emit_streaming_text(app_handle: &AppHandle, text: &StreamText, is_final: 
         }
         Err(e) => {
             error!("[StreamingWorker] Failed to emit streaming-text-update: {}", e);
+        }
+    }
+}
+
+/// 发送流式错误事件
+///
+/// 当流式转录过程中发生错误时调用，通过 Tauri 发送 `streaming-error` 事件到前端。
+///
+/// # Arguments
+///
+/// * `app_handle` - Tauri AppHandle
+/// * `error` - 错误消息
+pub fn emit_streaming_error(app_handle: &AppHandle, error: &str) {
+    error!("[StreamingWorker] 发送错误事件: {}", error);
+
+    let event = StreamingErrorEvent {
+        error: error.to_string(),
+        saved_text: String::new(),
+    };
+
+    match app_handle.emit_to("float-panel", "streaming-error", event) {
+        Ok(_) => {
+            info!("[StreamingWorker] Successfully emitted streaming-error to float-panel");
+        }
+        Err(e) => {
+            error!("[StreamingWorker] Failed to emit streaming-error: {}", e);
         }
     }
 }
