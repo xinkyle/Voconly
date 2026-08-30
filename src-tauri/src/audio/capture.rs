@@ -23,11 +23,9 @@ use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use std::collections::VecDeque;
 
-/// 转录任务（使用 Arc 共享全量录音，只记录索引范围，避免复制）
+/// 转录任务（直接携带音频数据，避免共享 buffer 累积问题）
 struct TranscribeTask {
-    full_recording: Arc<Mutex<Vec<f32>>>, // 共享全量录音
-    start_index: usize,                   // 当前分段起始位置
-    sample_count: usize,                  // 当前分段样本数
+    samples: Vec<f32>,  // 当前分段的音频数据
     scene_id: String,
     duration: f64,
 }
@@ -549,7 +547,6 @@ fn run_consumer(
 
     // 全量录音 buffer（共享 Arc，供 Worker 提取分段）
     let full_recording: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
-    let mut current_segment_start: usize = 0; // 当前分段起始索引
     let mut current_scene_id: String = String::new(); // 当前场景 ID
 
     // ===== Partial/Final 实时转录状态变量 =====
@@ -730,11 +727,8 @@ fn run_consumer(
                         task.scene_id
                     );
 
-                    // 从共享全量录音中提取当前分段的 samples
-                    let segment_samples: Vec<f32> = {
-                        let recording = task.full_recording.lock().unwrap();
-                        recording[task.start_index..task.start_index + task.sample_count].to_vec()
-                    };
+                    // 直接使用任务携带的音频数据
+                    let segment_samples = task.samples;
 
                     // 执行转录
                     let result = crate::commands::transcribe::transcribe_samples_internal(
@@ -840,24 +834,22 @@ fn run_consumer(
         });
     }
 
-    /// 将分段音频入队列等待转录（使用 Arc 共享全量录音，只记录索引范围）
+    /// 将分段音频入队列等待转录（直接携带音频数据，避免共享 buffer 累积）
     fn enqueue_segment(
         app_handle: &AppHandle,
-        full_recording: Arc<Mutex<Vec<f32>>>,
-        start_index: usize,
-        sample_count: usize,
+        samples: Vec<f32>,
         scene_id: &str,
     ) {
-        if sample_count == 0 {
+        if samples.is_empty() {
             log::info!("[Streaming] enqueue_segment called with empty samples, skipping");
             return;
         }
 
-        let duration = sample_count as f64 / WHISPER_SAMPLE_RATE as f64;
+        let duration = samples.len() as f64 / WHISPER_SAMPLE_RATE as f64;
         log::info!(
             "[Streaming] Enqueueing segment: {:.2}s, {} samples, scene: {}",
             duration,
-            sample_count,
+            samples.len(),
             scene_id
         );
 
@@ -872,11 +864,9 @@ fn run_consumer(
             );
         }
 
-        // 创建任务（只记录索引范围，不复制 samples）
+        // 创建任务（直接携带音频数据，避免共享 buffer 累积）
         let task = TranscribeTask {
-            full_recording: full_recording.clone(),
-            start_index,
-            sample_count,
+            samples,
             scene_id: scene_id.to_string(),
             duration,
         };
@@ -1031,11 +1021,12 @@ fn run_consumer(
                             }
 
                             // 强制发送 segment（不等待 silence）
-                            let current_len = full_recording.lock().unwrap().len();
-                            let segment_sample_count = current_len - current_segment_start;
-                            enqueue_segment(&app_handle, full_recording.clone(), current_segment_start, segment_sample_count, &current_scene_id);
-                            current_segment_start = current_len;
+                            // 使用 segment_buffer 的数据，入队后清理 full_recording
+                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
+                            // 清理 full_recording 中已入队的历史数据，避免无限累积
+                            full_recording.lock().unwrap().clear();
                             segment_buffer.clear();
+                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Hard threshold");
@@ -1085,11 +1076,12 @@ fn run_consumer(
                         log::info!("[Streaming] Final segment duration: {:.2}s", duration);
 
                         if !segment_buffer.is_empty() {
-                            let current_len = full_recording.lock().unwrap().len();
-                            let segment_sample_count = current_len - current_segment_start;
-                            enqueue_segment(&app_handle, full_recording.clone(), current_segment_start, segment_sample_count, &current_scene_id);
-                            current_segment_start = current_len;
+                            // 使用 segment_buffer 的数据，入队后清理 full_recording
+                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
+                            // 清理 full_recording 中已入队的历史数据，避免无限累积
+                            full_recording.lock().unwrap().clear();
                             segment_buffer.clear();
+                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Segment sent");
@@ -1172,7 +1164,6 @@ fn run_consumer(
                     last_vad_status = false;
                     in_speech_segment = false;
                     segment_buffer.clear();
-                    current_segment_start = 0; // 重置分段起始索引
                     current_scene_id = scene_id.clone(); // 保存 scene_id
                     full_recording.lock().unwrap().clear(); // 清空全量录音
                                                             // 【进度条】新录音开始，重置待转录时长
@@ -1382,18 +1373,12 @@ fn run_consumer(
                                 "[Streaming] Emitting final segment on stop: {:.2}s",
                                 get_duration_secs(&segment_buffer)
                             );
-                            let current_len = full_recording.lock().unwrap().len();
-                            let segment_sample_count = current_len - current_segment_start;
-                            if segment_sample_count > 0 {
-                                enqueue_segment(
-                                    &app_handle,
-                                    full_recording.clone(),
-                                    current_segment_start,
-                                    segment_sample_count,
-                                    &current_scene_id,
-                                );
-                            }
+                            // 使用 segment_buffer 的数据
+                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
+                            // 清理 full_recording
+                            full_recording.lock().unwrap().clear();
                             segment_buffer.clear();
+                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
                         } else {
                             log::info!("[Streaming] No remaining segment to emit on stop");
                         }
@@ -1508,7 +1493,6 @@ fn run_consumer(
                     processed_samples.clear();
                     segment_buffer.clear();
                     in_speech_segment = false;
-                    current_segment_start = 0;
 
                     // ===== Partial/Final: 重置状态变量 =====
                     partial_segment_index = 0;
