@@ -19,6 +19,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart || false);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
   const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'medium');
+  const [asrIdleTimeout, setAsrIdleTimeout] = useState<number>(config.asrIdleTimeoutSeconds ?? 300);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +45,8 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     setCheckUpdates(config.checkUpdates ?? false);
     setPreviewHeight(config.previewHeight ?? 'medium');
     setSelectedMic(config.defaultMicrophone || '');
-  }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone]);
+    setAsrIdleTimeout(config.asrIdleTimeoutSeconds ?? 300);
+  }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);
 
   const loadAutostartStatus = async () => {
     setLoading(true);
@@ -144,6 +146,14 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const handleMicrophoneChange = (deviceId: string) => {
     setSelectedMic(deviceId);
     const newConfig = { ...config, defaultMicrophone: deviceId };
+    onSave(newConfig);
+  };
+
+  const handleAsrIdleTimeoutChange = (minutes: number) => {
+    // 分钟转换为秒
+    const seconds = minutes === 0 ? 0 : minutes * 60;
+    setAsrIdleTimeout(seconds);
+    const newConfig = { ...config, asrIdleTimeoutSeconds: seconds };
     onSave(newConfig);
   };
 
@@ -254,6 +264,34 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               }`}
             />
           </button>
+        </div>
+
+        {/* ASR Idle Timeout setting */}
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.asrIdleTimeout')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.asrIdleTimeoutDesc')}</p>
+            </div>
+          </div>
+          <select
+            value={asrIdleTimeout === 0 ? 0 : Math.floor(asrIdleTimeout / 60)}
+            onChange={(e) => handleAsrIdleTimeoutChange(parseInt(e.target.value))}
+            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
+          >
+            <option value={0}>{t('settings.system.asrIdleTimeoutDisabled')}</option>
+            <option value={1}>{t('settings.system.asrIdleTimeout1min')}</option>
+            <option value={3}>{t('settings.system.asrIdleTimeout3min')}</option>
+            <option value={5}>{t('settings.system.asrIdleTimeout5min')}</option>
+            <option value={10}>{t('settings.system.asrIdleTimeout10min')}</option>
+            <option value={15}>{t('settings.system.asrIdleTimeout15min')}</option>
+            <option value={30}>{t('settings.system.asrIdleTimeout30min')}</option>
+          </select>
         </div>
 
         {/* Preview height setting */}

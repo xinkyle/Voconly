@@ -1,24 +1,8 @@
 import { invoke } from '../utils/tauri';
+import type { FloatPanelState } from '../types';
 
-export interface FloatPanelState {
-  visible: boolean;
-  status: 'idle' | 'recording' | 'transcribing' | 'typing';
-  sceneName?: string;
-  text?: string;
-  // 进度条相关字段
-  modelId?: string;
-  device?: 'CPU' | 'GPU';
-  audioDuration?: number;
-  isTranscribing?: boolean;
-  // LLM 进度相关字段
-  llmModelId?: string;
-  hasLlmProfile?: boolean;
-  textLen?: number;
-  // 双击跳过 LLM 标记
-  skipLlm?: boolean;
-  // 分段转录开关（用于控制状态指示器）
-  segmentTranscribe?: boolean;
-}
+// Re-export for backward compatibility
+export type { FloatPanelState };
 
 /**
  * Show the global float panel with the given state

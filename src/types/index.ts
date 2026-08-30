@@ -167,6 +167,8 @@ export interface AppConfig {
   previewHeight?: PreviewHeight;  // 预览窗口高度档位（默认 medium）
   tutorialCompleted?: boolean;    // 首次引导是否已完成
   versionInfoUrl?: string;         // 版本信息 URL（用于自动更新检查）
+  /** ASR 模型闲置自动卸载时间（秒），默认 300 秒（5 分钟），设置为 0 禁用自动卸载 */
+  asrIdleTimeoutSeconds?: number;
 }
 
 // 麦克风设备
@@ -177,7 +179,7 @@ export interface MicrophoneDevice {
 }
 
 // 录音状态
-export type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing';
+export type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing' | 'loading-model';
 
 // 悬浮面板状态 (使用 camelCase 匹配后端)
 export interface FloatPanelState {

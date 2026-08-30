@@ -46,7 +46,16 @@
       "autostartTip": "Note: Auto-start requires adding a registry entry. It will be removed when disabled.",
       "loadAutostartError": "Failed to load auto-start status",
       "setAutostartError": "Failed to set auto-start",
-      "openLogDirError": "Failed to open log directory"
+      "openLogDirError": "Failed to open log directory",
+      "asrIdleTimeout": "Model Memory Release",
+      "asrIdleTimeoutDesc": "Automatically release model memory after idle period",
+      "asrIdleTimeoutDisabled": "Never",
+      "asrIdleTimeout1min": "1 minute",
+      "asrIdleTimeout3min": "3 minutes",
+      "asrIdleTimeout5min": "5 minutes (Recommended)",
+      "asrIdleTimeout10min": "10 minutes",
+      "asrIdleTimeout15min": "15 minutes",
+      "asrIdleTimeout30min": "30 minutes"
     },
     "prompt": {
       "title": "Scene Prompt Management",
@@ -542,6 +551,7 @@
       "transcribingSkipLlm": "Transcribing (Skip LLM)",
       "typing": "Typing",
       "idle": "Idle",
+      "loadingModel": "Loading Model",
       "llmError": "LLM error, original text output",
       "llmSkippedTooLong": "Text too long, LLM skipped"
     },

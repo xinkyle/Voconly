@@ -335,6 +335,9 @@ pub async fn transcribe_audio(
             .get_or_load_model(&request.scene_id)
             .map_err(|e| format!("Failed to get model: {}", e))?;
 
+        // 更新最后使用时间
+        model.touch();
+
         // 锁在这里释放！
         model
     };
@@ -425,6 +428,9 @@ pub fn transcribe_samples_internal(
         let model = mgr
             .get_or_load_model(scene_id)
             .map_err(|e| format!("Failed to get model: {}", e))?;
+
+        // 更新最后使用时间
+        model.touch();
 
         // 锁在这里释放！Arc<LoadedModel> 不依赖锁的生命周期
         model

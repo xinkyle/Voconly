@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]  // 隐藏 CMD 控制台窗口
+//#![windows_subsystem = "windows"]  // 隐藏 CMD 控制台窗口
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1524,8 +1524,8 @@ fn build_console_filter() -> env_filter::Filter {
             info!("Using RUST_LOG environment variable: {}", spec);
         }
         _ => {
-            // 默认 Warn 级别（release 版本减少噪音）
-            builder.filter_level(log::LevelFilter::Warn);
+            // 默认 Info 级别（便于调试）
+            builder.filter_level(log::LevelFilter::Info);
         }
     }
 
@@ -2155,6 +2155,90 @@ fn main() {
                 "[STARTUP] 后台初始化线程已启动, 耗时: {}ms",
                 preload_thread_start.elapsed().as_millis()
             );
+
+            // ===== 启动 ASR 模型闲置检测定时器 =====
+            // 每分钟检查一次闲置模型
+            let app_for_idle = app.handle().clone();
+            std::thread::spawn(move || {
+                info!("[IdleChecker] ASR 模型闲置检测定时器启动");
+                loop {
+                    // 每分钟检查一次
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+
+                    // 获取闲置超时配置和模型状态
+                    let (idle_timeout_secs, loaded_count, idle_info) = {
+                        if let Some(state) = app_for_idle.try_state::<AppServices>() {
+                            let config_val = if let Ok(config) = state.config.lock() {
+                                config.asr_idle_timeout_seconds
+                            } else {
+                                continue
+                            };
+
+                            // 获取模型状态
+                            let (count, info) = if let Ok(mgr_guard) = state.model_manager.lock() {
+                                if let Some(mgr) = mgr_guard.as_ref() {
+                                    let models = mgr.get_loaded_models();
+                                    let info: Vec<(String, u64)> = models.iter()
+                                        .map(|m| (m.model_id.clone(), m.last_used_secs))
+                                        .collect();
+                                    (models.len(), info)
+                                } else {
+                                    (0, Vec::new())
+                                }
+                            } else {
+                                (0, Vec::new())
+                            };
+
+                            (config_val, count, info)
+                        } else {
+                            continue
+                        }
+                    };
+
+                    // 打印检查信息
+                    info!(
+                        "[IdleChecker] ⏱️ 配置超时: {}秒 ({}分钟), 已加载模型: {}, 状态: {:?}",
+                        idle_timeout_secs,
+                        idle_timeout_secs / 60,
+                        loaded_count,
+                        idle_info
+                    );
+
+                    // 0 表示禁用自动清理
+                    if idle_timeout_secs == 0 {
+                        info!("[IdleChecker] 自动清理已禁用，跳过");
+                        continue;
+                    }
+
+                    // 执行闲置清理并获取被卸载的模型列表
+                    let unloaded_models = if let Some(state) = app_for_idle.try_state::<AppServices>() {
+                        if let Ok(mut mgr_guard) = state.model_manager.lock() {
+                            if let Some(mgr) = mgr_guard.as_mut() {
+                                mgr.cleanup_idle_models(idle_timeout_secs)
+                            } else {
+                                Vec::new()
+                            }
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    };
+
+                    // 如果有模型被卸载，通知前端更新状态
+                    if !unloaded_models.is_empty() {
+                        info!(
+                            "[IdleChecker] ✅ 已卸载 {} 个模型: {:?}",
+                            unloaded_models.len(),
+                            unloaded_models
+                        );
+                        if let Err(e) = app_for_idle.emit("asr-models-unloaded", &unloaded_models) {
+                            error!("[IdleChecker] 发送卸载通知失败: {}", e);
+                        }
+                    }
+                }
+            });
+            info!("[STARTUP] ASR 模型闲置检测定时器已启动");
 
             Ok(())
         })

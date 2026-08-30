@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
@@ -126,8 +127,8 @@ pub struct LoadedModel {
     pub backend: BackendEnum,
     /// 加载时间
     pub loaded_at: Instant,
-    /// 最后使用时间
-    pub last_used: Instant,
+    /// 最后使用时间戳（Unix 时间戳毫秒，原子操作支持 Arc 下更新）
+    last_used_timestamp: AtomicU64,
     /// 内存占用估算 (MB)
     pub memory_mb: u64,
     /// 模型路径（用于获取文件大小）
@@ -138,8 +139,35 @@ pub struct LoadedModel {
 
 impl LoadedModel {
     /// 更新最后使用时间
-    pub fn touch(&mut self) {
-        self.last_used = Instant::now();
+    pub fn touch(&self) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        self.last_used_timestamp.store(now, Ordering::Release);
+    }
+
+    /// 获取最后使用时间（返回 Instant 用于计算间隔）
+    pub fn last_used(&self) -> Instant {
+        let timestamp_ms = self.last_used_timestamp.load(Ordering::Acquire);
+        // 将时间戳转换回 Instant（近似值）
+        let now_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let elapsed_ms = now_timestamp.saturating_sub(timestamp_ms);
+        Instant::now() - std::time::Duration::from_millis(elapsed_ms)
+    }
+
+    /// 获取闲置时间（秒）
+    pub fn idle_seconds(&self) -> u64 {
+        let timestamp_ms = self.last_used_timestamp.load(Ordering::Acquire);
+        let now_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let elapsed_ms = now_timestamp.saturating_sub(timestamp_ms);
+        elapsed_ms / 1000
     }
 }
 
@@ -663,10 +691,16 @@ impl ModelManager {
         // Get runtime capabilities from backend (only for TranscribeCpp)
         let capabilities = backend.get_capabilities().cloned();
 
+        // 初始化最后使用时间戳为当前时间
+        let init_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
         let loaded = Arc::new(LoadedModel {
             backend,
             loaded_at: now,
-            last_used: now,
+            last_used_timestamp: AtomicU64::new(init_timestamp),
             memory_mb,
             model_path: model_config.path.clone(),
             capabilities,
@@ -726,42 +760,43 @@ impl ModelManager {
 
     /// 清理空闲模型（定时任务调用）
     ///
-    /// 在 Arc 方案下，使用引用计数判断模型是否还在使用：
-    /// - strong_count == 1：只有 ModelManager 持有，可以清理
-    /// - strong_count > 1：还有其他地方在使用，不能清理
-    #[allow(dead_code)]
-    pub fn cleanup_idle_models(&mut self) {
-        let now = Instant::now();
+    /// 使用全局闲置超时配置，检测并卸载闲置超过阈值的模型。
+    /// 条件：
+    /// - 引用计数 == 1（仅 ModelManager 持有，无其他引用）
+    /// - 闲置时间 > idle_timeout_secs
+    ///
+    /// 参数 idle_timeout_secs:
+    /// - Some(n): 使用指定值
+    /// - None: 禁用自动清理
+    ///
+    /// 返回被卸载的模型 ID 列表（用于通知前端更新状态）
+    pub fn cleanup_idle_models(&mut self, idle_timeout_secs: u64) -> Vec<String> {
+        if idle_timeout_secs == 0 {
+            // 0 表示禁用自动清理
+            return Vec::new();
+        }
+
         let models_to_remove: Vec<(String, u64)> = self
             .loaded_models
             .iter()
             .filter(|(id, arc_model)| {
-                let strategy = self.get_model_load_strategy(id);
-                match strategy {
-                    LoadStrategy::Always => {
-                        // 常驻模型不清理
-                        false
-                    }
-                    LoadStrategy::Lazy { idle_timeout } => {
-                        // Arc 方案：检查引用计数和空闲时间
-                        let ref_count = Arc::strong_count(arc_model);
-                        let model = arc_model.as_ref();
-                        let idle_secs = now.duration_since(model.last_used).as_secs();
+                let ref_count = Arc::strong_count(arc_model);
+                let idle_secs = arc_model.idle_seconds();
 
-                        // 只有当引用计数为 1（仅 ModelManager 持有）且空闲超时才清理
-                        let should_remove = ref_count == 1 && idle_secs > idle_timeout;
-                        if should_remove {
-                            info!(
-                                "[ModelManager] 模型 {} 空闲 {} 秒（引用计数={}），超过阈值 {} 秒，标记清理",
-                                id, idle_secs, ref_count, idle_timeout
-                            );
-                        }
-                        should_remove
-                    }
+                // 只有当引用计数为 1（仅 ModelManager 持有）且空闲超时才清理
+                let should_remove = ref_count == 1 && idle_secs > idle_timeout_secs;
+                if should_remove {
+                    info!(
+                        "[ModelManager] 模型 {} 空闲 {} 秒（引用计数={}），超过阈值 {} 秒，标记清理",
+                        id, idle_secs, ref_count, idle_timeout_secs
+                    );
                 }
+                should_remove
             })
             .map(|(id, arc_model)| (id.clone(), arc_model.memory_mb))
             .collect();
+
+        let mut unloaded_ids = Vec::new();
 
         if !models_to_remove.is_empty() {
             info!(
@@ -772,6 +807,7 @@ impl ModelManager {
 
         for (model_id, memory_mb) in models_to_remove {
             self.loaded_models.remove(&model_id);
+            unloaded_ids.push(model_id.clone());
             info!(
                 "[ModelManager] ✓ 空闲模型 {} 已清理，释放 {} MB",
                 model_id, memory_mb
@@ -784,6 +820,8 @@ impl ModelManager {
                 self.loaded_models.len()
             );
         }
+
+        unloaded_ids
     }
 
     /// 应用启动时预加载全局 ASR 模型
@@ -851,7 +889,7 @@ impl ModelManager {
                     memory_mb: model.memory_mb,
                     size_mb,
                     loaded_at_secs: model.loaded_at.elapsed().as_secs(),
-                    last_used_secs: model.last_used.elapsed().as_secs(),
+                    last_used_secs: model.idle_seconds(),
                 }
             })
             .collect()

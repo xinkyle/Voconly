@@ -10,6 +10,7 @@ import { switchAsrModel, isModelLoaded } from '../services/whisper';
 import { subscribeToDownloadComplete } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
 import { getProviderList, getLlmPromptPresets } from '../services/llm';
+import { listen } from '@tauri-apps/api/event';
 import AsrModelSelectModal from './AsrModelSelectModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
 import { useToast } from './ui/Toast';
@@ -192,6 +193,7 @@ export default function HomePanelV2({
   const [providers, setProviders] = useState<ProviderWithConfig[]>([]);
   const [selectingSceneId, setSelectingSceneId] = useState<string | null>(null);
   const [asrLoading, setAsrLoading] = useState(false); // ASR 模型加载中状态
+  const [asrModelLoaded, setAsrModelLoaded] = useState(false); // ASR 模型是否真正加载到内存
   const [stats, setStats] = useState<FullStats>({
     totalDuration: 0,
     totalWords: 0,
@@ -307,17 +309,20 @@ export default function HomePanelV2({
       if (!modelId) {
         // 未配置模型，不显示加载状态
         setAsrLoading(false);
+        setAsrModelLoaded(false);
         return;
       }
 
       // 初始设为加载中，后端可能在预加载
       setAsrLoading(true);
+      setAsrModelLoaded(false);
 
       try {
         // 检查模型是否已加载
         const loaded = await isModelLoaded(modelId);
         if (mounted) {
           setAsrLoading(!loaded);
+          setAsrModelLoaded(loaded);
           if (loaded) {
             log.info(`ASR model ${modelId} is already loaded`);
           } else {
@@ -329,20 +334,27 @@ export default function HomePanelV2({
                 const reloaded = await isModelLoaded(modelId);
                 if (mounted) {
                   setAsrLoading(!reloaded);
+                  setAsrModelLoaded(reloaded);
                   if (reloaded) {
                     log.info(`ASR model ${modelId} loaded after retry`);
                   }
                 }
               } catch (e) {
                 log.warn(`Failed to recheck model load status: ${e}`);
-                if (mounted) setAsrLoading(false);
+                if (mounted) {
+                  setAsrLoading(false);
+                  setAsrModelLoaded(false);
+                }
               }
             }, 2000);
           }
         }
       } catch (err) {
         log.error(`Failed to check model load status: ${err}`);
-        if (mounted) setAsrLoading(false);
+        if (mounted) {
+          setAsrLoading(false);
+          setAsrModelLoaded(false);
+        }
       }
     };
 
@@ -353,6 +365,118 @@ export default function HomePanelV2({
 
     return () => {
       mounted = false;
+    };
+  }, [globalModelConfig?.asrModel]);
+
+  // 监听模型卸载事件（闲置自动卸载）
+  useEffect(() => {
+    let mounted = true;
+
+    const unlisten = listen<string[]>('asr-models-unloaded', async (event) => {
+      if (!mounted) return;
+
+      const unloadedModels = event.payload;
+      log.info(`[HomePanel] 收到模型卸载通知: ${JSON.stringify(unloadedModels)}`);
+
+      // 检查当前模型是否被卸载
+      const currentModelId = globalModelConfig?.asrModel
+        ? getFullModelId(globalModelConfig.asrModel)
+        : '';
+
+      if (currentModelId && unloadedModels.includes(currentModelId)) {
+        log.info(`[HomePanel] 当前模型 ${currentModelId} 已被卸载，更新状态`);
+        setAsrLoading(false);
+        setAsrModelLoaded(false); // 标记模型未加载
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unlisten.then(fn => fn());
+    };
+  }, [globalModelConfig?.asrModel]);
+
+  // 监听模型加载开始事件
+  useEffect(() => {
+    let mounted = true;
+
+    const unlisten = listen<{ modelId: string }>('asr-model-loading', async (event) => {
+      if (!mounted) return;
+
+      const { modelId } = event.payload;
+      log.info(`[HomePanel] 收到模型加载开始通知: ${modelId}`);
+
+      // 检查是否是当前配置的模型
+      const currentModelId = globalModelConfig?.asrModel
+        ? getFullModelId(globalModelConfig.asrModel)
+        : '';
+
+      if (currentModelId === modelId) {
+        log.info(`[HomePanel] 当前模型 ${modelId} 正在加载，显示加载动画`);
+        setAsrLoading(true);
+        setAsrModelLoaded(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unlisten.then(fn => fn());
+    };
+  }, [globalModelConfig?.asrModel]);
+
+  // 监听模型加载完成事件
+  useEffect(() => {
+    let mounted = true;
+
+    const unlisten = listen<{ modelId: string }>('asr-model-loaded', async (event) => {
+      if (!mounted) return;
+
+      const { modelId } = event.payload;
+      log.info(`[HomePanel] 收到模型加载完成通知: ${modelId}`);
+
+      // 检查是否是当前配置的模型
+      const currentModelId = globalModelConfig?.asrModel
+        ? getFullModelId(globalModelConfig.asrModel)
+        : '';
+
+      if (currentModelId === modelId) {
+        log.info(`[HomePanel] 当前模型 ${modelId} 已加载完成，显示绿点`);
+        setAsrLoading(false);
+        setAsrModelLoaded(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unlisten.then(fn => fn());
+    };
+  }, [globalModelConfig?.asrModel]);
+
+  // 监听模型加载失败事件
+  useEffect(() => {
+    let mounted = true;
+
+    const unlisten = listen<{ modelId: string; error?: string }>('asr-model-load-failed', async (event) => {
+      if (!mounted) return;
+
+      const { modelId } = event.payload;
+      log.info(`[HomePanel] 收到模型加载失败通知: ${modelId}`);
+
+      // 检查是否是当前配置的模型
+      const currentModelId = globalModelConfig?.asrModel
+        ? getFullModelId(globalModelConfig.asrModel)
+        : '';
+
+      if (currentModelId === modelId) {
+        log.info(`[HomePanel] 当前模型 ${modelId} 加载失败，显示灰点`);
+        setAsrLoading(false);
+        setAsrModelLoaded(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unlisten.then(fn => fn());
     };
   }, [globalModelConfig?.asrModel]);
 
@@ -418,6 +542,7 @@ export default function HomePanelV2({
 
       // 开始加载模型，设置加载中状态
       setAsrLoading(true);
+      setAsrModelLoaded(false);
       log.info(`Switching ASR model from ${oldModelId} to ${modelId}`);
 
       // 切换模型（卸载旧模型 + 加载新模型）
@@ -425,6 +550,7 @@ export default function HomePanelV2({
 
       if (result.success) {
         log.info(`ASR model switched successfully: ${modelId}`);
+        setAsrModelLoaded(true); // 标记模型已加载
         showToast({
           type: 'success',
           title: t('common.saved'),
@@ -432,6 +558,7 @@ export default function HomePanelV2({
         });
       } else {
         log.warn(`ASR model switch failed: ${result.error}`);
+        setAsrModelLoaded(false); // 标记模型未加载
         showToast({
           type: 'warning',
           title: t('common.saved'),
@@ -444,6 +571,7 @@ export default function HomePanelV2({
       }
     } catch (err) {
       log.error(`Failed to save ASR model: ${err}`);
+      setAsrModelLoaded(false);
       showToast({
         type: 'error',
         title: t('common.error'),
@@ -588,9 +716,12 @@ export default function HomePanelV2({
                   <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '200ms' }} />
                   <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '400ms' }} />
                 </span>
-              ) : (
+              ) : asrModelLoaded ? (
                 // 已加载：绿点
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              ) : (
+                // 未加载（被卸载）：灰点（表示"已配置但未加载"的状态）
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
               )
             )}
           </button>

@@ -99,6 +99,8 @@ interface RustAppConfig {
   previewHeight?: 'high' | 'medium' | 'low';
   tutorialCompleted?: boolean;
   versionInfoUrl?: string;
+  /// ASR 模型闲置自动卸载时间（秒）
+  asrIdleTimeoutSeconds?: number;
 }
 
 // ============== Rust LLM 类型 ==============
@@ -259,6 +261,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     previewHeight: rust.previewHeight,
     tutorialCompleted: rust.tutorialCompleted,
     versionInfoUrl: rust.versionInfoUrl,
+    // ASR 模型闲置自动卸载时间
+    asrIdleTimeoutSeconds: rust.asrIdleTimeoutSeconds,
   };
 }
 
@@ -302,6 +306,8 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
     previewHeight: config.previewHeight,
     tutorialCompleted: config.tutorialCompleted,
     versionInfoUrl: config.versionInfoUrl,
+    // ASR 模型闲置自动卸载时间
+    asrIdleTimeoutSeconds: config.asrIdleTimeoutSeconds,
   };
 }
 

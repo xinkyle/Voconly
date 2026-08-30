@@ -46,7 +46,16 @@
       "autostartTip": "提示：开机自启功能需要在系统注册表中添加启动项，关闭后将自动移除。",
       "loadAutostartError": "加载开机自启状态失败",
       "setAutostartError": "设置开机自启失败",
-      "openLogDirError": "打开日志目录失败"
+      "openLogDirError": "打开日志目录失败",
+      "asrIdleTimeout": "模型内存释放",
+      "asrIdleTimeoutDesc": "闲置一段时间后自动释放模型内存",
+      "asrIdleTimeoutDisabled": "永不释放",
+      "asrIdleTimeout1min": "1 分钟",
+      "asrIdleTimeout3min": "3 分钟",
+      "asrIdleTimeout5min": "5 分钟（推荐）",
+      "asrIdleTimeout10min": "10 分钟",
+      "asrIdleTimeout15min": "15 分钟",
+      "asrIdleTimeout30min": "30 分钟"
     },
     "prompt": {
       "title": "场景提示词管理",
@@ -542,6 +551,7 @@
       "transcribingSkipLlm": "识别中（跳过LLM）",
       "typing": "输入中",
       "idle": "空闲",
+      "loadingModel": "加载模型中",
       "llmError": "LLM异常，已输出原文",
       "llmSkippedTooLong": "文本过长，跳过LLM处理"
     },

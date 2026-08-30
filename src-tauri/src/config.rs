@@ -485,6 +485,15 @@ pub struct AppConfig {
     /// scan_available_asr_models() 会扫描这些目录中的模型
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_asr_model_dirs: Vec<String>,
+    /// ASR 模型闲置自动卸载时间（秒）
+    /// 默认 300 秒（5 分钟），设置为 0 禁用自动卸载
+    #[serde(default = "default_asr_idle_timeout")]
+    pub asr_idle_timeout_seconds: u64,
+}
+
+/// 默认 ASR 模型闲置超时时间（300 秒 = 5 分钟）
+fn default_asr_idle_timeout() -> u64 {
+    300
 }
 
 /// 默认自动语言
@@ -563,6 +572,7 @@ impl Default for AppConfig {
             #[allow(deprecated)]
             llm_models: Vec::new(),
             custom_asr_model_dirs: Vec::new(),
+            asr_idle_timeout_seconds: default_asr_idle_timeout(), // 默认 5 分钟
         }
     }
 }
@@ -775,6 +785,10 @@ fn migrate_global_llm_config(config: &mut AppConfig) -> bool {
 /// This can be called from other commands without the Tauri command wrapper
 pub fn save_config_internal(config: &AppConfig, app_services: &AppServices) -> Result<(), String> {
     log::info!("[save_config_internal] Saving config");
+    log::info!("[save_config_internal] ⏱️ ASR idle timeout: {} seconds ({} minutes)",
+        config.asr_idle_timeout_seconds,
+        config.asr_idle_timeout_seconds / 60
+    );
 
     let config_path = get_config_path()?;
     log::info!("[save_config_internal] Config path: {:?}", config_path);
@@ -796,7 +810,9 @@ pub fn save_config_internal(config: &AppConfig, app_services: &AppServices) -> R
             .lock()
             .map_err(|e| format!("Failed to lock config: {}", e))?;
         *memory_config = config.clone();
-        log::info!("[save_config_internal] Memory config updated successfully");
+        log::info!("[save_config_internal] ✅ Memory config updated, asr_idle_timeout_seconds = {}",
+            memory_config.asr_idle_timeout_seconds
+        );
     }
 
     // 配置变更后，清理不再被任何场景使用的模型

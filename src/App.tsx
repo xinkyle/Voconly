@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { emitTo, listen } from './utils/tauri';
+import { emitTo, listen, emit } from './utils/tauri';
 import type { AppConfig, Scene, FloatPanelState, HistoryRecord, Model, LlmErrorPayload } from './types';
 import { getFullModelId } from './types';
 import ModelConfigPanel from './components/ModelConfigPanel';
@@ -32,6 +32,7 @@ import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
 import { checkModelExists } from './services/downloader';
+import { isModelLoaded, loadModel } from './services/whisper';
 import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
@@ -1159,6 +1160,50 @@ function App() {
         setShowModelDialog(true);
         isProcessingShortcutRef.current = false;
         return;
+      }
+
+      // 2.5. Check if model is loaded into memory
+      const modelLoaded = await isModelLoaded(fullModelId);
+      if (!modelLoaded) {
+        log.info(`[HANDLE_SHORTCUT] Model ${fullModelId} not loaded, loading now...`);
+        // Emit event to notify HomePanelV2 that model is loading
+        emit('asr-model-loading', { modelId: fullModelId }).catch((e) => log.error(`Failed to emit asr-model-loading: ${e}`));
+        // Show "loading-model" status
+        showFloatPanelStatus('loading-model', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
+          segmentTranscribe: config?.segmentTranscribe ?? true,
+        });
+
+        try {
+          const result = await loadModel(fullModelId);
+          if (!result.success) {
+            log.error(`[HANDLE_SHORTCUT] Failed to load model: ${result.error}`);
+            // Emit event to notify HomePanelV2 that model load failed
+            emit('asr-model-load-failed', { modelId: fullModelId, error: result.error }).catch((e) => log.error(`Failed to emit asr-model-load-failed: ${e}`));
+            hideFloatPanelStatus('model-load-failed');
+            showToast({
+              type: 'error',
+              title: t('common.error'),
+              description: result.error || '模型加载失败',
+            });
+            isProcessingShortcutRef.current = false;
+            return;
+          }
+          log.info(`[HANDLE_SHORTCUT] Model ${fullModelId} loaded successfully`);
+          // Emit event to notify HomePanelV2 that model is loaded
+          emit('asr-model-loaded', { modelId: fullModelId }).catch((e) => log.error(`Failed to emit asr-model-loaded: ${e}`));
+        } catch (error) {
+          log.error(`[HANDLE_SHORTCUT] Model load error: ${error}`);
+          // Emit event to notify HomePanelV2 that model load failed
+          emit('asr-model-load-failed', { modelId: fullModelId, error: String(error) }).catch((e) => log.error(`Failed to emit asr-model-load-failed: ${e}`));
+          hideFloatPanelStatus('model-load-error');
+          isProcessingShortcutRef.current = false;
+          return;
+        }
+
+        // Update float panel to show "recording" status
+        showFloatPanelStatus('recording', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
+          segmentTranscribe: config?.segmentTranscribe ?? true,
+        });
       }
 
       // 3. Then start recording
