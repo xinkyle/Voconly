@@ -193,7 +193,11 @@
     "clickToSelectAsr": "Click to select ASR model",
     "clickToConfigureLlm": "Click to configure LLM model",
     "asrModelUpdated": "ASR model updated",
-    "sceneSettings": "Scene settings"
+    "sceneSettings": "Scene settings",
+    "shortcutTitle": "Scene Shortcuts",
+    "shortcutHint": "Press shortcut to start voice input, press again to end",
+    "noEnabledScenes": "No enabled scenes",
+    "addSceneHint": "Go to settings to add scenes"
   },
   "scene": {
     "quickDesc": "Fast input, quick response",
@@ -241,7 +245,13 @@
     "confirm": "Confirm Clear",
     "activeDays": "Active for {{count}} days",
     "avgWordsPerDay": "{{count}} words/day avg",
-    "avgRecordsPerDay": "{{count}} records/day avg"
+    "avgRecordsPerDay": "{{count}} records/day avg",
+    "statsDuration": "Duration",
+    "statsWords": "Words",
+    "statsRecords": "Records",
+    "statsToday": "Today",
+    "daysCount": "{{count}} days",
+    "avgDaily": "Avg {{count}}"
   },
   "modelConfig": {
     "title": "Local Model Configuration",

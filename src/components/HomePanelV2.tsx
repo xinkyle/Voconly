@@ -742,8 +742,8 @@ export default function HomePanelV2({
       <section className="flex-1 flex flex-col justify-center">
         <div className="-mx-4 px-4 py-10" style={{ background: 'radial-gradient(ellipse at center, rgba(243, 244, 246, 0.7) 0%, rgba(243, 244, 246, 0.4) 50%, transparent 90%)' }}>
           <div className="text-center mb-8">
-            <h2 className="text-base font-medium text-gray-500 mb-2">场景快捷键</h2>
-            <p className="text-xs text-gray-400">按下快捷键开始语音输入，再次按下结束识别</p>
+            <h2 className="text-base font-medium text-gray-500 mb-2">{t('home.shortcutTitle')}</h2>
+            <p className="text-xs text-gray-400">{t('home.shortcutHint')}</p>
           </div>
 
           {enabledScenes.length > 0 ? (
@@ -756,7 +756,7 @@ export default function HomePanelV2({
                 return (
                   <button
                     key={scene.id}
-                    className="group relative flex flex-col items-center bg-white border border-gray-100 rounded-2xl p-12 text-center transition-all duration-200 hover:border-gray-200 hover:shadow-lg min-w-[260px] w-[280px]"
+                    className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl p-12 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[260px] w-[280px]"
                     onClick={() => handleShortcutClick(scene.id)}
                   >
                     {/* 键帽样式快捷键 */}
@@ -798,48 +798,61 @@ export default function HomePanelV2({
             </div>
           ) : (
             <div className="bg-white/60 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center py-12">
-              <div className="text-sm font-medium text-gray-400 mb-1">暂无启用的场景</div>
-              <div className="text-xs text-gray-400">请前往设置添加场景</div>
+              <div className="text-sm font-medium text-gray-400 mb-1">{t('home.noEnabledScenes')}</div>
+              <div className="text-xs text-gray-400">{t('home.addSceneHint')}</div>
             </div>
           )}
         </div>
       </section>
 
       {/* 统计卡片 - 底部区域 */}
-      <section className="mt-8 pt-6 border-t border-gray-100">
-        <div className="grid grid-cols-4 gap-3">
+      <section className="mt-8">
+        <div className="flex justify-center items-stretch">
           {/* 总时长 */}
-          <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalDuration')}</div>
-            <div className="text-lg font-bold text-gray-900">{formatDuration(stats.totalDuration)}</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {stats.activeDays > 0 ? `共 ${stats.activeDays} 天` : '—'}
+          <div className="text-center px-8 py-1">
+            <div className="text-base font-semibold text-gray-800 tabular-nums">
+              {formatDuration(stats.totalDuration)}
+            </div>
+            <div className="text-xs text-gray-400 mt-1.5">
+              {t('memory.statsDuration')}{stats.activeDays > 0 && ` / ${t('memory.daysCount', { count: stats.activeDays })}`}
             </div>
           </div>
+
+          {/* 分割线 */}
+          <div className="w-px bg-gray-100 mx-1 self-stretch"></div>
 
           {/* 总字数 */}
-          <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalWords')}</div>
-            <div className="text-lg font-bold text-gray-900">{(stats.totalWords ?? 0).toLocaleString()}</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {stats.activeDays > 0 ? `日均 ${avgStats.avgWordsPerDay.toLocaleString()}` : '—'}
+          <div className="text-center px-8 py-1">
+            <div className="text-base font-semibold text-gray-800 tabular-nums">
+              {(stats.totalWords ?? 0).toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-400 mt-1.5">
+              {t('memory.statsWords')}{stats.activeDays > 0 && ` / ${t('memory.avgDaily', { count: avgStats.avgWordsPerDay.toLocaleString() })}`}
             </div>
           </div>
+
+          {/* 分割线 */}
+          <div className="w-px bg-gray-100 mx-1 self-stretch"></div>
 
           {/* 总记录 */}
-          <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.totalCount')}</div>
-            <div className="text-lg font-bold text-gray-900">{stats.totalCount}</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {stats.activeDays > 0 ? `日均 ${avgStats.avgRecordsPerDay}` : '—'}
+          <div className="text-center px-8 py-1">
+            <div className="text-base font-semibold text-gray-800 tabular-nums">
+              {stats.totalCount}
+            </div>
+            <div className="text-xs text-gray-400 mt-1.5">
+              {t('memory.statsRecords')}{stats.activeDays > 0 && ` / ${t('memory.avgDaily', { count: avgStats.avgRecordsPerDay })}`}
             </div>
           </div>
 
+          {/* 分割线 */}
+          <div className="w-px bg-gray-100 mx-1 self-stretch"></div>
+
           {/* 今日 */}
-          <div className="bg-gray-100 rounded-xl p-3 text-center">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('memory.todayCount')}</div>
-            <div className="text-lg font-bold text-gray-900">{stats.todayCount}</div>
-            <div className="text-xs text-gray-500 mt-1">今日记录</div>
+          <div className="text-center px-8 py-1">
+            <div className="text-base font-semibold text-gray-800 tabular-nums">
+              {stats.todayCount}
+            </div>
+            <div className="text-xs text-gray-400 mt-1.5">{t('memory.statsToday')}</div>
           </div>
         </div>
       </section>

@@ -193,7 +193,11 @@
     "clickToSelectAsr": "点击选择 ASR 模型",
     "clickToConfigureLlm": "点击配置 LLM 模型",
     "asrModelUpdated": "ASR 模型已更新",
-    "sceneSettings": "场景设置"
+    "sceneSettings": "场景设置",
+    "shortcutTitle": "场景快捷键",
+    "shortcutHint": "按下快捷键开始语音输入，再次按下结束识别",
+    "noEnabledScenes": "暂无启用的场景",
+    "addSceneHint": "请前往设置添加场景"
   },
   "scene": {
     "quickDesc": "适合快速输入，响应速度快",
@@ -241,7 +245,13 @@
     "confirm": "确认清空",
     "activeDays": "累计使用 {{count}} 天",
     "avgWordsPerDay": "平均每天 {{count}} 字",
-    "avgRecordsPerDay": "平均每天 {{count}} 条"
+    "avgRecordsPerDay": "平均每天 {{count}} 条",
+    "statsDuration": "总时长",
+    "statsWords": "总字数",
+    "statsRecords": "总次数",
+    "statsToday": "今日记录",
+    "daysCount": "共{{count}}天",
+    "avgDaily": "日均{{count}}"
   },
   "modelConfig": {
     "title": "本地模型配置",
