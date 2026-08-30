@@ -68,12 +68,28 @@ export default function SettingsAbout({ onUpdateAvailable }: SettingsAboutProps)
   return (
     <div>
       {/* App info */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-4 mb-6">
         <LogoIcon className="w-12 h-12" />
         <div>
           <h1 className="text-xl font-semibold text-gray-900">{APP_NAME}</h1>
           <p className="text-sm text-gray-500 mt-1">{t('settings.about.subtitle')}</p>
         </div>
+      </div>
+
+      {/* Product description */}
+      <div className="mb-8 p-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 border border-gray-100">
+        <p className="text-sm text-gray-700 leading-relaxed">
+          <strong className="text-gray-900">Voconly</strong> 是一款免费、开源、本地优先的 AI 语音输入助手，完全运行在你的设备上。
+        </p>
+        <p className="text-sm text-gray-600 leading-relaxed mt-3">
+          它将语音在本地转换为文字，并通过 AI 进行润色、翻译、整理和结构化处理，让你在任何应用中用说话代替键盘输入。
+        </p>
+        <p className="text-xs text-gray-500 mt-3 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          无需上传音频，不依赖云端服务，保护你的隐私。
+        </p>
       </div>
 
       {/* Update check */}

@@ -32,7 +32,6 @@ export default function SceneForm({
 }: SceneFormProps) {
   const { t } = useTranslation();
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
-  const [enabled, setEnabled] = useState(scene?.enabled ?? true);
   const [promptType, setPromptType] = useState(scene?.promptType || 'lightPolish');
   const [customPrompt, setCustomPrompt] = useState(scene?.customPrompt || '');
   const [errors, setErrors] = useState<{ shortcut?: string; conflict?: string }>({});
@@ -57,7 +56,6 @@ export default function SceneForm({
   useEffect(() => {
     if (scene) {
       setShortcut(scene.shortcut);
-      setEnabled(scene.enabled);
       setPromptType(scene.promptType || 'lightPolish');
       setCustomPrompt(scene.customPrompt || '');
     }
@@ -118,7 +116,7 @@ export default function SceneForm({
       name: sceneName, // 保存推导出的名称
       shortcut: shortcut.trim(),
       model: scene?.model || { modelId: '', quantization: undefined },
-      enabled,
+      enabled: true, // 场景始终启用
       promptType,
       customPrompt: promptType === 'custom' ? customPrompt : undefined,
     };
@@ -226,20 +224,6 @@ export default function SceneForm({
               <p className="mt-1.5 text-xs text-gray-500">{t('llmConfig.promptTip')}</p>
             </div>
           )}
-
-          {/* Enabled Toggle */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="enabled"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-            />
-            <label htmlFor="enabled" className="ml-2.5 text-sm text-gray-700">
-              {t('sceneForm.enableScene')}
-            </label>
-          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4">

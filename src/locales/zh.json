@@ -65,7 +65,7 @@
       "editPrompt": "编辑提示词"
     },
     "about": {
-      "subtitle": "本地语音转文字桌面应用",
+      "subtitle": "本地语音转文字桌面应用，本地优先的 AI 语音输入助手",
       "update": "更新",
       "currentVersion": "当前版本 v{{version}}",
       "checkUpdate": "检查更新",
@@ -266,7 +266,7 @@
     "gpuWarning": "本地大模型在 GPU 上运行速度更快。如果没有 GPU，CPU 也能运行但速度较慢。",
     "noLlmModels": "暂无可用的大模型",
     "llmProvidersTitle": "AI 服务配置",
-    "llmProvidersSubtitle": "配置云端 AI 服务",
+    "llmProvidersSubtitle": "配置 AI 服务处理各类文本润色场景",
     "cloudTitle": "云端 Provider 配置",
     "cloudSubtitle": "使用云端 API 进行语音识别或文本处理",
     "providerSaved": "Provider 配置已保存",

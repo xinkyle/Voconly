@@ -65,7 +65,7 @@
       "editPrompt": "Edit Prompt"
     },
     "about": {
-      "subtitle": "Local voice-to-text desktop application",
+      "subtitle": "Local voice-to-text desktop app, a local-first AI voice input assistant",
       "update": "Update",
       "currentVersion": "Current version v{{version}}",
       "checkUpdate": "Check for Updates",
@@ -266,7 +266,7 @@
     "gpuWarning": "Local LLMs run faster on GPU. CPU works but is slower.",
     "noLlmModels": "No LLM models available",
     "llmProvidersTitle": "AI Service Configuration",
-    "llmProvidersSubtitle": "Configure cloud AI services",
+    "llmProvidersSubtitle": "Configure AI services for various text polishing scenarios",
     "cloudTitle": "Cloud Provider Configuration",
     "cloudSubtitle": "Use cloud APIs for speech recognition or text processing",
     "providerSaved": "Provider configuration saved",
