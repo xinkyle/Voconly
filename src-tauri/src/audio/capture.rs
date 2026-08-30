@@ -80,7 +80,7 @@ const HARD_THRESHOLD_SECS: f64 = 15.0;
 const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
 
 /// 最大并行识别任务数
-const MAX_PARALLEL_RECOGNITIONS: usize = 4;
+const MAX_PARALLEL_RECOGNITIONS: usize = 8;
 
 /// 待处理任务队列最大容量
 const MAX_PENDING_QUEUE_SIZE: usize = 8;
