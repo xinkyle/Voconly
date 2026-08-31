@@ -724,7 +724,8 @@ async fn hide_float_panel(app: AppHandle, reason: Option<String>) -> Result<(), 
         .map_err(|e| format!("Failed to emit preview window hide: {}", e))?;
 
     // Wait for animation (150ms), then hide the windows
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    // 使用异步等待避免阻塞主线程（修复 IPC 通信阻塞问题）
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
     // Get the float panel window and hide it
     if let Some(float_window) = app.get_webview_window("float-panel") {
