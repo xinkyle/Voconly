@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderWithConfig, GlobalModelConfig, AppConfig } from '../types';
-import { getProviderList, saveProviderConfig } from '../services/llm';
+import { getProviderList, saveProviderConfig, checkProviderConnection } from '../services/llm';
 import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
@@ -172,6 +172,23 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
     // Provider is configured - set as active provider
     try {
       const config = await loadConfig();
+      let model = provider?.instance?.defaultModel || '';
+
+      // For llama_cpp without defaultModel, auto-detect first available model
+      if (providerId === 'llama_cpp' && !model) {
+        log.info('[ProviderPanel] llama.cpp has no defaultModel, detecting available models...');
+        const connectionResult = await checkProviderConnection('llama_cpp', '', undefined);
+        if (connectionResult.available && connectionResult.models.length > 0) {
+          model = connectionResult.models[0];
+          log.info(`[ProviderPanel] Auto-selected first model: ${model}`);
+        } else {
+          // No models available, open config modal
+          log.info('[ProviderPanel] No models available, opening config modal');
+          handleProviderConfigure(providerId);
+          return;
+        }
+      }
+
       const newConfig = {
         ...config,
         globalModelConfig: {
@@ -179,8 +196,7 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
           llm: {
             ...config.globalModelConfig.llm,
             providerId,
-            // Use the provider's default model
-            model: provider?.instance?.defaultModel || '',
+            model,
           },
         },
       };

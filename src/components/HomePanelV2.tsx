@@ -785,16 +785,20 @@ export default function HomePanelV2({
                   >
                     {/* 键帽样式快捷键 */}
                     <div className="relative mb-5">
+                      {/* 键帽底座 - 浅灰色层 */}
+                      <div className="absolute top-[72px] left-1/2 -translate-x-1/2 w-[72px] h-3 rounded-b-lg bg-gray-400 transition-all duration-150 group-hover:bg-gray-500 group-hover:-translate-y-0.5"></div>
+
+                      {/* 键帽顶部 */}
                       <div
-                        className={`w-20 h-20 rounded-xl font-mono text-2xl font-bold flex items-center justify-center transition-all duration-150 ${
+                        className={`relative w-20 h-20 rounded-xl font-mono text-2xl font-bold flex items-center justify-center transition-all duration-150 ${
                           isListening
-                            ? 'bg-amber-400 text-amber-900 shadow-lg shadow-amber-200 animate-pulse'
-                            : 'bg-gray-800 text-white shadow-lg group-hover:bg-gray-900 group-hover:shadow-xl group-hover:-translate-y-0.5'
+                            ? 'bg-amber-400 text-amber-900 animate-pulse'
+                            : 'bg-gray-800 text-white group-hover:bg-gray-900 group-hover:-translate-y-0.5'
                         }`}
                         style={{
                           boxShadow: isListening
-                            ? '0 8px 0 0 rgb(217 119 6), 0 12px 24px -4px rgba(217, 119, 6, 0.4)'
-                            : '0 8px 0 0 rgb(31 41 55), 0 12px 24px -4px rgba(0, 0, 0, 0.15)'
+                            ? '0 4px 0 0 rgb(217 119 6)'
+                            : '0 4px 0 0 rgb(55 65 81)'
                         }}
                       >
                         {isListening ? (
