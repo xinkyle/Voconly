@@ -17,43 +17,6 @@ use crate::backends::probe_gguf_capabilities;
 use std::path::PathBuf;
 
 // ============================================================================
-// 转录队列基础设施
-// ============================================================================
-
-use once_cell::sync::Lazy;
-use std::collections::VecDeque;
-
-/// 转录任务（直接携带音频数据，避免共享 buffer 累积问题）
-struct TranscribeTask {
-    samples: Vec<f32>,  // 当前分段的音频数据
-    scene_id: String,
-    duration: f64,
-}
-
-/// 转录队列（全局静态，使用 Lazy 初始化）
-static TRANSCRIBE_QUEUE: Lazy<Mutex<VecDeque<TranscribeTask>>> =
-    Lazy::new(|| Mutex::new(VecDeque::new()));
-
-/// 转录线程运行状态
-static TRANSCRIBE_WORKER_RUNNING: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-/// 停止信号（用于 Stop/Cancel 时通知转录线程退出）
-static TRANSCRIBE_STOP_SIGNAL: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-/// 取消标志（用于 Cancel 时丢弃转录结果，不追加到 preview_text）
-static TRANSCRIBE_CANCELLED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-/// 待转录总时长（用于进度条预估）
-/// 入队时累加，Worker 完成时扣减
-static PENDING_TRANSCRIBE_DURATION: Lazy<Mutex<f64>> = Lazy::new(|| Mutex::new(0.0));
-
-/// 队列长度上限（防止内存无限膨胀）
-const MAX_TRANSCRIBE_QUEUE_LEN: usize = 10;
-
-// ============================================================================
 // 常量定义
 // ============================================================================
 
@@ -78,9 +41,8 @@ const HARD_THRESHOLD_SECS: f64 = 15.0;
 const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
 
 /// 最大并行识别任务数
-/// 注意: transcribe-cpp 库限制同一 Model 下只能有一个并发计算，
-/// 设置大于 1 会有锁等待，但可以减少队列延迟
-const MAX_PARALLEL_RECOGNITIONS: usize = 4;
+/// 单 Worker 模式：避免多线程竞争 Session 锁
+const MAX_PARALLEL_RECOGNITIONS: usize = 1;
 
 /// 待处理任务队列最大容量
 const MAX_PENDING_QUEUE_SIZE: usize = 8;
@@ -122,7 +84,7 @@ struct StreamingFinalEvent {
 }
 
 /// 识别任务类型
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum RecognitionKind {
     Partial,
     Final,
@@ -619,8 +581,15 @@ fn run_consumer(
         let start_ms = task.start_ms;
         let end_ms = task.end_ms;
         let samples = task.samples;
+        let audio_ms = (samples.len() / 16) as u64;
 
         std::thread::spawn(move || {
+            let task_start = std::time::Instant::now();
+            log::info!(
+                "[RecognitionTask] 🟠 任务启动: segment={}, kind={:?}, 音频 {}ms",
+                segment_index, kind, audio_ms
+            );
+
             // 获取 AppServices
             let services = app_handle.try_state::<crate::config::AppServices>();
 
@@ -641,6 +610,13 @@ fn run_consumer(
                 log::error!("[Partial/Final] AppServices not available");
                 String::new()
             };
+
+            let total_ms = task_start.elapsed().as_millis();
+            log::info!(
+                "[RecognitionTask] 🟢 任务完成: segment={}, 总耗时 {}ms (音频 {}ms, 比值 {:.2}x)",
+                segment_index, total_ms, audio_ms,
+                total_ms as f64 / audio_ms.max(1) as f64
+            );
 
             let result = RecognitionResult {
                 kind,
@@ -695,201 +671,6 @@ fn run_consumer(
     /// Get duration in seconds from sample count
     fn get_duration_secs(samples: &[f32]) -> f64 {
         samples.len() as f64 / WHISPER_SAMPLE_RATE as f64
-    }
-
-    /// 启动转录处理线程（单线程线性处理队列）
-    fn start_transcribe_worker(app: AppHandle) {
-        if TRANSCRIBE_WORKER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
-            return; // 已经在运行
-        }
-
-        TRANSCRIBE_WORKER_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
-        TRANSCRIBE_STOP_SIGNAL.store(false, std::sync::atomic::Ordering::SeqCst);
-        TRANSCRIBE_CANCELLED.store(false, std::sync::atomic::Ordering::SeqCst); // 重置取消标志
-
-        std::thread::spawn(move || {
-            log::info!("[TranscribeWorker] Worker thread started");
-
-            // 在线程内部获取 AppServices
-            let services = app
-                .try_state::<crate::config::AppServices>()
-                .expect("AppServices not available");
-
-            loop {
-                // 从队列取任务（先取任务，再检查信号）
-                let task = {
-                    let mut queue = TRANSCRIBE_QUEUE.lock().unwrap();
-                    queue.pop_front()
-                };
-
-                if let Some(task) = task {
-                    // 有任务就处理，不管有没有收到 STOP_SIGNAL
-                    log::info!(
-                        "[TranscribeWorker] Processing task: {:.2}s audio, scene: {}",
-                        task.duration,
-                        task.scene_id
-                    );
-
-                    // 直接使用任务携带的音频数据
-                    let segment_samples = task.samples;
-
-                    // 执行转录
-                    let result = crate::commands::transcribe::transcribe_samples_internal(
-                        &services,
-                        &segment_samples,
-                        &task.scene_id,
-                        Some(&app),
-                    );
-
-                    match result {
-                        Ok(text) => {
-                            // 【进度条】转录完成，扣减待转录时长
-                            {
-                                let mut duration = PENDING_TRANSCRIBE_DURATION.lock().unwrap();
-                                *duration -= task.duration;
-                                log::info!(
-                                    "[进度条] 转录完成扣减时长: {:.2}s, 当前待转录: {:.2}s",
-                                    task.duration,
-                                    *duration
-                                );
-                            }
-
-                            // 检查是否已取消
-                            if TRANSCRIBE_CANCELLED.load(std::sync::atomic::Ordering::SeqCst) {
-                                log::info!(
-                                    "[TranscribeWorker] Cancelled, discarding result: {} chars",
-                                    text.len()
-                                );
-                                continue;
-                            }
-
-                            if !text.is_empty() {
-                                log::info!("[TranscribeWorker] Transcribed: {} chars", text.len());
-
-                                // 先更新 preview_text（后端状态），再获取完整文本发送事件
-                                let full_text =
-                                    if let Some(state) = app.try_state::<crate::AppState>() {
-                                        if let Ok(mut preview) = state.preview_text.lock() {
-                                            if !preview.is_empty() {
-                                                preview.push(' ');
-                                            }
-                                            preview.push_str(&text);
-                                            preview.clone()
-                                        } else {
-                                            text.clone()
-                                        }
-                                    } else {
-                                        text.clone()
-                                    };
-
-                                // 发送预览文字更新事件到 float-panel 窗口（用于 UI 显示）
-                                let _ = app.emit_to(
-                                    "float-panel",
-                                    "preview-text-update",
-                                    PreviewTextPayload {
-                                        full_text,
-                                        segment_text: text.clone(),
-                                    },
-                                );
-
-                                // 同时发送 transcription-result 事件（用于其他监听者）
-                                let _ = app.emit(
-                                    "transcription-result",
-                                    TranscriptionText {
-                                        text,
-                                        duration: task.duration,
-                                    },
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            // 【进度条】转录失败也要扣减时长
-                            {
-                                let mut duration = PENDING_TRANSCRIBE_DURATION.lock().unwrap();
-                                *duration -= task.duration;
-                                log::info!(
-                                    "[进度条] 转录失败扣减时长: {:.2}s, 当前待转录: {:.2}s",
-                                    task.duration,
-                                    *duration
-                                );
-                            }
-                            log::error!("[TranscribeWorker] Transcription failed: {}", e);
-                            let _ =
-                                app.emit("transcription-error", TranscriptionError { error: e });
-                        }
-                    }
-                } else {
-                    // 队列空，检查是否收到停止信号
-                    if TRANSCRIBE_STOP_SIGNAL.load(std::sync::atomic::Ordering::SeqCst) {
-                        // 队列已空，且收到停止信号，退出循环
-                        log::info!(
-                            "[TranscribeWorker] Queue empty and stop signal received, exiting"
-                        );
-                        break;
-                    }
-                    // 队列空但没收到停止信号，短暂休眠等待新任务
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
-            }
-
-            TRANSCRIBE_WORKER_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
-            log::info!("[TranscribeWorker] Worker thread stopped");
-        });
-    }
-
-    /// 将分段音频入队列等待转录（直接携带音频数据，避免共享 buffer 累积）
-    fn enqueue_segment(
-        app_handle: &AppHandle,
-        samples: Vec<f32>,
-        scene_id: &str,
-    ) {
-        if samples.is_empty() {
-            log::info!("[Streaming] enqueue_segment called with empty samples, skipping");
-            return;
-        }
-
-        let duration = samples.len() as f64 / WHISPER_SAMPLE_RATE as f64;
-        log::info!(
-            "[Streaming] Enqueueing segment: {:.2}s, {} samples, scene: {}",
-            duration,
-            samples.len(),
-            scene_id
-        );
-
-        // 【进度条】入队时累加待转录时长
-        {
-            let mut pending = PENDING_TRANSCRIBE_DURATION.lock().unwrap();
-            *pending += duration;
-            log::info!(
-                "[进度条] 入队累加时长: {:.2}s, 当前待转录: {:.2}s",
-                duration,
-                *pending
-            );
-        }
-
-        // 创建任务（直接携带音频数据，避免共享 buffer 累积）
-        let task = TranscribeTask {
-            samples,
-            scene_id: scene_id.to_string(),
-            duration,
-        };
-
-        // 入队列（检查长度上限）
-        {
-            let mut queue = TRANSCRIBE_QUEUE.lock().unwrap();
-            if queue.len() >= MAX_TRANSCRIBE_QUEUE_LEN {
-                log::warn!(
-                    "[Streaming] Queue overflow ({}), dropping oldest task",
-                    queue.len()
-                );
-                queue.pop_front();
-            }
-            queue.push_back(task);
-            log::info!("[Streaming] Task enqueued, queue length: {}", queue.len());
-        }
-
-        // 确保 worker 线程运行
-        start_transcribe_worker(app_handle.clone());
     }
 
     loop {
@@ -1005,7 +786,7 @@ fn run_consumer(
                                 segment_duration, HARD_THRESHOLD_SECS);
 
                             // ===== Partial/Final: 触发 Final 识别 =====
-                            // 硬阈值分段时，也发送 Final 识别结果（与语音结束时的逻辑一致）
+                            // 硬阈值分段时，发送 Final 识别结果
                             if speech_started && !segment_buffer.is_empty() {
                                 recognition_version += 1;
                                 let task = RecognitionTask {
@@ -1023,19 +804,15 @@ fn run_consumer(
                                     partial_segment_index, recognition_version, segment_buffer.len());
                             }
 
-                            // 强制发送 segment（不等待 silence）
-                            // 使用 segment_buffer 的数据，入队后清理 full_recording
-                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
-                            // 清理 full_recording 中已入队的历史数据，避免无限累积
+                            // 清理 buffer（已通过 Final 识别处理）
                             full_recording.lock().unwrap().clear();
                             segment_buffer.clear();
-                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
+                            processed_samples.clear();
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Hard threshold");
 
-                            // 【修复】重置 Partial/Final 状态，准备下一个片段
-                            // 这样下一个片段会使用新的索引，避免覆盖之前的结果
+                            // 重置 Partial/Final 状态，准备下一个片段
                             if speech_started {
                                 partial_segment_index += 1;
                                 speech_started = false;
@@ -1074,17 +851,11 @@ fn run_consumer(
                             speech_started = false;
                         }
 
-                        // 发送 segment
-                        let duration = get_duration_secs(&segment_buffer);
-                        log::info!("[Streaming] Final segment duration: {:.2}s", duration);
-
+                        // 清理 buffer（已通过 Final 识别处理）
                         if !segment_buffer.is_empty() {
-                            // 使用 segment_buffer 的数据，入队后清理 full_recording
-                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
-                            // 清理 full_recording 中已入队的历史数据，避免无限累积
                             full_recording.lock().unwrap().clear();
                             segment_buffer.clear();
-                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
+                            processed_samples.clear();
 
                             // 重置软阈值状态和VAD敏感度
                             reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Segment sent");
@@ -1141,9 +912,29 @@ fn run_consumer(
                     let _ = app_handle.emit_to("float-panel", "streaming-final-update", &event);
                     log::info!("[Partial/Final] Final result: index={}, version={}, text={}",
                         recognition.segment_index, recognition.version, recognition.text);
+
+                    // 【新增】追加到后端 preview_text
+                    if !recognition.text.is_empty() {
+                        if let Some(state) = app_handle.try_state::<crate::AppState>() {
+                            if let Ok(mut preview) = state.preview_text.lock() {
+                                if !preview.is_empty() {
+                                    preview.push(' ');
+                                }
+                                preview.push_str(&recognition.text);
+                                log::info!("[Partial/Final] Appended to preview_text, total {} chars", preview.len());
+                            }
+                        }
+                    }
+
+                    // 【新增】发送 transcription-result 事件（状态指示器需要）
+                    let _ = app_handle.emit("transcription-result", TranscriptionText {
+                        text: recognition.text.clone(),
+                        duration: (recognition.end_ms - recognition.start_ms) as f64 / 1000.0,
+                    });
                 }
             }
             active_recognition_threads = active_recognition_threads.saturating_sub(1);
+            log::info!("[Queue] 任务结束, active_threads={}", active_recognition_threads);
         }
 
         // ===== Partial/Final: 从队列取任务执行 =====
@@ -1170,9 +961,6 @@ fn run_consumer(
                     current_scene_id = scene_id.clone(); // 保存 scene_id
                     recording_start_time = Some(std::time::Instant::now()); // 记录音开始时间
                     full_recording.lock().unwrap().clear(); // 清空全量录音
-                                                            // 【进度条】新录音开始，重置待转录时长
-                    *PENDING_TRANSCRIBE_DURATION.lock().unwrap() = 0.0;
-                    log::info!("[进度条] Start: 重置待转录时长为 0");
 
                     // 【修复】清空预览文本缓存，防止历史文本残留
                     if let Some(state) = app_handle.try_state::<crate::AppState>() {
@@ -1377,62 +1165,136 @@ fn run_consumer(
                         log::info!("[Streaming] segment_buffer: {} samples ({:.2}s)",
                             segment_buffer.len(), get_duration_secs(&segment_buffer));
 
-                        // Emit any remaining segment
-                        if !segment_buffer.is_empty() {
+                        // 如果有剩余的 segment_buffer，触发 Final 识别
+                        if !segment_buffer.is_empty() && speech_started {
                             log::info!(
-                                "[Streaming] Emitting final segment on stop: {:.2}s",
+                                "[Streaming] Triggering final recognition on stop: {:.2}s",
                                 get_duration_secs(&segment_buffer)
                             );
-                            // 使用 segment_buffer 的数据
-                            enqueue_segment(&app_handle, segment_buffer.clone(), &current_scene_id);
-                            // 清理 full_recording
-                            full_recording.lock().unwrap().clear();
-                            segment_buffer.clear();
-                            processed_samples.clear(); // 【修复】清空 VAD 输出 buffer，避免累积
-                        } else {
-                            log::info!("[Streaming] No remaining segment to emit on stop");
+
+                            recognition_version += 1;
+                            let task = RecognitionTask {
+                                samples: segment_buffer.clone(),
+                                kind: RecognitionKind::Final,
+                                segment_index: partial_segment_index,
+                                version: recognition_version,
+                                start_ms: samples_to_ms(speech_start_sample),
+                                end_ms: samples_to_ms(total_samples_processed),
+                            };
+
+                            pending_queue.push(task);
+                            log::info!("[Partial/Final] Stop: queued final recognition, index={}, version={}, buffer_len={}",
+                                partial_segment_index, recognition_version, segment_buffer.len());
                         }
 
-                        // 发送停止信号给转录 worker
-                        TRANSCRIBE_STOP_SIGNAL.store(true, std::sync::atomic::Ordering::SeqCst);
-
-                        // 【进度条】直接读取待转录总时长（入队时累加，Worker完成时扣减）
-                        let pending_duration = *PENDING_TRANSCRIBE_DURATION.lock().unwrap();
-                        log::info!(
-                            "[Capture] Pending transcription duration: {:.2}s",
-                            pending_duration
-                        );
-
-                        // 等待 Worker 线程退出（确保所有已入队任务都已完成转录）
-                        let max_wait = std::time::Duration::from_secs(15);
+                        // 等待所有识别任务完成（包括队列中的和正在执行的）
+                        // 必须同时检查：1) 队列非空 2) 有活跃线程
+                        // 否则队列中的任务可能永远不会被启动
+                        let max_wait = std::time::Duration::from_secs(10); // 增加到 10 秒
                         let start = std::time::Instant::now();
-                        while TRANSCRIBE_WORKER_RUNNING.load(std::sync::atomic::Ordering::SeqCst)
-                            && start.elapsed() < max_wait
-                        {
-                            std::thread::sleep(std::time::Duration::from_millis(100));
-                        }
-                        log::info!(
-                            "[Capture] Worker stopped, waited {}ms",
-                            start.elapsed().as_millis()
-                        );
+                        let mut last_log_time = start;
 
-                        // Notify frontend that recording stopped with pending duration
+                        loop {
+                            // 先尝试从队列取任务执行（如果还有空闲 Worker）
+                            while active_recognition_threads < MAX_PARALLEL_RECOGNITIONS && !pending_queue.is_empty() {
+                                if let Some(task) = pending_queue.pop() {
+                                    spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
+                                    active_recognition_threads += 1;
+                                    log::info!("[Stop] Started queued task, active_threads={}", active_recognition_threads);
+                                }
+                            }
+
+                            // 处理已完成的识别结果
+                            while let Ok(recognition) = recognition_rx.try_recv() {
+                                match recognition.kind {
+                                    RecognitionKind::Partial => {
+                                        let event = StreamingPartialEvent {
+                                            segment_index: recognition.segment_index,
+                                            version: recognition.version,
+                                            text: recognition.text.clone(),
+                                            start_ms: recognition.start_ms,
+                                            end_ms: recognition.end_ms,
+                                        };
+                                        let _ = app_handle.emit_to("float-panel", "streaming-partial-update", &event);
+                                    }
+                                    RecognitionKind::Final => {
+                                        let event = StreamingFinalEvent {
+                                            segment_index: recognition.segment_index,
+                                            version: recognition.version,
+                                            text: recognition.text.clone(),
+                                            start_ms: recognition.start_ms,
+                                            end_ms: recognition.end_ms,
+                                        };
+                                        let _ = app_handle.emit_to("float-panel", "streaming-final-update", &event);
+
+                                        if !recognition.text.is_empty() {
+                                            if let Some(state) = app_handle.try_state::<crate::AppState>() {
+                                                if let Ok(mut preview) = state.preview_text.lock() {
+                                                    if !preview.is_empty() {
+                                                        preview.push(' ');
+                                                    }
+                                                    preview.push_str(&recognition.text);
+                                                    log::info!("[Stop] Appended to preview_text: {}", recognition.text);
+                                                }
+                                            }
+                                            let _ = app_handle.emit("transcription-result", TranscriptionText {
+                                                text: recognition.text.clone(),
+                                                duration: (recognition.end_ms - recognition.start_ms) as f64 / 1000.0,
+                                            });
+                                        }
+                                    }
+                                }
+                                active_recognition_threads = active_recognition_threads.saturating_sub(1);
+                            }
+
+                            // 检查是否所有任务都完成：队列为空 且 没有活跃线程
+                            let queue_empty = pending_queue.is_empty();
+                            let all_done = queue_empty && active_recognition_threads == 0;
+
+                            if all_done {
+                                log::info!("[Stop] All recognition tasks completed (queue empty, no active threads)");
+                                break;
+                            }
+
+                            // 超时检查
+                            if start.elapsed() >= max_wait {
+                                log::warn!(
+                                    "[Stop] Timeout waiting for recognition tasks: queue_size={}, active_threads={}",
+                                    pending_queue.tasks.len(), active_recognition_threads
+                                );
+                                break;
+                            }
+
+                            // 每 500ms 打印一次进度日志
+                            if last_log_time.elapsed() >= std::time::Duration::from_millis(500) {
+                                log::info!(
+                                    "[Stop] Waiting for tasks: queue_size={}, active_threads={}, elapsed={:.1}s",
+                                    pending_queue.tasks.len(), active_recognition_threads, start.elapsed().as_secs_f64()
+                                );
+                                last_log_time = std::time::Instant::now();
+                            }
+
+                            std::thread::sleep(std::time::Duration::from_millis(50));
+                        }
+
+                        // 清理 buffer
+                        full_recording.lock().unwrap().clear();
+                        segment_buffer.clear();
+                        processed_samples.clear();
+
+                        // Notify frontend that recording stopped
                         let recording_duration = recording_start_time
                             .map(|t| t.elapsed().as_secs_f64())
                             .unwrap_or(0.0);
                         let _ = app_handle.emit(
                             "streaming-recording-stopped",
                             StreamingRecordingStopped {
-                                pending_duration_secs: pending_duration,
+                                pending_duration_secs: 0.0,
                                 recording_duration_secs: recording_duration,
                             },
                         );
 
-                        // 重置停止信号（为下次录音做准备）
-                        TRANSCRIBE_STOP_SIGNAL.store(false, std::sync::atomic::Ordering::SeqCst);
-
-                        // 【修复 Bug 2】Stop 命令时恢复 VAD 敏感度
-                        // 确保下次录音从正常敏感度开始
+                        // 重置 VAD 敏感度
                         reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Stop");
                     }
 
@@ -1477,44 +1339,14 @@ fn run_consumer(
                     stop_flag.store(true, Ordering::Relaxed);
                     log::info!("[Capture] Cancel command received, discarding all audio data");
 
-                    // 1. 先设置取消标志（Worker 完成转录后会检查此标志，丢弃结果）
-                    TRANSCRIBE_CANCELLED.store(true, std::sync::atomic::Ordering::SeqCst);
-
-                    // 2. 发送停止信号
-                    TRANSCRIBE_STOP_SIGNAL.store(true, std::sync::atomic::Ordering::SeqCst);
-
-                    // 3. 清空转录队列（停止接受新任务）
-                    TRANSCRIBE_QUEUE.lock().unwrap().clear();
-
-                    // 【进度条】重置待转录时长
-                    *PENDING_TRANSCRIBE_DURATION.lock().unwrap() = 0.0;
-                    log::info!("[进度条] Cancel: 重置待转录时长为 0");
-
-                    // 4. 等待 Worker 线程退出
-                    let max_wait = std::time::Duration::from_secs(5);
-                    let start = std::time::Instant::now();
-                    while TRANSCRIBE_WORKER_RUNNING.load(std::sync::atomic::Ordering::SeqCst)
-                        && start.elapsed() < max_wait
-                    {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                    }
-                    log::info!(
-                        "[Capture] Cancel: Worker stopped, waited {}ms",
-                        start.elapsed().as_millis()
-                    );
-
-                    // 5. 清空 preview_text（双重保险）
+                    // 清空预览文本
                     if let Some(state) = app_handle.try_state::<crate::AppState>() {
                         if let Ok(mut preview) = state.preview_text.lock() {
                             preview.clear();
                         }
                     }
 
-                    // 6. 重置信号（为下次录音做准备）
-                    TRANSCRIBE_STOP_SIGNAL.store(false, std::sync::atomic::Ordering::SeqCst);
-                    TRANSCRIBE_CANCELLED.store(false, std::sync::atomic::Ordering::SeqCst);
-
-                    // Discard all buffers without emitting any segments
+                    // 清空所有 buffer
                     processed_samples.clear();
                     segment_buffer.clear();
                     in_speech_segment = false;
@@ -1603,20 +1435,6 @@ struct VadStatus {
 struct TranscriptionText {
     text: String,
     duration: f64,
-}
-
-/// Preview text update event payload (for FloatPanel UI)
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PreviewTextPayload {
-    full_text: String,
-    segment_text: String,
-}
-
-/// Transcription error event payload
-#[derive(Clone, serde::Serialize)]
-struct TranscriptionError {
-    error: String,
 }
 
 /// Streaming recording stopped event payload

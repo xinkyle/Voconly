@@ -408,18 +408,26 @@ pub fn transcribe_samples_internal(
     scene_id: &str,
     app_handle: Option<&AppHandle>,
 ) -> Result<String, String> {
+    let total_start = std::time::Instant::now();
+    let audio_duration_ms = (samples.len() / 16) as u64; // 16kHz
     info!(
-        "[Transcribe] Internal transcribing {} samples for scene: {}",
+        "[Transcribe] 🔵 开始识别: {} 样本, 时长 {}ms, 场景 {}",
         samples.len(),
+        audio_duration_ms,
         scene_id
     );
 
     // 获取模型（Arc 方案：获取后立即释放锁）
     let loaded_model: std::sync::Arc<crate::model_manager::LoadedModel> = {
+        let lock_start = std::time::Instant::now();
         let mut model_manager = services
             .model_manager
             .lock()
             .map_err(|e| format!("Failed to lock model manager: {}", e))?;
+        let lock_wait_ms = lock_start.elapsed().as_millis();
+        if lock_wait_ms > 5 {
+            info!("[Transcribe] 🟡 ModelManager 锁等待: {}ms", lock_wait_ms);
+        }
 
         let mgr = model_manager
             .as_mut()
@@ -513,13 +521,24 @@ pub fn transcribe_samples_internal(
     drop(config);
 
     // 执行转录（ModelManager 锁已释放，loaded_model 仍有效）
+    let transcribe_start = std::time::Instant::now();
     let result = loaded_model
         .backend
         .transcribe(samples, &params)
         .map_err(|e| format!("Transcription failed: {}", e))?;
+    let transcribe_ms = transcribe_start.elapsed().as_millis();
 
     // 转换结果（繁体转简体、词典修正）
     let response = convert_result(result, &dictionary, backend_type);
+
+    let total_ms = total_start.elapsed().as_millis();
+    info!(
+        "[Transcribe] 🟢 识别完成: 转录 {}ms, 总计 {}ms (音频 {}ms, 比值 {:.2}x)",
+        transcribe_ms,
+        total_ms,
+        audio_duration_ms,
+        total_ms as f64 / audio_duration_ms.max(1) as f64
+    );
 
     Ok(response.text)
 }

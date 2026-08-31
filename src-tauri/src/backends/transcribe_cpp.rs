@@ -436,6 +436,7 @@ impl SpeechBackend for TranscribeCppBackend {
         );
 
         // Execute transcription (need to lock session for thread safety)
+        let lock_start = std::time::Instant::now();
         let mut session = self.session.lock().map_err(|e| {
             warn!("[TranscribeCppBackend] Failed to lock session: {}", e);
             std::io::Error::new(
@@ -443,7 +444,12 @@ impl SpeechBackend for TranscribeCppBackend {
                 format!("Failed to lock session: {}", e),
             )
         })?;
+        let lock_wait_ms = lock_start.elapsed().as_millis();
+        if lock_wait_ms > 10 {
+            info!("[TranscribeCpp] 🔴 Session 锁等待: {}ms (可能有并发竞争)", lock_wait_ms);
+        }
 
+        let run_start = std::time::Instant::now();
         let result = session.run(audio, &run_options).map_err(|e| {
             warn!("[TranscribeCppBackend] Transcription failed: {}", e);
             std::io::Error::new(
@@ -451,9 +457,17 @@ impl SpeechBackend for TranscribeCppBackend {
                 format!("GGUF transcription failed: {}", e),
             )
         })?;
+        let run_ms = run_start.elapsed().as_millis();
 
         // Release session lock before accumulating duration
         drop(session);
+
+        info!(
+            "[TranscribeCpp] 🔷 Session.run: {}ms (音频 {}ms, 实时比 {:.2}x)",
+            run_ms,
+            (audio.len() / 16),
+            run_ms as f64 / ((audio.len() / 16) as f64).max(1.0)
+        );
 
         debug!(
             "[TranscribeCppBackend] Transcription complete: {} chars",
