@@ -25,8 +25,8 @@
       window.addEventListener('load', () => {
         const loader = document.getElementById('startup-loader');
         if (loader) {
-          loader.classList.add('fade-out');
-          setTimeout(() => loader.classList.add('hidden'), 400);
+          // 立即隐藏，不使用淡出动画，避免与 React 应用重叠
+          loader.style.display = 'none';
         }
       });
     </script>

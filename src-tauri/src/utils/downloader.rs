@@ -448,8 +448,8 @@ pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
     let base_id = crate::utils::get_base_model_id(model_id);
     let quant_suffix = crate::utils::extract_quant_suffix(model_id);
 
-    // 找到基础模型
-    let model = scanned.iter().find(|p| p.id == base_id);
+    // 找到基础模型（不区分大小写匹配，与 get_model_config 保持一致）
+    let model = scanned.iter().find(|p| p.id.to_lowercase() == base_id.to_lowercase());
     match model {
         Some(m) => {
             if let Some(q) = quant_suffix {

@@ -1186,7 +1186,7 @@ function App() {
 
     log.debug('Resetting isProcessingShortcutRef to false');
     isProcessingShortcutRef.current = false;
-  }, [config?.scenes, config?.models, downloadStates, showToast, t, showFloatPanelStatus, hideFloatPanelStatus]); // 分段转录始终开启，不依赖配置
+  }, [config?.scenes, config?.models, config?.globalModelConfig, downloadStates, showToast, t, showFloatPanelStatus, hideFloatPanelStatus]); // 分段转录始终开启，不依赖配置
 
   // Register shortcuts for all scenes
   const { registerShortcutWithResult } = useSceneShortcuts(config?.scenes || [], handleShortcutTriggered);
@@ -1537,11 +1537,13 @@ function App() {
                 downloadStates={downloadStates}
                 onDownload={handleDownload}
                 onDownloadCancel={handleDownloadCancel}
-                onGlobalModelConfigChange={(newGlobalConfig) => {
+                onGlobalModelConfigChange={async (newGlobalConfig) => {
                   if (config) {
-                    const newConfig = { ...config, globalModelConfig: newGlobalConfig };
+                    // 重新加载配置，确保获取最新的 modelQuantPrefs 等数据
+                    const latestConfig = await loadConfig();
+                    const newConfig = { ...latestConfig, globalModelConfig: newGlobalConfig };
                     setConfig(newConfig);
-                    saveConfig(newConfig);
+                    // 不需要再次调用 saveConfig，因为 HomePanelV2 已经保存过了
                   }
                 }}
                 onNavigateToSettings={() => {
