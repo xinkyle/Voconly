@@ -78,7 +78,9 @@ const HARD_THRESHOLD_SECS: f64 = 15.0;
 const PARTIAL_INTERVAL_SAMPLES: usize = 4000;
 
 /// 最大并行识别任务数
-const MAX_PARALLEL_RECOGNITIONS: usize = 8;
+/// 注意: transcribe-cpp 库限制同一 Model 下只能有一个并发计算，
+/// 设置大于 1 会有锁等待，但可以减少队列延迟
+const MAX_PARALLEL_RECOGNITIONS: usize = 4;
 
 /// 待处理任务队列最大容量
 const MAX_PENDING_QUEUE_SIZE: usize = 8;
@@ -548,6 +550,7 @@ fn run_consumer(
     // 全量录音 buffer（共享 Arc，供 Worker 提取分段）
     let full_recording: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let mut current_scene_id: String = String::new(); // 当前场景 ID
+    let mut recording_start_time: Option<std::time::Instant> = None; // 录音开始时间（用于计算总时长）
 
     // ===== Partial/Final 实时转录状态变量 =====
     /// 当前语音片段索引
@@ -1165,6 +1168,7 @@ fn run_consumer(
                     in_speech_segment = false;
                     segment_buffer.clear();
                     current_scene_id = scene_id.clone(); // 保存 scene_id
+                    recording_start_time = Some(std::time::Instant::now()); // 记录音开始时间
                     full_recording.lock().unwrap().clear(); // 清空全量录音
                                                             // 【进度条】新录音开始，重置待转录时长
                     *PENDING_TRANSCRIBE_DURATION.lock().unwrap() = 0.0;
@@ -1351,11 +1355,17 @@ fn run_consumer(
                         // 清理状态
                         stream_router = None;
 
+                        // 计算录音总时长
+                        let recording_duration = recording_start_time
+                            .map(|t| t.elapsed().as_secs_f64())
+                            .unwrap_or(0.0);
+
                         // 发送停止事件（流式模式没有待处理时长）
                         let _ = app_handle.emit(
                             "streaming-recording-stopped",
                             StreamingRecordingStopped {
                                 pending_duration_secs: 0.0,
+                                recording_duration_secs: recording_duration,
                             },
                         );
 
@@ -1407,10 +1417,14 @@ fn run_consumer(
                         );
 
                         // Notify frontend that recording stopped with pending duration
+                        let recording_duration = recording_start_time
+                            .map(|t| t.elapsed().as_secs_f64())
+                            .unwrap_or(0.0);
                         let _ = app_handle.emit(
                             "streaming-recording-stopped",
                             StreamingRecordingStopped {
                                 pending_duration_secs: pending_duration,
+                                recording_duration_secs: recording_duration,
                             },
                         );
 
@@ -1444,6 +1458,17 @@ fn run_consumer(
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));
                     stop_flag.store(false, Ordering::Relaxed);
+
+                    // 录制结束后重建 Session，确保下次转录是全新状态
+                    if let Some(services) = app_handle.try_state::<crate::config::AppServices>() {
+                        if let Some(model_manager_guard) = services.model_manager.lock().ok() {
+                            if let Some(model_manager) = model_manager_guard.as_ref() {
+                                if let Ok(model_id) = model_manager.get_global_asr_model() {
+                                    model_manager.recreate_session(&model_id);
+                                }
+                            }
+                        }
+                    }
 
                     log::info!("Recording stopped");
                 }
@@ -1513,10 +1538,14 @@ fn run_consumer(
                     );
 
                     // Notify frontend
+                    let recording_duration = recording_start_time
+                        .map(|t| t.elapsed().as_secs_f64())
+                        .unwrap_or(0.0);
                     let _ = app_handle.emit(
                         "streaming-recording-stopped",
                         StreamingRecordingStopped {
                             pending_duration_secs: 0.0,
+                            recording_duration_secs: recording_duration,
                         },
                     );
 
@@ -1596,6 +1625,8 @@ struct TranscriptionError {
 struct StreamingRecordingStopped {
     /// Duration of audio still pending transcription (in seconds)
     pending_duration_secs: f64,
+    /// Total recording duration from start to stop (in seconds)
+    recording_duration_secs: f64,
 }
 
 /// Frame resampler for converting input sample rate to 16kHz

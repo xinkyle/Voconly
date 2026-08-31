@@ -518,6 +518,7 @@ function App() {
   const streamingTextRef = useRef<string>('');
   const isSegmentTranscribeActiveRef = useRef(false); // 分段转录激活状态（录音时为 true）
   const pendingTranscribeDurationRef = useRef<number>(0); // 后端待转录时长（用于进度条预估）
+  const recordingDurationRef = useRef<number>(0); // 录音总时长（从开始到结束的时间）
 
   // 后端分段转录始终开启，无需前端设置 streaming mode
 
@@ -565,10 +566,11 @@ function App() {
       );
 
       // Listen for streaming recording stopped (with pending duration for progress estimation)
-      await eventManager.ensureOnce<{ pendingDurationSecs: number }>('streaming-recording-stopped', (event) => {
-        log.debug(`Streaming recording stopped, pending_duration: ${event.payload.pendingDurationSecs}s`);
+      await eventManager.ensureOnce<{ pendingDurationSecs: number; recordingDurationSecs: number }>('streaming-recording-stopped', (event) => {
+        log.debug(`Streaming recording stopped, pending_duration: ${event.payload.pendingDurationSecs}s, recording_duration: ${event.payload.recordingDurationSecs}s`);
         isSegmentTranscribeActiveRef.current = false;
         pendingTranscribeDurationRef.current = event.payload.pendingDurationSecs;
+        recordingDurationRef.current = event.payload.recordingDurationSecs;
       });
 
       log.info('[Streaming] Event listeners registered successfully');
@@ -942,7 +944,10 @@ function App() {
 
         // 历史记录保存
         const currentRecorder = recorderRef.current;
-        const duration = currentRecorder?.lastAudioData?.duration || 0;
+        // 使用录音总时长（从开始到结束的时间），更符合用户直觉
+        const duration = recordingDurationRef.current || currentRecorder?.lastAudioData?.duration || 0;
+        // 重置录音时长
+        recordingDurationRef.current = 0;
         const wordCount = countWords(recognizedText);  // 智能统计：中文按字，英文按词
         const newRecord = await addHistoryRecord({
           timestamp: Date.now(),
@@ -1002,7 +1007,10 @@ function App() {
       }
 
       // 历史记录保存（根据是否有 LLM 处理决定保存内容）
-      const duration = recorderRef.current?.lastAudioData?.duration || 0;
+      // 使用录音总时长（从开始到结束的时间），更符合用户直觉
+      const duration = recordingDurationRef.current || recorderRef.current?.lastAudioData?.duration || 0;
+      // 重置录音时长
+      recordingDurationRef.current = 0;
       // 如果 LLM 处理成功，保存 LLM 结果；否则保存原始识别文本
       const historyContent = llmResult.processed && llmResult.text ? llmResult.text : previewText;
       const wordCount = countWords(historyContent);  // 智能统计：中文按字，英文按词
@@ -1145,6 +1153,8 @@ function App() {
       // 分段转录始终开启：初始化分段转录状态
       isSegmentTranscribeActiveRef.current = true;
       streamingTextRef.current = '';
+      // 重置录音时长计数器（新录音开始）
+      recordingDurationRef.current = 0;
       // 开始录音时重置 skipLlm 标记
       skipLlmRef.current = false;
       log.info('[Streaming] Segment transcription ENABLED for this session (always active)');

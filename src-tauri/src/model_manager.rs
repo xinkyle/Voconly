@@ -119,6 +119,23 @@ impl BackendEnum {
             }
         }
     }
+
+    /// Recreate session to clear accumulated state
+    ///
+    /// This is useful to call after a recording session ends to ensure
+    /// fresh state for the next recording. Only TranscribeCpp backend
+    /// supports this; ONNX is a no-op.
+    pub fn recreate_session(&self) -> bool {
+        match self {
+            BackendEnum::Onnx(_) => {
+                // ONNX backend does not have session recreation
+                true
+            }
+            BackendEnum::TranscribeCpp(backend) => {
+                backend.recreate_session().is_ok()
+            }
+        }
+    }
 }
 
 /// 已加载的模型实例
@@ -903,6 +920,17 @@ impl ModelManager {
     /// 检查模型是否已加载
     pub fn is_loaded(&self, model_id: &str) -> bool {
         self.loaded_models.contains_key(model_id)
+    }
+
+    /// 重建 Session（录制结束后调用）
+    ///
+    /// 清除 Session 累积的状态，确保下次转录是全新的状态。
+    pub fn recreate_session(&self, model_id: &str) -> bool {
+        if let Some(model) = self.loaded_models.get(model_id) {
+            model.backend.recreate_session()
+        } else {
+            false
+        }
     }
 }
 

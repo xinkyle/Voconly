@@ -119,8 +119,8 @@ pub struct TranscribeCppBackend {
     accumulated_duration_ms: AtomicU64,
 }
 
-/// Threshold for session recreation (1 minute for testing, change back to 30 minutes after)
-const SESSION_RECREATE_THRESHOLD_MS: u64 = 1 * 60 * 1000;
+/// Threshold for session recreation (300 minutes)
+const SESSION_RECREATE_THRESHOLD_MS: u64 = 300 * 60 * 1000;
 
 impl TranscribeCppBackend {
     /// Create a new TranscribeCppBackend with full config access
