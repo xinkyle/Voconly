@@ -87,7 +87,7 @@ body {
   --pill-width-ratio: 1; /* 宽度比例变量，可通过 .compact 类调整为 0.6 */
   --base-pill-width: min(373px, 90vw); /* 基础宽度，限制最大 373px 或视口 90% */
 
-  background: #1e1e23;
+  background: #16161a;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
@@ -131,7 +131,7 @@ body {
   overflow: hidden;
   flex: 1 1 auto; /* 自动填充剩余空间 */
   padding: 8px 16px;
-  background: rgba(30, 30, 35, 0.6);
+  background: rgba(22, 22, 26, 0.6);
   border-radius: 16px 16px 0 0;
 }
 
@@ -246,7 +246,7 @@ body {
 
 /* Panel styles - Pill-shaped Dark Theme (保留用于兼容) */
 .float-panel {
-  background: #1e1e23;
+  background: #16161a;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 6px 14px;
@@ -588,7 +588,7 @@ body {
 /* Error state wrapper - 保持原背景，仅橙色边框高亮 */
 .float-panel-wrapper.error-state {
   border: 2px solid rgba(255, 149, 0, 0.6);
-  background: #1e1e23;
+  background: #16161a;
 }
 
 /* Error status area */
