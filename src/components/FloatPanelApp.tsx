@@ -7,7 +7,6 @@ import { estimateTranscribeTime, estimateLlmTime, initPerformanceCache, initLlmP
 import { createLogger } from '../services/log';
 import { countWords } from '../utils/i18n';  // 导入智能统计函数
 import type { LlmErrorPayload } from '../types';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // 创建日志记录器
 const log = createLogger('FloatPanel');
