@@ -29,7 +29,7 @@ pub enum LogLevel {
 
 impl Default for LogLevel {
     fn default() -> Self {
-        LogLevel::Debug
+        LogLevel::Warn
     }
 }
 
@@ -71,7 +71,7 @@ pub fn level_filter_from_u8(level: u8) -> log::LevelFilter {
 }
 
 /// 全局原子变量存储文件日志级别
-pub static FILE_LOG_LEVEL: AtomicU8 = AtomicU8::new(log::LevelFilter::Debug as u8);
+pub static FILE_LOG_LEVEL: AtomicU8 = AtomicU8::new(log::LevelFilter::Warn as u8);
 
 /// 获取当前日志目录路径
 #[tauri::command]
