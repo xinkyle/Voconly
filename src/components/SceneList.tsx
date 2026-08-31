@@ -5,7 +5,7 @@ import SceneForm from './SceneForm';
 import ShortcutErrorModal from './ShortcutErrorModal';
 import ConfirmModal from './ui/ConfirmModal';
 import { extractShortcutFromEvent } from '../utils/keyboard';
-import { getSceneNameFromPromptType, getPromptTypeLabel } from '../utils/i18n';
+import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getLlmPromptPresets } from '../services/llm';
 import { createLogger } from '../services/log';
 
@@ -19,6 +19,9 @@ interface SceneListProps {
   onSave?: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
+  setPaused?: (paused: boolean) => void;
+  /** 是否正在录音（用于禁止切换快捷键） */
+  isRecording?: boolean;
 }
 
 
@@ -29,6 +32,8 @@ export default function SceneList({
   onSave,
   checkConflict,
   tryRegisterShortcut,
+  setPaused,
+  isRecording,
 }: SceneListProps) {
   const { t } = useTranslation();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
@@ -70,6 +75,14 @@ export default function SceneList({
   // Ref for the listening timeout
   const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Ref for setPaused (to avoid stale closure)
+  const setPausedRef = useRef(setPaused);
+
+  // Update setPaused ref
+  useEffect(() => {
+    setPausedRef.current = setPaused;
+  }, [setPaused]);
+
   // Load custom presets
   useEffect(() => {
     const loadPresets = async () => {
@@ -98,6 +111,17 @@ export default function SceneList({
       }
     };
   }, []);
+
+  // 监听 listeningShortcut 变化，暂停/恢复全局快捷键监听
+  useEffect(() => {
+    if (listeningShortcut) {
+      // 开始编辑快捷键，暂停全局监听
+      setPausedRef.current?.(true);
+    } else {
+      // 编辑结束，恢复全局监听
+      setPausedRef.current?.(false);
+    }
+  }, [listeningShortcut]);
 
   const handleAdd = () => {
     setEditingScene(null);
@@ -165,6 +189,15 @@ export default function SceneList({
 
   // Handle shortcut key capture
   const handleShortcutClick = useCallback((scene: Scene) => {
+    // 如果正在录音，禁止切换快捷键
+    if (isRecording) {
+      log.warn('Cannot change shortcut while recording');
+      return;
+    }
+
+    // 立即暂停全局快捷键监听（同步操作，避免 keyhook 在 useEffect 执行前捕获按键）
+    setPausedRef.current?.(true);
+
     // Cancel any existing listening
     if (listeningTimeoutRef.current) {
       clearTimeout(listeningTimeoutRef.current);
@@ -177,7 +210,7 @@ export default function SceneList({
     listeningTimeoutRef.current = setTimeout(() => {
       setListeningShortcut(null);
     }, 5000);
-  }, []);
+  }, [isRecording]);
 
   // Keydown handler for shortcut capture
   const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
@@ -279,8 +312,8 @@ export default function SceneList({
         <div className="space-y-3">
           {localScenes.map((scene, index) => {
             const isListening = listeningShortcut === scene.id;
-            // 检查该场景是否启用了 LLM
-            // 判断依据：全局 LLM 已配置 且 场景有提示词配置
+            // 录音时禁止切换快捷键
+            const isShortcutDisabled = isRecording && !isListening;
 
             return (
               <div
@@ -291,13 +324,15 @@ export default function SceneList({
                 <div className="flex-1 flex items-center gap-4">
                   {/* Shortcut - Click to capture or show listening state */}
                   <button
-                    onClick={() => !isListening && handleShortcutClick(scene)}
+                    onClick={() => !isListening && !isShortcutDisabled && handleShortcutClick(scene)}
                     className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-mono transition-all duration-200 min-w-[72px] justify-center ${
                       isListening
                         ? 'bg-amber-100 text-amber-700 animate-pulse'
+                        : isShortcutDisabled
+                        ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
-                    title={isListening ? t('home.pressAnyKey') : t('sceneList.clickToChangeShortcut')}
+                    title={isListening ? t('home.pressAnyKey') : isShortcutDisabled ? t('sceneList.cannotChangeWhileRecording') : t('sceneList.clickToChangeShortcut')}
                   >
                     {isListening ? (
                       <>

@@ -93,14 +93,18 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
   const start = useCallback(async (overrideSceneId?: string): Promise<boolean> => {
     clearError();
     const effectiveSceneId = overrideSceneId ?? sceneId;
-    log.debug(`start() called, useVad: ${useVad}, sceneId: ${effectiveSceneId}`);
+    log.info(`[Recorder] 🎙️ start() called, useVad: ${useVad}, sceneId: ${effectiveSceneId}`);
+    console.log(`[Recorder] start() at ${Date.now()}`);
 
     try {
       if (useVad) {
         // Use VAD-based recording from Rust backend
-        log.debug('Starting VAD recording...');
+        log.info('[Recorder] Calling startVadRecording...');
+        const startTime = Date.now();
         const success = await startVadRecording(effectiveSceneId);
-        log.debug(`VAD recording result: ${success}`);
+        const elapsed = Date.now() - startTime;
+        log.info(`[Recorder] startVadRecording returned: ${success}, elapsed: ${elapsed}ms`);
+        console.log(`[Recorder] startVadRecording took ${elapsed}ms`);
 
         if (!success) {
           const errMsg = '启动录音失败';

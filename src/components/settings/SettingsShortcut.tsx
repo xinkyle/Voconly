@@ -6,6 +6,9 @@ interface SettingsShortcutProps {
   onSave: (scenes: Scene[]) => void;
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
+  setPaused?: (paused: boolean) => void;
+  /** 是否正在录音（用于禁止切换快捷键） */
+  isRecording?: boolean;
 }
 
 export default function SettingsShortcut({
@@ -13,6 +16,8 @@ export default function SettingsShortcut({
   onSave,
   checkConflict,
   tryRegisterShortcut,
+  setPaused,
+  isRecording,
 }: SettingsShortcutProps) {
   return (
     <SceneList
@@ -20,6 +25,8 @@ export default function SettingsShortcut({
       onSave={onSave}
       checkConflict={checkConflict}
       tryRegisterShortcut={tryRegisterShortcut}
+      setPaused={setPaused}
+      isRecording={isRecording}
     />
   );
 }

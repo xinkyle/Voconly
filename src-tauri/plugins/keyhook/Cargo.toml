@@ -1,0 +1,36 @@
+[package]
+name = "tauri-plugin-keyhook"
+version = "0.1.0"
+authors = ["Voconly"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/voconly/voconly"
+rust-version = "1.70"
+links = "tauri-plugin-keyhook"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+lazy_static = "1.4"
+thiserror = "1"
+tracing = "0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Threading",
+    "Win32_UI_Input",
+    "Win32_UI_WindowsAndMessaging"
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+core-foundation = "0.10"
+cocoa = "0.26"
+objc = "0.2"

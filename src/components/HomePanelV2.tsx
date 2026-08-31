@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
-import { extractShortcutFromEvent, formatShortcut } from '../utils/keyboard';
+import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
@@ -30,31 +30,6 @@ const AsrIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 const LlmIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-  </svg>
-);
-
-// 统计图标
-const ClockIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const TextIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const MicIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-  </svg>
-);
-
-const CalendarIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 
@@ -102,51 +77,6 @@ function getModelQuant(modelId: string, asrModels?: AsrModelWithStatus[], t?: (k
   return null;
 }
 
-// 获取模型大小
-function getModelSize(modelId: string, asrModels?: AsrModelWithStatus[]): string {
-  const { baseId, quant } = parseModelId(modelId);
-
-  if (asrModels) {
-    const asrModel = asrModels.find(m => m.preset.id.toLowerCase() === baseId.toLowerCase());
-    if (asrModel) {
-      if (quant && asrModel.quantVariants) {
-        const quantVariant = asrModel.quantVariants.find(v => v.quant.toUpperCase() === quant.toUpperCase());
-        if (quantVariant) {
-          const mb = quantVariant.sizeBytes / (1024 * 1024);
-          if (mb >= 1024) {
-            return `${(mb / 1024).toFixed(1)}GB`;
-          }
-          return `${Math.round(mb)}MB`;
-        }
-      }
-
-      if (asrModel.sizeMb) {
-        const mb = asrModel.sizeMb;
-        if (mb >= 1024) {
-          return `${(mb / 1024).toFixed(1)}GB`;
-        }
-        return `${mb}MB`;
-      }
-      if (asrModel.preset.size) {
-        return asrModel.preset.size;
-      }
-    }
-  }
-
-  return '';
-}
-
-// 获取提示词类型显示名称
-const getPromptTypeLabel = (type: string, t: (key: string) => string): string => {
-  const labels: Record<string, string> = {
-    lightPolish: t('llmConfig.promptTypes.lightPolish'),
-    translate: t('llmConfig.promptTypes.translate'),
-    professionalPolish: t('llmConfig.promptTypes.professionalPolish'),
-    meetingSecretary: t('llmConfig.promptTypes.meetingSecretary'),
-  };
-  return labels[type] || type;
-};
-
 // 格式化时长
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -171,6 +101,7 @@ interface HomePanelV2Props {
   onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
   tutorialCompleted?: boolean;
   onTutorialComplete?: () => void;
+  setPaused?: (paused: boolean) => void;
 }
 
 export default function HomePanelV2({
@@ -190,6 +121,7 @@ export default function HomePanelV2({
   onQuantPrefChange,
   tutorialCompleted,
   onTutorialComplete,
+  setPaused,
 }: HomePanelV2Props) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -215,6 +147,23 @@ export default function HomePanelV2({
   const localScenesRef = useRef(localScenes);
   const tryRegisterShortcutRef = useRef(tryRegisterShortcut);
   const onScenesSaveRef = useRef(onScenesSave);
+  const setPausedRef = useRef(setPaused);
+
+  // 更新 refs
+  useEffect(() => {
+    setPausedRef.current = setPaused;
+  }, [setPaused]);
+
+  // 监听 listeningSceneId 变化，暂停/恢复全局快捷键监听
+  useEffect(() => {
+    if (listeningSceneId) {
+      // 开始编辑快捷键，暂停全局监听
+      setPausedRef.current?.(true);
+    } else {
+      // 编辑结束，恢复全局监听
+      setPausedRef.current?.(false);
+    }
+  }, [listeningSceneId]);
 
   // 自定义预设
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
@@ -608,6 +557,9 @@ export default function HomePanelV2({
 
   // 处理快捷键点击
   const handleShortcutClick = useCallback((sceneId: string) => {
+    // 立即暂停全局快捷键监听（同步操作，避免 keyhook 在 useEffect 执行前捕获按键）
+    setPausedRef.current?.(true);
+
     // 取消已有的监听
     if (listeningTimeoutRef.current) {
       clearTimeout(listeningTimeoutRef.current);
@@ -775,6 +727,7 @@ export default function HomePanelV2({
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
                 const isListening = listeningSceneId === scene.id;
+                const { prefix, main } = parseShortcutForDisplay(scene.shortcut);
 
                 return (
                   <button
@@ -803,8 +756,15 @@ export default function HomePanelV2({
                       >
                         {isListening ? (
                           <span className="text-base">...</span>
+                        ) : prefix ? (
+                          // 有前缀（左/右修饰键）：前缀小字，主键名大字
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-sm font-medium opacity-70">{prefix}</span>
+                            <span className="text-xl font-bold">{main}</span>
+                          </div>
                         ) : (
-                          formatShortcut(scene.shortcut)
+                          // 普通键：直接显示
+                          main
                         )}
                       </div>
                     </div>

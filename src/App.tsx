@@ -527,7 +527,8 @@ function App() {
 
   // Debug: log when recorder state changes
   useEffect(() => {
-    log.debug(`Recorder isRecording changed: ${recorder.isRecording}`);
+    log.info(`[App] 🔄 Recorder isRecording changed: ${recorder.isRecording}`);
+    console.log(`[App] isRecording changed to ${recorder.isRecording} at ${Date.now()}`);
   }, [recorder.isRecording]);
 
   // Streaming transcription state
@@ -1205,7 +1206,7 @@ function App() {
   }, [config?.scenes, config?.models, config?.globalModelConfig, downloadStates, showToast, t, showFloatPanelStatus, hideFloatPanelStatus]); // 分段转录始终开启，不依赖配置
 
   // Register shortcuts for all scenes
-  const { registerShortcutWithResult } = useSceneShortcuts(config?.scenes || [], handleShortcutTriggered);
+  const { registerShortcutWithResult, setPaused } = useSceneShortcuts(config?.scenes || [], handleShortcutTriggered, recorder.isRecording);
 
   // Check for shortcut conflict with existing scenes
   const checkShortcutConflict = useCallback((shortcut: string, excludeSceneId?: string): string | null => {
@@ -1509,6 +1510,8 @@ function App() {
                 onSave={handleSaveScenes}
                 checkConflict={checkShortcutConflict}
                 tryRegisterShortcut={registerShortcutWithResult}
+                setPaused={setPaused}
+                isRecording={recorder.isRecording}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'prompt' && (
@@ -1575,6 +1578,7 @@ function App() {
                 onScenesSave={handleSaveScenes}
                 onQuantPrefChange={handleQuantPrefChange}
                 tutorialCompleted={config?.tutorialCompleted}
+                setPaused={setPaused}
                 onTutorialComplete={async () => {
                   if (config) {
                     const newConfig = { ...config, tutorialCompleted: true };

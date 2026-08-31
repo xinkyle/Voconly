@@ -37,4 +37,9 @@ export default defineConfig({
       },
     },
   },
+  resolve: {
+    alias: {
+      "@tauri-keyhook": resolve(__dirname, "src-tauri/plugins/keyhook/js"),
+    },
+  },
 });

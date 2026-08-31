@@ -498,6 +498,7 @@
     "notDownloaded": "Not downloaded",
     "clickToEdit": "Click to edit scene",
     "clickToChangeShortcut": "Click to change shortcut",
+    "cannotChangeWhileRecording": "Cannot change shortcut while recording",
     "clickToSwitchModel": "Click to switch model",
     "pressKey": "Press key",
     "llmConfig": "LLM Config",

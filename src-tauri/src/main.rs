@@ -1092,7 +1092,7 @@ async fn set_streaming_mode(app: AppHandle, enabled: bool) -> Result<(), String>
 /// microphone-in-use indicator in the system tray on startup
 #[tauri::command]
 async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
-    info!("Pre-initializing audio capture (loading VAD model only)...");
+    info!("Pre-initializing audio capture (loading VAD model and opening microphone)...");
 
     // Get VAD model path from Application directory
     let vad_model_path = resolve_resource_path("resources/models/silero_vad_v6.2.1_16k.onnx")?;
@@ -1102,20 +1102,27 @@ async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     let mut capture_guard = state.audio_capture.lock().map_err(|e| e.to_string())?;
 
-    // Skip if already initialized
-    if capture_guard.is_some() {
-        info!("Audio capture already initialized, skipping preinit");
-        return Ok(());
+    // Skip if already initialized and microphone is open
+    if let Some(capture) = capture_guard.as_ref() {
+        if capture.is_open() {
+            info!("Audio capture already initialized and microphone open, skipping preinit");
+            return Ok(());
+        }
     }
 
-    // Create new capture instance (this loads the VAD model, which is the expensive part)
-    // We do NOT call open() here to avoid activating the microphone device
-    let new_capture = AudioCapture::new(app.clone(), vad_model_path.to_str().unwrap())
+    // Create new capture instance
+    let mut new_capture = AudioCapture::new(app.clone(), vad_model_path.to_str().unwrap())
         .map_err(|e| format!("Failed to create AudioCapture: {}", e))?;
+
+    // 【关键修复】预打开麦克风，避免首次录音时的延迟
+    // 这样用户按快捷键时，麦克风已经准备好了
+    new_capture
+        .open()
+        .map_err(|e| format!("Failed to open microphone during preinit: {}", e))?;
 
     *capture_guard = Some(new_capture);
 
-    info!("Audio capture pre-initialized successfully (VAD model loaded, microphone not opened)");
+    info!("Audio capture pre-initialized successfully (VAD model loaded + microphone opened)");
     Ok(())
 }
 
@@ -1655,6 +1662,7 @@ fn main() {
         .manage(performance_state)
         .manage(llm_performance_state)
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_keyhook::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

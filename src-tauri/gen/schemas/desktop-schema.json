@@ -5973,6 +5973,42 @@
           "markdownDescription": "Denies the unregister_all command without any pre-configured scope."
         },
         {
+          "description": "Enables the is_listening command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:allow-is-listening",
+          "markdownDescription": "Enables the is_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the start_listen command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:allow-start-listen",
+          "markdownDescription": "Enables the start_listen command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the stop_listen command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:allow-stop-listen",
+          "markdownDescription": "Enables the stop_listen command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the is_listening command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:deny-is-listening",
+          "markdownDescription": "Denies the is_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the start_listen command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:deny-start-listen",
+          "markdownDescription": "Denies the start_listen command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stop_listen command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:deny-stop-listen",
+          "markdownDescription": "Denies the stop_listen command without any pre-configured scope."
+        },
+        {
           "description": "Allows the log command\n#### This default permission set includes:\n\n- `allow-log`",
           "type": "string",
           "const": "log:default",

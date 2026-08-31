@@ -498,6 +498,7 @@
     "notDownloaded": "未下载",
     "clickToEdit": "点击编辑场景",
     "clickToChangeShortcut": "点击修改快捷键",
+    "cannotChangeWhileRecording": "录音时无法修改快捷键",
     "clickToSwitchModel": "点击切换模型",
     "pressKey": "请按键",
     "llmConfig": "LLM 配置",

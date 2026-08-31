@@ -396,6 +396,11 @@ impl AudioCapture {
         Ok(())
     }
 
+    /// Check if microphone is open and ready
+    pub fn is_open(&self) -> bool {
+        self.worker_handle.is_some()
+    }
+
     /// Set streaming transcription mode
     pub fn set_streaming_mode(&self, enabled: bool) -> Result<()> {
         if let Some(tx) = &self.cmd_tx {

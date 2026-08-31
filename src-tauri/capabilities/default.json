@@ -49,6 +49,9 @@
     "dialog:allow-message",
     "dialog:allow-ask",
     "dialog:allow-confirm",
-    "opener:default"
+    "opener:default",
+    "keyhook:allow-start-listen",
+    "keyhook:allow-stop-listen",
+    "keyhook:allow-is-listening"
   ]
 }
