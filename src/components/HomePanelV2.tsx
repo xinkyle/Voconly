@@ -730,15 +730,15 @@ export default function HomePanelV2({
           >
             <AsrIcon className="w-3 h-3 text-gray-800" />
             <span>{asrModelName}</span>
-            {globalModelConfig?.asrModel?.modelId && (
-              asrLoading ? (
-                // 加载中：三个点依次闪烁的动画
-                <span className="inline-flex items-center gap-0.5">
-                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '200ms' }} />
-                  <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '400ms' }} />
-                </span>
-              ) : asrModelLoaded ? (
+            {asrLoading ? (
+              // 加载中：三个点依次闪烁的动画
+              <span className="inline-flex items-center gap-0.5">
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '200ms' }} />
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-loading-dot" style={{ animationDelay: '400ms' }} />
+              </span>
+            ) : globalModelConfig?.asrModel?.modelId && (
+              asrModelLoaded ? (
                 // 已加载：绿点
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               ) : (

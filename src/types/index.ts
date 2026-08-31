@@ -129,6 +129,9 @@ export interface Scene {
 // - 预设信息: 由 presets 模块提供
 // - 用户偏好: 本配置文件仅存储用户设置（语言偏好等）
 export interface AppConfig {
+  /** 配置版本号，用于检测重大变更 */
+  configVersion?: number;
+
   /** 全局模型配置（ASR + LLM） - 后端有默认值，不会为空 */
   globalModelConfig: GlobalModelConfig;
 

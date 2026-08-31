@@ -13,6 +13,7 @@
   },
   "settings": {
     "title": "设置",
+    "configResetNotice": "配置已重置为新版本格式，旧配置已备份",
     "tabs": {
       "shortcut": "场景配置",
       "prompt": "场景提示词",

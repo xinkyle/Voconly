@@ -12,7 +12,7 @@ import ProviderPanel from './components/ProviderPanel';
 import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
-import { loadConfig, saveConfig } from './services/config';
+import { loadConfig, saveConfig, loadConfigWithNotice } from './services/config';
 import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, type DownloadProgress } from './services/downloader';
   import { updateTrayMenu } from './services/tray';
 import { useSceneShortcuts } from './hooks/useShortcut';
@@ -149,6 +149,7 @@ function App() {
   const [hasUpdate, setHasUpdate] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [updateVersionInfo, setUpdateVersionInfo] = useState<RemoteVersionInfo | null>(null);
+  const [showConfigResetNotice, setShowConfigResetNotice] = useState(false);
 
   // Permission modal state
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -199,11 +200,20 @@ function App() {
 
   // Check permission when config is loaded and tutorial is already completed
   useEffect(() => {
+    log.info(`[ConfigReset] useEffect triggered: tutorialCompleted=${config?.tutorialCompleted}, permissionChecked=${permissionChecked}, showConfigResetNotice=${showConfigResetNotice}`);
     if (config?.tutorialCompleted === true && !permissionChecked) {
       // Tutorial was already completed, check permission now
       checkMicPermission();
+      // 显示配置重置提示（如果需要）
+      if (showConfigResetNotice) {
+        log.info('[ConfigReset] Showing toast notification');
+        showToast({ type: 'info', title: t('settings.configResetNotice') });
+        setShowConfigResetNotice(false);
+      } else {
+        log.info('[ConfigReset] showConfigResetNotice is false, skipping toast');
+      }
     }
-  }, [config?.tutorialCompleted, permissionChecked, checkMicPermission]);
+  }, [config?.tutorialCompleted, permissionChecked, checkMicPermission, showConfigResetNotice, showToast, t]);
 
   // Check for updates on startup
   useEffect(() => {
@@ -451,17 +461,23 @@ function App() {
   useEffect(() => {
     // Load config and history, start whisper server in background
     Promise.all([
-      loadConfig(),
+      loadConfigWithNotice(),
       loadHistory()
     ])
-      .then(async ([cfg, historyData]) => {
+      .then(async ([result, historyData]) => {
         log.info('[启动] loadConfig + loadHistory 完成，进入 .then 回调');
-        setConfig(cfg);
+        setConfig(result.config);
         setHistory(historyData);
+
+        // 如果版本不匹配，保存标志以便在引导完成后显示 toast
+        if (!result.versionMatches) {
+          log.info('[ConfigReset] Version mismatch detected, setting showConfigResetNotice to true');
+          setShowConfigResetNotice(true);
+        }
 
         // Update tray menu with current scenes (非关键操作，失败不影响主流程)
         try {
-          await updateTrayMenu(cfg.scenes);
+          await updateTrayMenu(result.config.scenes);
           log.info('[启动] Tray menu 更新成功');
         } catch (err) {
           log.warn(`[启动] Tray menu 更新失败（非关键错误）: ${err}`);
@@ -1565,6 +1581,7 @@ function App() {
                     setConfig(newConfig);
                     await saveConfig(newConfig);
                     // 引导完成后检查麦克风权限
+                    // 注意：toast 提示由 useEffect 统一处理，这里不重复显示
                     checkMicPermission();
                   }
                 }}

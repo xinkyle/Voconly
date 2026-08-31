@@ -49,7 +49,7 @@ mod presets;
 mod updater;
 mod utils; // Crash report module for enhanced crash tracking
 
-use config::{config_exists, get_model_storage_path, load_config, save_config, AppServices};
+use config::{config_exists, get_model_storage_path, load_config, save_config, AppConfig, AppServices};
 use history::{
     add_history_record, clear_history, delete_history_record, get_archive_stats, get_full_stats,
     get_history_count, load_history, load_history_paged, rebuild_stats, save_history,
@@ -1009,7 +1009,9 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     info!("VAD model path: {:?}", vad_model_path);
 
     // 从配置读取分段转录开关
-    let streaming_enabled = load_config().unwrap_or_default().segment_transcribe;
+    let streaming_enabled = load_config()
+        .map(|r| r.config.segment_transcribe)
+        .unwrap_or(true);
     info!("Segment transcription enabled: {}", streaming_enabled);
 
     // Get AppState for audio_capture
@@ -1568,7 +1570,9 @@ fn main() {
 
     // Load config first to initialize model manager
     let config_start = Instant::now();
-    let config = load_config().unwrap_or_default();
+    let config = load_config()
+        .map(|r| r.config)
+        .unwrap_or_else(|_| AppConfig::default());
     info!(
         "[STARTUP] 配置加载完成, 耗时: {}ms",
         config_start.elapsed().as_millis()

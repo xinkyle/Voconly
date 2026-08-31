@@ -54,7 +54,7 @@ use crate::backends::gguf_capabilities::{
 pub fn scan_available_asr_models() -> Vec<ModelPreset> {
     // 获取用户自定义目录列表
     let custom_dirs: Vec<String> = match load_config() {
-        Ok(config) => config.custom_asr_model_dirs,
+        Ok(result) => result.config.custom_asr_model_dirs,
         Err(e) => {
             log::warn!("无法加载配置文件获取自定义模型目录: {}", e);
             Vec::new()

@@ -11,6 +11,19 @@ use crate::model_manager::ModelManager;
 use crate::paths::{config_file_path, models_dir};
 use std::collections::HashMap;
 
+/// 当前配置版本
+/// 当配置结构发生重大变化时，递增此版本号
+/// 旧版本配置会被自动备份并重置为默认配置
+const CONFIG_VERSION: u32 = 2;
+
+/// 版本检测是否已执行的标志
+/// 确保版本检测只在应用启动时执行一次
+static VERSION_CHECKED: AtomicBool = AtomicBool::new(false);
+
+/// 本次启动是否发生过配置重置
+/// 用于在 UI 层显示提示
+static CONFIG_RESET_OCCURRED: AtomicBool = AtomicBool::new(false);
+
 /// 模型引用，用于唯一标识一个模型实例
 ///
 /// 将模型基础 ID 和量化版本分离存储，避免解析复杂度。
@@ -398,6 +411,10 @@ pub enum PreviewHeight {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
+    /// 配置版本号，用于检测重大变更并自动重置
+    #[serde(default)]
+    pub config_version: Option<u32>,
+
     /// 全局模型配置（ASR + LLM）
     #[serde(default)]
     pub global_model_config: GlobalModelConfig,
@@ -509,6 +526,9 @@ fn default_true() -> bool {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            // 配置版本号
+            config_version: Some(CONFIG_VERSION),
+
             // 新增：全局模型配置
             global_model_config: GlobalModelConfig::default(),
 
@@ -582,6 +602,15 @@ pub fn get_config_path() -> Result<PathBuf, String> {
     config_file_path()
 }
 
+/// 配置加载结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoadConfigResult {
+    pub config: AppConfig,
+    /// 版本是否匹配，false 表示配置已被重置，需要显示提示
+    pub version_matches: bool,
+}
+
 /// Load configuration from file
 ///
 /// 职责分离设计:
@@ -593,20 +622,94 @@ pub fn get_config_path() -> Result<PathBuf, String> {
 /// - 旧的 `models` 字段会被忽略
 /// - 保留字段定义以便 serde 反序列化不报错
 #[tauri::command]
-pub fn load_config() -> Result<AppConfig, String> {
+pub fn load_config() -> Result<LoadConfigResult, String> {
     let config_path = get_config_path()?;
 
     if !config_path.exists() {
         // 配置文件不存在，返回默认配置
         log::info!("[Config] Config file not found, using default config");
-        return Ok(AppConfig::default());
+        return Ok(LoadConfigResult {
+            config: AppConfig::default(),
+            version_matches: true,
+        });
     }
 
     let content = fs::read_to_string(&config_path)
         .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-    let mut config: AppConfig = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse config file: {}", e))?;
+    // 尝试解析配置
+    let parsed: Result<AppConfig, _> = serde_json::from_str(&content);
+
+    // 检查版本是否匹配
+    let version_matches = parsed.as_ref()
+        .map(|c| c.config_version == Some(CONFIG_VERSION))
+        .unwrap_or(false);
+
+    // 检查是否已经执行过版本重置（使用静态变量追踪）
+    let version_checked = VERSION_CHECKED.load(std::sync::atomic::Ordering::Relaxed);
+
+    log::info!(
+        "[Config] Version check: version_checked={}, version_matches={}, expected={}, got={:?}",
+        version_checked,
+        version_matches,
+        CONFIG_VERSION,
+        parsed.as_ref().ok().and_then(|c| c.config_version)
+    );
+
+    // 只在首次调用且版本不匹配时执行重置
+    if !version_checked && !version_matches {
+        // 标记版本检测已执行
+        VERSION_CHECKED.store(true, std::sync::atomic::Ordering::Relaxed);
+        // 标记本次启动发生了配置重置
+        CONFIG_RESET_OCCURRED.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        // 版本不匹配，备份旧配置并重置
+        let backup_path = config_path.with_extension("backup.json");
+
+        log::info!(
+            "[Config] Config version mismatch (expected {}, got {:?}). Backing up to {:?}",
+            CONFIG_VERSION,
+            parsed.as_ref().ok().and_then(|c| c.config_version),
+            backup_path
+        );
+
+        // 备份旧配置
+        if let Err(e) = fs::copy(&config_path, &backup_path) {
+            log::warn!("[Config] Failed to backup old config: {}", e);
+        }
+
+        // 重置为默认配置
+        let new_config = AppConfig::default();
+        log::info!(
+            "[Config] New default config has config_version: {:?}",
+            new_config.config_version
+        );
+
+        // 保存新配置
+        let config_content = serde_json::to_string_pretty(&new_config)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        log::info!(
+            "[Config] Serialized config contains 'configVersion': {}",
+            config_content.contains("configVersion")
+        );
+        fs::write(&config_path, config_content)
+            .map_err(|e| format!("Failed to write config file: {}", e))?;
+
+        log::info!("[Config] Config reset to default (version {})", CONFIG_VERSION);
+
+        return Ok(LoadConfigResult {
+            config: new_config,
+            version_matches: false,
+        });
+    }
+
+    // 标记版本检测已执行（如果还没标记）
+    if !version_checked {
+        VERSION_CHECKED.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    // 版本匹配，正常加载
+    let mut config: AppConfig = parsed.map_err(|e| format!("Failed to parse config file: {}", e))?;
 
     // 数据迁移：将旧的 model_id 字段迁移到新的 model 字段
     let migrated_model_refs = migrate_scene_model_refs(&mut config);
@@ -632,11 +735,22 @@ pub fn load_config() -> Result<AppConfig, String> {
         config.scenes = default_config.scenes;
     }
 
-    // 模型发现现在由 scan_available_asr_models() 完成
-    // 不再在此处检查模型存在性
+    // 检查本次启动是否发生过配置重置
+    let reset_occurred = CONFIG_RESET_OCCURRED.load(std::sync::atomic::Ordering::Relaxed);
+    // 如果发生过重置，强制返回 version_matches=false 以便前端显示提示
+    let version_matches = if reset_occurred {
+        log::info!("[Config] Config reset occurred earlier, returning version_matches=false");
+        false
+    } else {
+        version_matches
+    };
 
-    log::info!("[Config] Loaded config with {} scenes", config.scenes.len());
-    Ok(config)
+    log::info!("[Config] Loaded config with {} scenes, version_matches={}",
+        config.scenes.len(), version_matches);
+    Ok(LoadConfigResult {
+        config,
+        version_matches,
+    })
 }
 
 /// 迁移场景的模型引用数据
@@ -793,7 +907,17 @@ pub fn save_config_internal(config: &AppConfig, app_services: &AppServices) -> R
     let config_path = get_config_path()?;
     log::info!("[save_config_internal] Config path: {:?}", config_path);
 
-    let content = serde_json::to_string_pretty(&config)
+    // 确保版本号始终是当前版本
+    let config_to_save = if config.config_version != Some(CONFIG_VERSION) {
+        let mut config = config.clone();
+        config.config_version = Some(CONFIG_VERSION);
+        log::info!("[save_config_internal] Updated config version to {}", CONFIG_VERSION);
+        config
+    } else {
+        config.clone()
+    };
+
+    let content = serde_json::to_string_pretty(&config_to_save)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
     log::info!(
         "[save_config_internal] Serialized config length: {} bytes",
@@ -809,7 +933,7 @@ pub fn save_config_internal(config: &AppConfig, app_services: &AppServices) -> R
             .config
             .lock()
             .map_err(|e| format!("Failed to lock config: {}", e))?;
-        *memory_config = config.clone();
+        *memory_config = config_to_save;
         log::info!("[save_config_internal] ✅ Memory config updated, asr_idle_timeout_seconds = {}",
             memory_config.asr_idle_timeout_seconds
         );

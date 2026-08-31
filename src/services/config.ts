@@ -75,6 +75,8 @@ interface RustUserPromptPresets {
 }
 
 interface RustAppConfig {
+  /// 配置版本号
+  configVersion?: number;
   /// 全局模型配置
   globalModelConfig: GlobalModelConfig;
   /// DEPRECATED: 模型列表已迁移到预设系统
@@ -235,6 +237,8 @@ function convertSceneToRust(scene: Scene): RustScene {
 
 function convertConfigFromRust(rust: RustAppConfig): AppConfig {
   return {
+    // 配置版本号
+    configVersion: rust.configVersion,
     // 全局模型配置
     globalModelConfig: rust.globalModelConfig,
     // DEPRECATED: models 字段仅用于向后兼容，不再主动使用
@@ -268,6 +272,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
 
 function convertConfigToRust(config: AppConfig): RustAppConfig {
   return {
+    // 配置版本号（保留原值或使用当前版本）
+    configVersion: config.configVersion,
     // 全局模型配置
     globalModelConfig: config.globalModelConfig,
     // DEPRECATED: models 字段仅用于向后兼容，发送空数组
@@ -411,9 +417,29 @@ function convertLlmProviderInstanceToRust(instance: LlmProviderInstance): RustLl
 
 // ============== API 函数 ==============
 
+/// 配置加载结果（与 Rust LoadConfigResult 匹配）
+interface RustLoadConfigResult {
+  config: RustAppConfig;
+  versionMatches: boolean;
+}
+
+export interface LoadConfigResult {
+  config: AppConfig;
+  versionMatches: boolean;
+}
+
 export async function loadConfig(): Promise<AppConfig> {
-  const rustConfig = await invoke<RustAppConfig>('load_config');
-  return convertConfigFromRust(rustConfig);
+  const result = await invoke<RustLoadConfigResult>('load_config');
+  return convertConfigFromRust(result.config);
+}
+
+/// 加载配置并返回完整结果（包含版本是否匹配）
+export async function loadConfigWithNotice(): Promise<LoadConfigResult> {
+  const result = await invoke<RustLoadConfigResult>('load_config');
+  return {
+    config: convertConfigFromRust(result.config),
+    versionMatches: result.versionMatches,
+  };
 }
 
 export async function saveConfig(config: AppConfig): Promise<void> {

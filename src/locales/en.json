@@ -13,6 +13,7 @@
   },
   "settings": {
     "title": "Settings",
+    "configResetNotice": "Config reset to new version format. Old config backed up.",
     "tabs": {
       "shortcut": "Scenes",
       "prompt": "Scene Prompts",

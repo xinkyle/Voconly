@@ -367,7 +367,7 @@ pub fn get_model_path(model_id: &str, backend: &str) -> Result<PathBuf, String> 
 /// is_file: true 查找文件，false 查找目录
 fn find_in_custom_dirs(file_name: &str, is_file: bool) -> Option<PathBuf> {
     let custom_dirs = match load_config() {
-        Ok(config) => config.custom_asr_model_dirs,
+        Ok(result) => result.config.custom_asr_model_dirs,
         Err(e) => {
             log::warn!("[find_in_custom_dirs] 加载配置失败: {}", e);
             return None;
