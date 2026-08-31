@@ -21,6 +21,45 @@ const EN_RECOMMENDED_MODELS: Set<string> = new Set([
   'Cohere-Transcribe-03-2026',
 ]);
 
+// ASR model descriptions i18n mapping
+// Maps model ID (lowercase) to i18n key
+const ASR_MODEL_DESCRIPTIONS: Record<string, string> = {
+  'whisper-tiny': 'models.descriptions.whisperTiny',
+  'whisper-base': 'models.descriptions.whisperBase',
+  'whisper-small': 'models.descriptions.whisperSmall',
+  'whisper-medium': 'models.descriptions.whisperMedium',
+  'whisper-large': 'models.descriptions.whisperLarge',
+  'whisper-large-v3-turbo': 'models.descriptions.whisperTurbo',
+  'sensevoice-small': 'models.descriptions.sensevoiceSmall',
+  'parakeet-tdt-0.6b-v3': 'models.descriptions.parakeetV3',
+  'qwen3-asr-1.7b': 'models.descriptions.qwen3Asr17',
+  'qwen3-asr-1.7b-q5_k_m': 'models.descriptions.Qwen3-ASR-1.7B-Q5_K_M',
+  'cohere-transcribe-03-2026': 'models.descriptions.cohere-transcribe-03-2026-Q5_K_M',
+  'cohere-transcribe-03-2026-q5_k_m': 'models.descriptions.cohere-transcribe-03-2026-Q5_K_M',
+  'nemotron-3.5-asr-streaming-0.6b': 'models.descriptions.nemotron-3.5-asr-streaming-0.6b-Q5_K_M',
+  'nemotron-3.5-asr-streaming-0.6b-q5_k_m': 'models.descriptions.nemotron-3.5-asr-streaming-0.6b-Q5_K_M',
+  'parakeet-tdt-0.6b-v3-q5_k_m': 'models.descriptions.parakeet-tdt-0.6b-v3-Q5_K_M',
+  'parakeet-unified-en-0.6b': 'models.descriptions.parakeet-unified-en-0.6b-Q5_K_M',
+  'parakeet-unified-en-0.6b-q5_k_m': 'models.descriptions.parakeet-unified-en-0.6b-Q5_K_M',
+  'whisper-large-v3-turbo-q5_k_m': 'models.descriptions.whisper-large-v3-turbo-Q5_K_M',
+};
+
+// Get i18n description for a model
+function getModelDescription(modelId: string, fallback: string | undefined, t: (key: string) => string): string | undefined {
+  const lowerId = modelId.toLowerCase();
+  const i18nKey = ASR_MODEL_DESCRIPTIONS[lowerId];
+  if (i18nKey) {
+    return t(i18nKey);
+  }
+  // Try base ID without quant suffix
+  const baseId = lowerId.split('-q')[0];
+  const baseI18nKey = ASR_MODEL_DESCRIPTIONS[baseId];
+  if (baseI18nKey) {
+    return t(baseI18nKey);
+  }
+  return fallback;
+}
+
 // ASR model logo mapping
 const ASR_MODEL_LOGO_MAP: Record<string, string> = {
   'whisper': 'openai.png',
@@ -408,10 +447,10 @@ export default function AsrModelList({
             )}
 
             <div className="relative px-4 py-3 z-10">
-              <div className="flex items-start justify-between gap-3">
-                {/* Left side: Model info */}
+              {/* 第一行: Logo + 模型名字 + 右侧状态标签 */}
+              <div className="flex items-center justify-between gap-3">
+                {/* Left side: Logo + Model name */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {/* Logo */}
                   {logoPath && (
                     <img
                       src={logoPath}
@@ -419,42 +458,13 @@ export default function AsrModelList({
                       className="w-6 h-6 object-contain flex-shrink-0"
                     />
                   )}
-                  <div className="flex-1 min-w-0">
-                    {/* Name and badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900 text-sm">
-                        {model.preset.name}
-                      </span>
-                      {getModelSize(model) && (
-                        <span className="text-xs text-gray-400">({getModelSize(model)})</span>
-                      )}
-                      {/* Recommendation badge */}
-                      {showRecommendation && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-500 text-white">
-                          {t('models.recommended')}
-                        </span>
-                      )}
-                    </div>
-                    {/* Description */}
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
-                      {model.preset.description || ''}
-                    </p>
-                    {/* Accuracy and Speed Scores */}
-                    {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
-                      <div className="flex items-center gap-4 mt-2">
-                        {model.preset.accuracyScore !== undefined && (
-                          <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
-                        )}
-                        {model.preset.speedScore !== undefined && (
-                          <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <span className="font-semibold text-gray-900 text-sm truncate">
+                    {model.preset.name}
+                  </span>
                 </div>
 
                 {/* Right side: Status indicator */}
-                <div className="flex-shrink-0 text-right" onClick={(e) => handleTagClick(e, model)}>
+                <div className="flex-shrink-0" onClick={(e) => handleTagClick(e, model)}>
                   {isDownloading ? (
                     // Downloading: show progress and cancel button
                     <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
@@ -478,7 +488,7 @@ export default function AsrModelList({
                   ) : isSelected ? (
                     // Selected: show checkmark only
                     <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-gray-100">
-                      <CheckIcon className="w-3.5 h-3.5 text-gray-700" />
+                      <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                       {selectedQuant && (
                         <span className="text-gray-600">
                           {QUANT_LABELS[selectedQuant] ? t(`models.quantLabels.${QUANT_LABELS[selectedQuant]}`) : selectedQuant}
@@ -517,6 +527,37 @@ export default function AsrModelList({
                   )}
                 </div>
               </div>
+
+              {/* 第二行: 模型大小 + 推荐标签 (横跨整行，左对齐 Logo) */}
+              <div className="flex items-center gap-2 mt-0.5 pl-9">
+                {getModelSize(model) && (
+                  <span className="text-xs text-gray-500">{getModelSize(model)}</span>
+                )}
+                {showRecommendation && (
+                  <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-emerald-500 text-white">
+                    {t('models.recommended')}
+                  </span>
+                )}
+              </div>
+
+              {/* 第三行: 模型描述 (横跨整行) */}
+              {getModelDescription(model.preset.id, model.preset.description, t) && (
+                <p className="text-xs text-gray-400 mt-0.5 pl-9">
+                  {getModelDescription(model.preset.id, model.preset.description, t)}
+                </p>
+              )}
+
+              {/* Accuracy and Speed Scores (横跨整行) */}
+              {(model.preset.accuracyScore !== undefined || model.preset.speedScore !== undefined) && (
+                <div className="flex items-center gap-4 mt-2 pl-9">
+                  {model.preset.accuracyScore !== undefined && (
+                    <ScoreBar label={t('models.accuracy')} score={model.preset.accuracyScore} color="blue" />
+                  )}
+                  {model.preset.speedScore !== undefined && (
+                    <ScoreBar label={t('models.speed')} score={model.preset.speedScore} color="green" />
+                  )}
+                </div>
+              )}
 
               {/* Quant version panel - Show for both downloaded and not downloaded models */}
               {isExpanded && hasMultipleQuantVariants && (

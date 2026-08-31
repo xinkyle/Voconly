@@ -547,7 +547,7 @@ impl Default for AppConfig {
                 Scene {
                     id: "1".to_string(),
                     name: "轻度润色".to_string(),
-                    shortcut: "[".to_string(),
+                    shortcut: "RightAlt".to_string(),
                     model: ModelRef::new(String::new()), // 空 model_id，提示用户先下载模型
                     model_id: None,
                     enabled: true,
@@ -559,7 +559,7 @@ impl Default for AppConfig {
                 Scene {
                     id: "2".to_string(),
                     name: "专业润色".to_string(),
-                    shortcut: "]".to_string(),
+                    shortcut: "RightCtrl".to_string(),
                     model: ModelRef::new(String::new()), // 空 model_id，提示用户先下载模型
                     model_id: None,
                     enabled: true,

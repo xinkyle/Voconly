@@ -132,7 +132,7 @@
       "whisperMedium": "High accuracy for professional scenarios",
       "whisperLarge": "Highest accuracy for quality transcription, slower speed",
       "whisperTurbo": "Accuracy close to Large, 8x faster",
-      "sensevoiceSmall": "Excellent Chinese recognition, mixed Chinese-English performance is poor, low system requirements",
+      "sensevoiceSmall": "Excellent Chinese recognition, mixed Chinese-English performance is fair, low system requirements",
       "parakeetV3": "NVIDIA high-speed speech recognition, 25 European languages",
       "qwen3Asr": "Chinese/English mixed recognition with custom dictionary hotword support",
       "qwen3Asr17": "Chinese/English mixed recognition, excellent performance. GPU recommended for faster processing, CPU is slower",
@@ -198,7 +198,8 @@
     "shortcutTitle": "Scene Shortcuts",
     "shortcutHint": "Press shortcut to start voice input, press again to end",
     "noEnabledScenes": "No enabled scenes",
-    "addSceneHint": "Go to settings to add scenes"
+    "addSceneHint": "Go to settings to add scenes",
+    "localLlm": "Local LLM"
   },
   "scene": {
     "quickDesc": "Fast input, quick response",
@@ -262,7 +263,7 @@
     "asrRequired": "ASR Model Required",
     "asrRequiredDesc": "Please select and download a speech model from below. This is required to use voice input.",
     "llmTitle": "Local LLM Models",
-    "llmSubtitle": "Locally-run AI models for scene text optimization (optional)",
+    "llmSubtitle": "Locally-run AI models for scene text optimization (optional). After downloading, configure Llama.cpp in AI Services to use.",
     "gpuRecommended": "GPU Recommended",
     "gpuWarning": "Local LLMs run faster on GPU. CPU works but is slower.",
     "noLlmModels": "No LLM models available",
@@ -457,11 +458,12 @@
     "sceneNamePlaceholder": "e.g., Quick Input",
     "sceneNameRequired": "Please enter scene name",
     "shortcut": "Shortcut",
-    "shortcutPlaceholder": "e.g., 1, 2, F1, F2",
+    "shortcutPlaceholder": "Click to input shortcut",
     "shortcutRequired": "Please enter shortcut",
     "shortcutConflict": "Shortcut \"{{shortcut}}\" is already used by \"{{name}}\"",
     "shortcutConflictTip": "Tip: You can change the shortcut or edit existing scenes to resolve conflicts",
-    "shortcutSupport": "Supports: numbers (0-9), letters (A-Z), F1-F12, arrow keys, and symbols [ ] / ? , . - = ; ' ` \\",
+    "shortcutSupport": "Supports: numbers (0-9), letters (A-Z), F1-F12, arrow keys, left/right modifier keys (Ctrl/Alt/Shift/Win), etc.",
+    "pressKey": "Press a key...",
     "voiceModel": "Voice Model",
     "downloaded": "Downloaded",
     "loadStrategy": "Load Strategy",
@@ -521,6 +523,10 @@
     "selectPrompt": "Select Prompt",
     "moveUp": "Move up, homepage shows first two scenes",
     "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage."
+  },
+  "keyboard": {
+    "left": "Left",
+    "right": "Right"
   },
   "memoryStatus": {
     "title": "Resident Models in Memory",

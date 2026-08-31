@@ -332,12 +332,8 @@ export function getKeycodeDisplayName(keycode: string, isMac: boolean): string {
  * Returns the shortcut identifier or empty string if not a valid shortcut key
  */
 export function extractShortcutFromEvent(e: KeyboardEvent): string {
-  // Handle function keys (F1-F24)
-  if (e.key.startsWith('F') && !isNaN(Number(e.key.slice(1)))) {
-    return e.key;
-  }
-
   // Handle modifier keys (use code for left/right distinction)
+  // 注意：修饰键检查放在最前面，优先处理
   if (e.code === 'AltRight') return 'RightAlt';
   if (e.code === 'AltLeft') return 'LeftAlt';
   if (e.code === 'ControlRight') return 'RightCtrl';
@@ -346,6 +342,30 @@ export function extractShortcutFromEvent(e: KeyboardEvent): string {
   if (e.code === 'ShiftLeft') return 'LeftShift';
   if (e.code === 'MetaRight') return 'RightWindows';
   if (e.code === 'MetaLeft') return 'LeftWindows';
+
+  // 备用检查：使用 e.key + e.location 区分左右修饰键
+  // 某些键盘或系统上 e.code 可能返回 'Shift' 而非 'ShiftRight'/'ShiftLeft'
+  if (e.key === 'Shift') {
+    if (e.location === 2) return 'RightShift';
+    if (e.location === 1) return 'LeftShift';
+  }
+  if (e.key === 'Alt') {
+    if (e.location === 2) return 'RightAlt';
+    if (e.location === 1) return 'LeftAlt';
+  }
+  if (e.key === 'Control') {
+    if (e.location === 2) return 'RightCtrl';
+    if (e.location === 1) return 'LeftCtrl';
+  }
+  if (e.key === 'Meta') {
+    if (e.location === 2) return 'RightWindows';
+    if (e.location === 1) return 'LeftWindows';
+  }
+
+  // Handle function keys (F1-F24)
+  if (e.key.startsWith('F') && !isNaN(Number(e.key.slice(1)))) {
+    return e.key;
+  }
 
   // Handle single digits (0-9)
   if (/^[0-9]$/.test(e.key)) {
@@ -400,20 +420,29 @@ export function formatShortcut(shortcut: string): string {
 /**
  * Parse shortcut for split display (prefix + main)
  * Used for keycap styling: prefix (smaller) + main (normal)
- * @returns { prefix: string, main: string } - prefix is "左"/"右" for modifier keys, main is the key name
+ * @param shortcut - The shortcut string (e.g., "RightAlt", "LeftCtrl")
+ * @param t - Optional translation function (i18next t function)
+ * @returns { prefix: string, main: string } - prefix is "左"/"右" or translated text for modifier keys, main is the key name
  */
-export function parseShortcutForDisplay(shortcut: string): { prefix: string; main: string } {
+export function parseShortcutForDisplay(
+  shortcut: string,
+  t?: (key: string) => string
+): { prefix: string; main: string } {
+  // 获取翻译后的"左"/"右"
+  const leftText = t ? t('keyboard.left') : '左';
+  const rightText = t ? t('keyboard.right') : '右';
+
   // 左修饰键
-  if (shortcut === 'AltLeft' || shortcut === 'LeftAlt') return { prefix: '左', main: 'Alt' };
-  if (shortcut === 'ControlLeft' || shortcut === 'LeftCtrl') return { prefix: '左', main: 'Ctrl' };
-  if (shortcut === 'ShiftLeft' || shortcut === 'LeftShift') return { prefix: '左', main: 'Shift' };
-  if (shortcut === 'MetaLeft' || shortcut === 'LeftWindows') return { prefix: '左', main: 'Win' };
+  if (shortcut === 'AltLeft' || shortcut === 'LeftAlt') return { prefix: leftText, main: 'Alt' };
+  if (shortcut === 'ControlLeft' || shortcut === 'LeftCtrl') return { prefix: leftText, main: 'Ctrl' };
+  if (shortcut === 'ShiftLeft' || shortcut === 'LeftShift') return { prefix: leftText, main: 'Shift' };
+  if (shortcut === 'MetaLeft' || shortcut === 'LeftWindows') return { prefix: leftText, main: 'Win' };
 
   // 右修饰键
-  if (shortcut === 'AltRight' || shortcut === 'RightAlt') return { prefix: '右', main: 'Alt' };
-  if (shortcut === 'ControlRight' || shortcut === 'RightCtrl') return { prefix: '右', main: 'Ctrl' };
-  if (shortcut === 'ShiftRight' || shortcut === 'RightShift') return { prefix: '右', main: 'Shift' };
-  if (shortcut === 'MetaRight' || shortcut === 'RightWindows') return { prefix: '右', main: 'Win' };
+  if (shortcut === 'AltRight' || shortcut === 'RightAlt') return { prefix: rightText, main: 'Alt' };
+  if (shortcut === 'ControlRight' || shortcut === 'RightCtrl') return { prefix: rightText, main: 'Ctrl' };
+  if (shortcut === 'ShiftRight' || shortcut === 'RightShift') return { prefix: rightText, main: 'Shift' };
+  if (shortcut === 'MetaRight' || shortcut === 'RightWindows') return { prefix: rightText, main: 'Win' };
 
   // 其他键没有前缀
   return { prefix: '', main: formatShortcut(shortcut) };

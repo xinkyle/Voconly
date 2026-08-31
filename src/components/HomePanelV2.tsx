@@ -645,9 +645,9 @@ export default function HomePanelV2({
 
   // 获取 Provider 友好显示名称
   const getProviderDisplayName = (providerId: string): string => {
-    // llama.cpp 显示为"本地大模型"，更易于理解
+    // llama.cpp 显示为"本地大模型"/"Local LLM"，更易于理解
     if (providerId === 'llama_cpp') {
-      return '本地大模型';
+      return t('home.localLlm');
     }
     // 其他 Provider 使用原有 label
     return currentProvider?.meta.label || providerId;
@@ -727,7 +727,7 @@ export default function HomePanelV2({
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
                 const isListening = listeningSceneId === scene.id;
-                const { prefix, main } = parseShortcutForDisplay(scene.shortcut);
+                const { prefix, main } = parseShortcutForDisplay(scene.shortcut, t);
 
                 return (
                   <button

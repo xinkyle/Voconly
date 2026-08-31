@@ -132,7 +132,7 @@
       "whisperMedium": "适合专业场景，高准确度",
       "whisperLarge": "适合高质量转录，最高准确度但速度较慢",
       "whisperTurbo": "准确度接近 Large，速度提升 8 倍",
-      "sensevoiceSmall": "纯中文识别效果不错，中英混合识别差，系统资源要求不高",
+      "sensevoiceSmall": "纯中文识别效果不错，中英混合识别一般，系统资源要求不高",
       "parakeetV3": "NVIDIA 高速语音识别，25种欧洲语言",
       "qwen3Asr": "中文/英文混合识别，支持用户词库热词提示",
       "qwen3Asr17": "中文/英文混合识别，效果优异。建议本地有 GPU 支持，CPU 运行速度较慢",
@@ -198,7 +198,8 @@
     "shortcutTitle": "场景快捷键",
     "shortcutHint": "按下快捷键开始语音输入，再次按下结束识别",
     "noEnabledScenes": "暂无启用的场景",
-    "addSceneHint": "请前往设置添加场景"
+    "addSceneHint": "请前往设置添加场景",
+    "localLlm": "本地大模型"
   },
   "scene": {
     "quickDesc": "适合快速输入，响应速度快",
@@ -262,7 +263,7 @@
     "asrRequired": "需要下载语音模型",
     "asrRequiredDesc": "请从下方选择并下载一个语音模型，这是使用语音输入的必要条件",
     "llmTitle": "本地大语言模型",
-    "llmSubtitle": "本地运行的 AI 模型，用于场景文案优化（需 GPU 支持，可选）",
+    "llmSubtitle": "本地运行的 AI 模型，用于场景文案优化（可选）。下载后需在 AI 服务中选择 Llama.cpp 配置使用。",
     "gpuRecommended": "建议使用 GPU",
     "gpuWarning": "本地大模型在 GPU 上运行速度更快。如果没有 GPU，CPU 也能运行但速度较慢。",
     "noLlmModels": "暂无可用的大模型",
@@ -457,11 +458,12 @@
     "sceneNamePlaceholder": "例如：轻度润色",
     "sceneNameRequired": "请输入场景名称",
     "shortcut": "快捷键",
-    "shortcutPlaceholder": "例如：1, 2, F1, F2",
+    "shortcutPlaceholder": "点击输入快捷键",
     "shortcutRequired": "请输入快捷键",
     "shortcutConflict": "快捷键 \"{{shortcut}}\" 已被 \"{{name}}\" 占用",
     "shortcutConflictTip": "提示：可以修改快捷键或编辑已存在的场景以解决冲突",
-    "shortcutSupport": "支持：数字(0-9)、字母(A-Z)、F1-F12、方向键、以及 [ ] / ? , . - = ; ' ` \\ 等符号",
+    "shortcutSupport": "支持：数字(0-9)、字母(A-Z)、F1-F12、方向键、左右修饰键(Ctrl/Alt/Shift/Win)等",
+    "pressKey": "请按下快捷键...",
     "voiceModel": "语音模型",
     "downloaded": "已下载",
     "loadStrategy": "加载策略",
@@ -521,6 +523,10 @@
     "selectPrompt": "选择提示词",
     "moveUp": "上移，首页将展示前两个场景",
     "hint": "首页仅展示列表前两位的场景。点击「上移」按钮调整位置，即可将其显示在首页。其他场景虽不在首页展示，但仍可通过快捷键正常使用。"
+  },
+  "keyboard": {
+    "left": "左",
+    "right": "右"
   },
   "memoryStatus": {
     "title": "当前驻留内存的模型",

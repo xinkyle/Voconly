@@ -4,7 +4,7 @@ import type { Scene } from '../types';
 import SceneForm from './SceneForm';
 import ShortcutErrorModal from './ShortcutErrorModal';
 import ConfirmModal from './ui/ConfirmModal';
-import { extractShortcutFromEvent } from '../utils/keyboard';
+import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getLlmPromptPresets } from '../services/llm';
 import { createLogger } from '../services/log';
@@ -314,6 +314,7 @@ export default function SceneList({
             const isListening = listeningShortcut === scene.id;
             // 录音时禁止切换快捷键
             const isShortcutDisabled = isRecording && !isListening;
+            const { prefix, main } = parseShortcutForDisplay(scene.shortcut, t);
 
             return (
               <div
@@ -341,13 +342,15 @@ export default function SceneList({
                         </svg>
                         {t('sceneList.pressKey')}
                       </>
+                    ) : prefix ? (
+                      // 有前缀（左/右修饰键）：前缀小字，主键名大字
+                      <div className="flex flex-col items-center leading-tight">
+                        <span className="text-[10px] font-medium opacity-70">{prefix}</span>
+                        <span className="text-sm font-bold">{main}</span>
+                      </div>
                     ) : (
-                      <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                        </svg>
-                        {scene.shortcut}
-                      </>
+                      // 普通键：直接显示
+                      main
                     )}
                   </button>
 
@@ -436,6 +439,7 @@ export default function SceneList({
           onSave={handleSave}
           onCancel={handleCancel}
           checkConflict={checkConflict}
+          setPaused={setPaused}
         />
       )}
 

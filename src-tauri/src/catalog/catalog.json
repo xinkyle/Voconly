@@ -269,7 +269,7 @@
       },
       "speed_score": 95,
       "accuracy_score": 86,
-      "description": "纯中文识别效果不错，中英混合识别差，系统资源要求不高",
+      "description": "纯中文识别效果不错，中英混合识别一般，系统资源要求不高",
       "download_urls": [
         {
           "name": "ModelScope",

@@ -1373,54 +1373,6 @@ export default function FloatPanelApp() {
             <div
               className={`preview-text height-${getPreviewHeight()}`}
               ref={previewTextRef}
-              contentEditable={true}
-              suppressContentEditableWarning={true}
-              onInput={() => {
-                // 标记用户已编辑（任何输入操作）
-                hasUserEditedRef.current = true;
-                isEditingRef.current = true;
-                // 获取当前文本并更新 state
-                const currentText = previewTextRef.current?.textContent || '';
-                setPreviewText(currentText);
-                // 防抖同步：清除之前的定时器，重新设置
-                if (syncTimeoutRef.current) {
-                  clearTimeout(syncTimeoutRef.current);
-                }
-                syncTimeoutRef.current = window.setTimeout(() => {
-                  invoke('update_preview_text', { text: currentText })
-                    .then(() => log.debug(`[Sync] Debounced sync: ${currentText.length} chars`))
-                    .catch((e) => log.error(`[Sync] Failed to sync: ${e}`));
-                  syncTimeoutRef.current = null;
-                }, 100);
-              }}
-              onFocus={async () => {
-                log.debug('[预览编辑] 用户进入编辑状态');
-                isEditingRef.current = true;
-                // 让窗口获得焦点，这样才能接收键盘输入
-                try {
-                  const win = getCurrentWindow();
-                  await win.setFocusable(true);
-                  await win.setFocus();
-                  log.debug('[预览编辑] 窗口已获得焦点');
-                } catch (e) {
-                  log.error(`[预览编辑] 无法让窗口获得焦点: ${e}`);
-                }
-              }}
-              onBlur={async () => {
-                log.debug('[预览编辑] 用户离开编辑状态');
-                isEditingRef.current = false;
-                // 恢复窗口为不可聚焦状态，避免影响主窗口
-                try {
-                  const win = getCurrentWindow();
-                  await win.setFocusable(false);
-                  log.debug('[预览编辑] 窗口已恢复为不可聚焦');
-                } catch (e) {
-                  log.error(`[预览编辑] 无法恢复窗口状态: ${e}`);
-                }
-                // 从 DOM 读取当前文本内容并更新 state（触发重新渲染以更新字数徽章等）
-                const currentText = previewTextRef.current?.textContent || '';
-                setPreviewText(currentText);
-                }}
             />
           </div>
         )}

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Scene } from '../types';
 import { getLlmPromptPresets } from '../services/llm';
 import { createLogger } from '../services/log';
 import { getSceneNameFromPromptType } from '../utils/i18n';
+import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
 
 const log = createLogger('SceneForm');
 
@@ -13,6 +14,7 @@ interface SceneFormProps {
   onCancel: () => void;
   existingShortcuts?: string[];
   checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
+  setPaused?: (paused: boolean) => void;
 }
 
 // 内置提示词类型
@@ -29,6 +31,7 @@ export default function SceneForm({
   onCancel,
   existingShortcuts = [],
   checkConflict,
+  setPaused,
 }: SceneFormProps) {
   const { t } = useTranslation();
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
@@ -37,6 +40,14 @@ export default function SceneForm({
   const [errors, setErrors] = useState<{ shortcut?: string; conflict?: string }>({});
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
+  const [isListening, setIsListening] = useState(false);
+  const inputRef = useRef<HTMLButtonElement>(null);
+  const setPausedRef = useRef(setPaused);
+
+  // Update setPaused ref
+  useEffect(() => {
+    setPausedRef.current = setPaused;
+  }, [setPaused]);
 
   // 加载自定义预设
   useEffect(() => {
@@ -88,18 +99,65 @@ export default function SceneForm({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleShortcutChange = (value: string) => {
-    setShortcut(value);
-    setConflictWarning(null);
+  // 点击输入框开始监听快捷键
+  const handleInputClick = useCallback(() => {
+    // 立即暂停全局快捷键监听（同步操作，避免 keyhook 在 useEffect 执行前捕获按键）
+    setPausedRef.current?.(true);
+    setIsListening(true);
+    setErrors(prev => ({ ...prev, shortcut: undefined }));
+  }, []);
 
-    // Check for conflict in real-time
-    if (value.trim() && checkConflict) {
-      const conflict = checkConflict(value.trim(), scene?.id);
-      if (conflict) {
-        setConflictWarning(conflict);
-      }
+  // 监听 isListening 变化，恢复全局监听
+  useEffect(() => {
+    if (!isListening) {
+      // 编辑结束，恢复全局监听
+      setPausedRef.current?.(false);
     }
-  };
+  }, [isListening]);
+
+  // 组件卸载时恢复全局监听
+  useEffect(() => {
+    return () => {
+      setPausedRef.current?.(false);
+    };
+  }, []);
+
+  // 监听键盘事件
+  useEffect(() => {
+    if (!isListening) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const newShortcut = extractShortcutFromEvent(e);
+      if (!newShortcut) return;
+
+      setShortcut(newShortcut);
+      setIsListening(false);
+      setConflictWarning(null);
+
+      // Check for conflict
+      if (checkConflict) {
+        const conflict = checkConflict(newShortcut, scene?.id);
+        if (conflict) {
+          setConflictWarning(conflict);
+        }
+      }
+    };
+
+    const handleBlur = () => {
+      setIsListening(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [isListening, checkConflict, scene?.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,19 +182,6 @@ export default function SceneForm({
     onSave(sceneData);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Prevent input of special keys, only allow single character
-    if (e.key.length === 1 || e.key === 'Backspace') {
-      // Allow single characters
-    } else if (e.key === 'Tab') {
-      // Allow tab
-    } else if (e.key.startsWith('F') && !isNaN(Number(e.key.slice(1)))) {
-      // Allow function keys like F1, F2
-    } else {
-      e.preventDefault();
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 animate-scale-in">
@@ -152,18 +197,32 @@ export default function SceneForm({
             <label htmlFor="shortcut" className="block text-sm font-medium text-gray-700 mb-2">
               {t('sceneForm.shortcut')}
             </label>
-            <input
-              type="text"
-              id="shortcut"
-              value={shortcut}
-              onChange={(e) => handleShortcutChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('sceneForm.shortcutPlaceholder')}
-              maxLength={3}
-              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 ${
+            <button
+              type="button"
+              ref={inputRef}
+              onClick={handleInputClick}
+              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 text-left ${
                 errors.shortcut || errors.conflict || conflictWarning ? 'border-red-300' : 'border-gray-200'
-              }`}
-            />
+              } ${isListening ? 'ring-2 ring-amber-400' : ''}`}
+            >
+              {isListening ? (
+                <span className="text-gray-400 animate-pulse">{t('sceneForm.pressKey')}</span>
+              ) : shortcut ? (
+                (() => {
+                  const { prefix, main } = parseShortcutForDisplay(shortcut, t);
+                  return prefix ? (
+                    <span className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">{prefix}</span>
+                      <span className="font-medium">{main}</span>
+                    </span>
+                  ) : (
+                    <span>{main}</span>
+                  );
+                })()
+              ) : (
+                <span className="text-gray-400">{t('sceneForm.shortcutPlaceholder')}</span>
+              )}
+            </button>
             {(errors.shortcut || errors.conflict || conflictWarning) && (
               <p className="mt-1.5 text-sm text-red-500">
                 {errors.shortcut || errors.conflict || conflictWarning}

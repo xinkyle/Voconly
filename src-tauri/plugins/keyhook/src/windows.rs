@@ -91,9 +91,10 @@ unsafe extern "system" fn raw_input_wnd_proc(
                                     ("LeftCtrl", 0xA2u32)
                                 }
                             }
-                            // Shift 键：扫描码区分左右
+                            // Shift 键：扫描码区分左右，同时检查扩展键标志作为备用
                             0x10 => {
-                                if scan_code == 54 {
+                                // 右 Shift: scan_code = 0x36 (54) 或有 E0 标志（某些键盘）
+                                if scan_code == 54 || is_extended {
                                     ("RightShift", 0xA1u32)
                                 } else {
                                     ("LeftShift", 0xA0u32)

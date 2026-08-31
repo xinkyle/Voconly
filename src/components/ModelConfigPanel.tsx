@@ -101,6 +101,7 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
 // LLM Model Card Component
 interface LlmModelCardProps {
   model: LlmModelWithStatus;
+  isSelected: boolean; // 当前是否正在使用
   isDownloading: boolean;
   downloadProgress?: DownloadProgress;
   onDownload: () => void;
@@ -108,7 +109,7 @@ interface LlmModelCardProps {
   t: (key: string) => string;
 }
 
-function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDownloadCancel, t }: LlmModelCardProps) {
+function LlmModelCard({ model, isSelected, isDownloading, downloadProgress, onDownload, onDownloadCancel, t }: LlmModelCardProps) {
   const isDownloaded = model.downloaded;
   const knownModel = DEFAULT_LLM_MODELS.find((m) => m.id === model.preset.id);
   const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
@@ -138,10 +139,22 @@ function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDo
             <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
           </div>
 
-          {/* Status/Action */}
-          <div className="relative flex-shrink-0 z-10 min-w-[72px] text-right">
+          {/* Status/Action - 右侧标签样式，与 ASR 模型列表一致 */}
+          <div className="relative flex-shrink-0 z-10 flex items-center gap-2">
             {isDownloaded ? (
-              <CheckIcon className="w-4 h-4 text-emerald-600" />
+              isSelected ? (
+                // 已选中（当前使用）：显示勾勾 + "当前使用"
+                <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{t('models.currentUse')}</span>
+                </div>
+              ) : (
+                // 已下载未选中：显示"已下载"
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{t('models.downloaded')}</span>
+                </div>
+              )
             ) : isDownloading ? (
               <div className="flex flex-col items-end gap-1">
                 <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
@@ -155,11 +168,13 @@ function LlmModelCard({ model, isDownloading, downloadProgress, onDownload, onDo
                 )}
               </div>
             ) : (
+              // 未下载：显示下载按钮
               <button
                 onClick={onDownload}
-                className="flex items-center justify-center w-7 h-7 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-600 transition-colors"
               >
-                <DownloadIcon className="w-4 h-4" />
+                <DownloadIcon className="w-3.5 h-3.5" />
+                <span>{t('models.download')}</span>
               </button>
             )}
           </div>
@@ -562,6 +577,7 @@ export default function ModelConfigPanel({
               <LlmModelCard
                 key={model.preset.id}
                 model={model}
+                isSelected={globalModelConfig?.llm?.model === model.preset.id}
                 isDownloading={downloadStates[model.preset.id]?.downloading ?? false}
                 downloadProgress={downloadStates[model.preset.id]?.progress}
                 onDownload={() => handleLlmDownload(model)}

@@ -150,7 +150,7 @@ body {
   min-height: 40px; /* 最小高度，确保至少能显示一行 */
   user-select: text;
   -webkit-user-select: text;
-  cursor: text;
+  cursor: default;
   /* 确保内容能撑开高度 */
   display: block;
 }
