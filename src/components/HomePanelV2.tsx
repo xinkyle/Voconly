@@ -13,6 +13,7 @@ import { getProviderList, getLlmPromptPresets } from '../services/llm';
 import { listen } from '@tauri-apps/api/event';
 import AsrModelSelectModal from './AsrModelSelectModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
+import { Tutorial } from './Tutorial';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
 
@@ -168,6 +169,8 @@ interface HomePanelV2Props {
   onTriggerSelectModelCleared?: () => void;
   onScenesSave?: (scenes: Scene[]) => void;
   onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
+  tutorialCompleted?: boolean;
+  onTutorialComplete?: () => void;
 }
 
 export default function HomePanelV2({
@@ -185,6 +188,8 @@ export default function HomePanelV2({
   onTriggerSelectModelCleared: _onTriggerSelectModelCleared,
   onScenesSave,
   onQuantPrefChange,
+  tutorialCompleted,
+  onTutorialComplete,
 }: HomePanelV2Props) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -201,6 +206,7 @@ export default function HomePanelV2({
     todayCount: 0,
     activeDays: 0,
   });
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // 快捷键监听状态
   const [listeningSceneId, setListeningSceneId] = useState<string | null>(null);
@@ -506,6 +512,21 @@ export default function HomePanelV2({
     });
   }, []);
 
+  // 检查是否需要显示引导
+  useEffect(() => {
+    if (scenes.length > 0 && !tutorialCompleted) {
+      setShowTutorial(true);
+    }
+  }, [scenes.length, tutorialCompleted]);
+
+  // 处理引导完成
+  const handleTutorialComplete = useCallback(() => {
+    setShowTutorial(false);
+    if (onTutorialComplete) {
+      onTutorialComplete();
+    }
+  }, [onTutorialComplete]);
+
   // 处理 ASR 模型选择
   const handleAsrModelSelect = useCallback(async (modelId: string) => {
     if (!modelId || !globalModelConfig) {
@@ -703,6 +724,7 @@ export default function HomePanelV2({
         {/* 模型状态栏 */}
         <div className="flex items-center gap-2 mt-4">
           <button
+            id="asr-model-button"
             onClick={() => setSelectingSceneId('global')}
             className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
@@ -726,6 +748,7 @@ export default function HomePanelV2({
             )}
           </button>
           <button
+            id="llm-config-button"
             onClick={onNavigateToLlmSettings}
             className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
           >
@@ -747,8 +770,8 @@ export default function HomePanelV2({
           </div>
 
           {enabledScenes.length > 0 ? (
-            <div className="flex flex-wrap gap-10 justify-center">
-              {enabledScenes.map((scene) => {
+            <div id="scene-cards-area" className="flex flex-wrap gap-10 justify-center">
+              {enabledScenes.map((scene, index) => {
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
                 const isListening = listeningSceneId === scene.id;
@@ -756,6 +779,7 @@ export default function HomePanelV2({
                 return (
                   <button
                     key={scene.id}
+                    id={index === 0 ? 'scene-card-first' : undefined}
                     className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl p-12 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[260px] w-[280px]"
                     onClick={() => handleShortcutClick(scene.id)}
                   >
@@ -881,6 +905,13 @@ export default function HomePanelV2({
           errorType={shortcutError.errorType}
           errorMessage={shortcutError.errorMessage}
           onClose={() => setShortcutError(null)}
+        />
+      )}
+
+      {/* Tutorial */}
+      {showTutorial && (
+        <Tutorial
+          onComplete={handleTutorialComplete}
         />
       )}
     </div>

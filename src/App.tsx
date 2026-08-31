@@ -1556,6 +1556,16 @@ function App() {
                 onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
                 onScenesSave={handleSaveScenes}
                 onQuantPrefChange={handleQuantPrefChange}
+                tutorialCompleted={config?.tutorialCompleted}
+                onTutorialComplete={async () => {
+                  if (config) {
+                    const newConfig = { ...config, tutorialCompleted: true };
+                    setConfig(newConfig);
+                    await saveConfig(newConfig);
+                    // 引导完成后检查麦克风权限
+                    checkMicPermission();
+                  }
+                }}
               />
             </div>
             {activeNav === 'memory' && (

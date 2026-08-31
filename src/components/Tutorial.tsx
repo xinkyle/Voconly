@@ -98,35 +98,27 @@ const customStyles = `
 
 const TUTORIAL_STEPS = [
   {
-    element: '#voice-model-area',
+    element: '#asr-model-button',
     popover: {
-      title: '语音模型',
-      description: '语音模型用于本地语音转文本，支持多种模型选择',
+      title: '语音识别模型',
+      description: '点击这里选择用于语音转文本的 AI 模型。绿点表示模型已加载就绪，可直接使用',
       side: 'bottom' as const,
     },
   },
   {
     element: '#llm-config-button',
     popover: {
-      title: 'LLM 配置',
-      description: 'LLM配置可以对语音识别结果进一步处理，支持润色、翻译、总结等操作',
+      title: 'AI 服务配置',
+      description: '点击这里配置大语言模型服务，可以对语音识别结果进行润色、翻译、总结等智能处理',
       side: 'bottom' as const,
     },
   },
   {
-    element: '#shortcut-area',
+    element: '#scene-cards-area',
     popover: {
-      title: '快捷键',
-      description: '快速访问常用操作的快捷键设置，一键启动语音识别',
-      side: 'bottom' as const,
-    },
-  },
-  {
-    element: '#scene-card-1',
-    popover: {
-      title: '多场景配置',
-      description: '可以配置多个场景，每个场景独立设置模型、快捷键和LLM处理方式',
-      side: 'bottom' as const,
+      title: '场景快捷键',
+      description: '每个场景对应一个快捷键。按下快捷键即可开始录音，再次按下结束录音并输出文字',
+      side: 'top' as const,
     },
   },
 ];
