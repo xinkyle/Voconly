@@ -1,6 +1,6 @@
 [package]
 name = "voconly-tauri"
-version = "0.4.1"
+version = "0.5.1"
 description = "Voconly - 本地语音转文字桌面应用"
 authors = ["Voconly"]
 edition = "2021"
