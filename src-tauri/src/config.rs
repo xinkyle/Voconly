@@ -584,7 +584,7 @@ impl Default for AppConfig {
             #[allow(deprecated)]
             llm_profiles: Vec::new(),
             llm_prompt_presets: None,
-            log_level: Some("info".to_string()),
+            log_level: Some("warn".to_string()),
             user_dictionary: UserDictionary::default(),
             segment_transcribe: true, // 默认开启分段转录
             preview_height: PreviewHeight::default(), // 默认中等高度
