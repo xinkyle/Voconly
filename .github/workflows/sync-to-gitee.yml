@@ -5,7 +5,7 @@ on:
     branches: [main]
   release:
     types: [published]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -17,7 +17,9 @@ jobs:
           fetch-depth: 0
 
       - name: Push to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          git remote add gitee https://${{ secrets.GITEE_TOKEN }}@gitee.com/xingkyle/Voconly.git
+          git remote add gitee https://${GITEE_TOKEN}@gitee.com/xingkyle/Voconly.git
           git push gitee --all --force
           git push gitee --tags --force
