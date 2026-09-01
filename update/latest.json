@@ -1,11 +1,11 @@
 {
-  "version": "0.5.2",
-  "pub_date": "2026-09-01T08:05:00Z",
-  "notes": "## [0.5.2] - 2026-09-01\n\n### 修复\n1. **修复应用启动后托盘显示麦克风图标**，恢复 `preinit_audio_capture` 只加载 VAD 模型不预打开麦克风，避免应用启动后系统托盘显示麦克风正在使用的图标。\n\n2. **修复流式模式录音停止报错**，流式模式下音频已通过流式转录实时处理，不再检查音频数据是否为空。\n\n### 优化\n1. **移除录音文件保存功能**，删除 `debug_audio` 模块，减少内存复制和磁盘 I/O 开销，录音停止后立即返回。\n\n---\n\n### Bug Fixes\n1. **Fixed microphone icon showing in system tray on startup** - Restored `preinit_audio_capture` to only load VAD model without opening microphone, preventing the microphone-in-use indicator from appearing in system tray after app launch.\n\n2. **Fixed streaming mode recording stop error** - In streaming mode, audio is processed in real-time, so empty audio check is skipped.\n\n### Improvements\n1. **Removed audio file saving** - Deleted `debug_audio` module to reduce memory copy and disk I/O overhead. Recording stops immediately without background file saving.",
+  "version": "0.5.3",
+  "pub_date": "2026-09-01T12:00:00Z",
+  "notes": "## [0.5.3] - 2026-09-01\n\n### 新功能\n1. **药丸窗口支持置顶**，使用 Win32 API 强制窗口始终在最前，解决 Tauri 的 always_on_top 不可靠问题。\n\n### 其他\n1. **更新检查优化**，改用 jsDelivr CDN 加速版本检查，国内外访问都快。\n\n---\n\n### New Features\n1. **Pill window always on top** - Using Win32 API to force window to stay on top, fixing unreliable Tauri always_on_top behavior.\n\n### Other\n1. **Update check optimized** - Using jsDelivr CDN for faster version checks in both China and overseas.",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSUGF3SjhMVkVtMEpJaWk3eEhpekthbWx6N1pUSWh4TUdGRWRwNGtFMnVGOHg3dEZzbGZFMGJPL0U2YUhnRFFwSHhzcGIvR2tldlM1UDR2b2tpelNMNzlKZlkveVNVQUFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjQ4NDAzCWZpbGU6Vm9jb25seV8wLjUuMl94NjQtc2V0dXAuZXhlClo1anFpWDY5eDRtWXJEM056bDF3eDNRVVg5REdZWFo1NnlYK2R2Ymx2Si9kcTBoTXhlWFdTQ2pNUzBPMWFXeXNvMXQvQUtkUFd3MjFJSTNZQXdyY0FnPT0K",
-      "url": "https://github.com/xinkyle/Voconly/releases/download/v0.5.2/Voconly_0.5.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSUGF3SjhMVkVtMEplUDJLMnA2NDFRMzJudjM2UXN3WXpzM3ZLMDQ3QlhZcjBKNitQLzlrdmFKd2N1RllveTBqUHEwNTZldkN3STFhNFpGSkJvYUJEL3ExZDZBOS8wRlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjYxNzQ2CWZpbGU6Vm9jb25seV8wLjUuM194NjQtc2V0dXAuZXhlCkhGRkJ1anlPWm5zZWNlSHd4TVZiOTgzU0M4VXVCallEakpaUEV1cjY0aVAwVk9QTUlyRWdFSlFiYnpoeFNXM3JLRW9HZjRyTTlGMG54Z01hLzd4VkNBPT0K",
+      "url": "https://github.com/xinkyle/Voconly/releases/download/v0.5.3/Voconly_0.5.3_x64-setup.exe"
     }
   }
 }
