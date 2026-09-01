@@ -72,7 +72,8 @@ metal = ["llama-cpp-4/metal"]    # Apple Metal (macOS only)
 winreg = "0.52"
 transcribe-rs = { version = "0.3.2", features = ["onnx", "ort-cuda"] }
 # 启用 Vulkan GPU 加速 (跨平台，支持 NVIDIA/AMD/Intel GPU)
-windows = { version = "0.58", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_SystemInformation", "Win32_UI_HiDpi"] }
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_SystemInformation", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
+raw-window-handle = "0.6"
 
 # Windows x86_64: transcribe-cpp Vulkan GPU 加速 + dynamic-backends
 # 支持 NVIDIA/AMD/Intel GPU，动态加载后端模块

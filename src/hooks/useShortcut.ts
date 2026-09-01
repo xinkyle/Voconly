@@ -32,6 +32,7 @@ interface UseShortcutReturn {
   error: string | null;
   checkConflict: (shortcut: string) => string | null;
   setPaused: (paused: boolean) => void;
+  clearKeyPressedState: () => void;
 }
 
 // keyhook 事件 payload 类型
@@ -122,6 +123,43 @@ function normalizeKeyName(key: string): string {
   return key;
 }
 
+// 将 DOM 键盘事件转换为 keyhook 格式的键名
+function convertDomEventToKeyName(e: KeyboardEvent): string | null {
+  // 处理修饰键
+  if (e.code === 'ControlLeft') return 'LeftCtrl';
+  if (e.code === 'ControlRight') return 'RightCtrl';
+  if (e.code === 'AltLeft') return 'LeftAlt';
+  if (e.code === 'AltRight') return 'RightAlt';
+  if (e.code === 'ShiftLeft') return 'LeftShift';
+  if (e.code === 'ShiftRight') return 'RightShift';
+  if (e.code === 'MetaLeft') return 'LeftWindows';
+  if (e.code === 'MetaRight') return 'RightWindows';
+
+  // 功能键
+  if (/^F\d+$/.test(e.code)) {
+    return e.code;
+  }
+
+  // 字母键 - e.code 已经是 KeyA 格式
+  if (/^Key[A-Z]$/.test(e.code)) {
+    return e.code;
+  }
+
+  // 数字键 - e.code 已经是 Digit0 格式
+  if (/^Digit\d$/.test(e.code)) {
+    return e.code;
+  }
+
+  // 其他键，直接使用 e.code
+  // 但过滤掉一些不需要的键
+  const ignoredKeys = ['CapsLock', 'NumLock', 'ScrollLock', 'Escape'];
+  if (ignoredKeys.includes(e.code)) {
+    return null;
+  }
+
+  return e.code;
+}
+
 /**
  * Hook for managing global shortcuts using keyhook plugin
  *
@@ -189,6 +227,12 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     }
   }, []);
 
+  // 清空按键状态（焦点丢失时调用）
+  const clearKeyPressedState = useCallback(() => {
+    pressedKeysRef.current.clear();
+    log.debug('按键状态已清空（焦点丢失或窗口隐藏）');
+  }, []);
+
   // 处理快捷键匹配
   const handleShortcutMatch = useCallback((sceneId: string) => {
     const now = Date.now();
@@ -254,6 +298,27 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     pendingTriggerRef.current.set(sceneId, { timestamp: now, timerId });
   }, [triggerShortcut]);
 
+  // 检查是否匹配已注册的快捷键，并返回是否匹配
+  const checkShortcutMatchAndBlock = useCallback((): boolean => {
+    const pressedKeys = pressedKeysRef.current;
+
+    // 遍历所有已注册的快捷键
+    for (const [shortcut, sceneId] of shortcutToSceneRef.current.entries()) {
+      const keys = parseShortcutKeys(shortcut);
+
+      // 检查是否所有键都被按下
+      const isAllPressed = keys.every(key => pressedKeys.has(key));
+
+      if (isAllPressed) {
+        // 匹配成功，触发快捷键
+        log.debug(`快捷键匹配: ${shortcut} -> sceneId=${sceneId}`);
+        handleShortcutMatch(sceneId);
+        return true;
+      }
+    }
+    return false;
+  }, [handleShortcutMatch]);
+
   // 检查是否匹配已注册的快捷键
   const checkShortcutMatch = useCallback(() => {
     const pressedKeys = pressedKeysRef.current;
@@ -276,8 +341,12 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
   // 处理键盘事件
   const handleKeyEvent = useCallback((payload: KeyEventPayload) => {
+    // 添加详细日志追踪事件接收
+    log.info(`[handleKeyEvent] 📥 收到键盘事件: keycode=${payload.keycode}, rawCode=${payload.rawCode}, eventType=${payload.eventType}`);
+
     // 如果暂停，完全跳过处理（编辑快捷键时）
     if (isPausedRef.current) {
+      log.info(`[handleKeyEvent] ⏸️ 快捷键监听已暂停，跳过处理`);
       return;
     }
 
@@ -287,6 +356,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     // 优先使用 keycode，fallback 到 rawCode 映射
     const keyName = keycode !== 'Other' ? keycode : mapRawCodeToKeyName(rawCode, isMacRef.current);
     if (!keyName) {
+      log.warn(`[handleKeyEvent] ❓ 未知按键: rawCode=${rawCode}`);
       return; // 忽略未知按键
     }
 
@@ -299,6 +369,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
       // 只有新按下的键才检查快捷键匹配
       if (!wasPressed) {
+        log.info(`[handleKeyEvent] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
         checkShortcutMatch();
       }
     } else if (eventType === 'up') {
@@ -310,28 +381,38 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   // 初始化 keyhook 监听
   const initializeKeyhook = useCallback(async () => {
     if (unlistenKeyhookRef.current) {
+      log.info('[initializeKeyhook] Already initialized');
       return; // 已初始化
     }
 
     try {
+      log.info('[initializeKeyhook] Starting...');
+
       // 动态导入 keyhook 模块
       const { commands, events } = await import('@tauri-keyhook');
+      log.info('[initializeKeyhook] Module imported');
 
       // 检查是否正在监听
       const isListening = await commands.isListening();
+      log.info(`[initializeKeyhook] isListening: ${isListening}`);
+
       if (!isListening) {
+        log.info('[initializeKeyhook] Calling startListen...');
         await commands.startListen();
+        log.info('[initializeKeyhook] startListen called');
       }
 
       // 监听键盘事件
       const unlisten = await events.keyEventPayload.listen((event) => {
+        log.info(`[keyhook listener] 🎉 事件监听器回调被触发`);
         handleKeyEvent(event.payload);
       });
 
       unlistenKeyhookRef.current = unlisten;
-      log.debug('Keyhook 初始化完成');
+      log.info('[initializeKeyhook] Completed successfully');
     } catch (err) {
-      log.error(`Keyhook 初始化失败: ${err}`);
+      log.error(`[initializeKeyhook] Failed: ${err}`);
+      console.error('[initializeKeyhook] Error:', err);
     }
   }, [handleKeyEvent]);
 
@@ -354,9 +435,33 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     sceneToShortcutRef.current.set(sceneId, shortcut);
     setRegisteredShortcuts(prev => [...prev, shortcut]);
 
+    // 更新拦截规则：拦截所有已注册快捷键中的按键
+    await updateBlockRule();
+
     log.debug(`快捷键已注册: ${shortcut} -> ${sceneId}`);
     setIsLoading(false);
   }, [checkConflict]);
+
+  // 更新拦截规则：拦截所有已注册快捷键中的按键
+  const updateBlockRule = useCallback(async () => {
+    try {
+      // 收集所有需要拦截的按键
+      const keycodesToBlock = new Set<string>();
+
+      for (const shortcut of registeredShortcutsRef.current) {
+        const keys = parseShortcutKeys(shortcut);
+        keys.forEach(key => keycodesToBlock.add(key));
+      }
+
+      if (keycodesToBlock.size > 0) {
+        const { commands } = await import('@tauri-keyhook');
+        await commands.setShortcutBlock(Array.from(keycodesToBlock));
+        log.info(`[updateBlockRule] 已设置拦截规则: ${Array.from(keycodesToBlock).join(', ')}`);
+      }
+    } catch (err) {
+      log.error(`[updateBlockRule] 设置拦截规则失败: ${err}`);
+    }
+  }, []);
 
   // 注册快捷键（带结果返回）
   const registerShortcutWithResult = useCallback(async (
@@ -380,10 +485,13 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     sceneToShortcutRef.current.set(sceneId, shortcut);
     setRegisteredShortcuts(prev => [...prev, shortcut]);
 
+    // 更新拦截规则
+    await updateBlockRule();
+
     log.debug(`快捷键已注册: ${shortcut} -> ${sceneId}`);
     setIsLoading(false);
     return { success: true };
-  }, [checkConflict]);
+  }, [checkConflict, updateBlockRule]);
 
   // 注销快捷键
   const unregisterShortcut = useCallback(async (shortcut: string) => {
@@ -400,9 +508,12 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     }
     setRegisteredShortcuts(prev => prev.filter(s => s !== shortcut));
 
+    // 更新拦截规则
+    await updateBlockRule();
+
     log.debug(`快捷键已注销: ${shortcut}`);
     setIsLoading(false);
-  }, []);
+  }, [updateBlockRule]);
 
   // 注销所有快捷键
   const unregisterAllShortcuts = useCallback(async () => {
@@ -413,6 +524,15 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     shortcutToSceneRef.current.clear();
     sceneToShortcutRef.current.clear();
     setRegisteredShortcuts([]);
+
+    // 清除拦截规则
+    try {
+      const { commands } = await import('@tauri-keyhook');
+      await commands.clearBlockRule();
+      log.info(`[unregisterAllShortcuts] 已清除拦截规则`);
+    } catch (err) {
+      log.error(`[unregisterAllShortcuts] 清除拦截规则失败: ${err}`);
+    }
 
     log.debug('所有快捷键已注销');
     setIsLoading(false);
@@ -453,6 +573,74 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
     init();
 
+    // 监听窗口焦点丢失事件 - 清空按键状态防止残留
+    const handleBlur = () => {
+      log.debug('窗口失去焦点，清空按键状态');
+      clearKeyPressedState();
+    };
+
+    // 监听页面可见性变化 - 当页面隐藏时清空按键状态
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        log.debug('页面隐藏，清空按键状态');
+        clearKeyPressedState();
+      }
+    };
+
+    // 当窗口有焦点时，使用 DOM 键盘事件作为补充
+    // 因为 rdev 的全局钩子在 WebView2 有焦点时可能不工作
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 如果暂停，跳过
+      if (isPausedRef.current) {
+        return;
+      }
+
+      // 将 DOM 键盘事件转换为 keyhook 格式
+      const keyName = convertDomEventToKeyName(e);
+      if (!keyName) {
+        return;
+      }
+
+      log.info(`[DOM Keydown] 📥 收到键盘事件: ${keyName}`);
+
+      // 更新按键状态
+      const wasPressed = pressedKeysRef.current.has(keyName);
+      pressedKeysRef.current.add(keyName);
+
+      // 只有新按下的键才检查快捷键匹配
+      if (!wasPressed) {
+        log.info(`[DOM Keydown] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
+        const matched = checkShortcutMatchAndBlock();
+        if (matched) {
+          // 匹配到快捷键，阻止默认行为（防止输入字符）
+          e.preventDefault();
+          e.stopPropagation();
+          log.info(`[DOM Keydown] 🚫 已阻止按键默认行为: ${keyName}`);
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // 如果暂停，跳过
+      if (isPausedRef.current) {
+        return;
+      }
+
+      const keyName = convertDomEventToKeyName(e);
+      if (!keyName) {
+        return;
+      }
+
+      // 更新按键状态
+      pressedKeysRef.current.delete(keyName);
+    };
+
+    // 添加事件监听
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
     return () => {
       // 清理 keyhook 监听
       if (unlistenKeyhookRef.current) {
@@ -472,8 +660,13 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       }
       pendingTriggerRef.current.clear();
       recentlyTriggeredRef.current.clear();
+      // 清理焦点监听
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [initializeKeyhook]);
+  }, [initializeKeyhook, clearKeyPressedState, checkShortcutMatch]);
 
   return {
     registerShortcut,
@@ -485,6 +678,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     error,
     checkConflict,
     setPaused,
+    clearKeyPressedState,
   };
 }
 
@@ -509,6 +703,7 @@ export function useSceneShortcuts(
     error,
     checkConflict,
     setPaused,
+    clearKeyPressedState,
   } = useShortcut({ onShortcutTriggered, isRecording });
 
   // Register shortcuts for all enabled scenes
@@ -573,5 +768,6 @@ export function useSceneShortcuts(
     error,
     checkConflict: checkShortcutConflict,
     setPaused,
+    clearKeyPressedState,
   };
 }

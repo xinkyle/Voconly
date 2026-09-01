@@ -26,6 +26,16 @@ export const commands = {
   async isListening(): Promise<boolean> {
     return await invoke("plugin:keyhook|is_listening");
   },
+
+  /** 设置快捷键拦截（拦截按键并阻止传递给其他应用） */
+  async setShortcutBlock(keycodes: string[]): Promise<void> {
+    await invoke("plugin:keyhook|set_shortcut_block", { keycodes });
+  },
+
+  /** 清除拦截规则 */
+  async clearBlockRule(): Promise<void> {
+    await invoke("plugin:keyhook|clear_block_rule");
+  },
 };
 
 /** keyhook 事件 */

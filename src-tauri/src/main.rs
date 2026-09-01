@@ -21,11 +21,13 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
 
 #[cfg(windows)]
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
 use windows::Win32::UI::HiDpi::{
     SetThreadDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 #[cfg(windows)]
-use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowTextW};
+use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowTextW, ShowWindow, SW_SHOWNOACTIVATE};
 
 use audio::AudioCapture;
 
@@ -676,13 +678,41 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
             }
         }
 
-        // 关键：先取消置顶，再显示窗口，最后重新置顶
-        let _ = float_window.set_always_on_top(false);
+        // 【关键修复】使用 Windows API 显示窗口但不激活（不抢焦点）
+        // SW_SHOWNOACTIVATE: 显示窗口但不激活，不改变当前焦点
+        #[cfg(windows)]
+        {
+            // 使用 raw_window_handle 获取原始窗口句柄
+            use raw_window_handle::HasWindowHandle;
+            match float_window.window_handle() {
+                Ok(handle) => {
+                    unsafe {
+                        // 获取原始 Win32 句柄
+                        if let raw_window_handle::RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                            let raw_hwnd = win32_handle.hwnd.get() as *mut std::ffi::c_void;
+                            let _ = ShowWindow(HWND(raw_hwnd), SW_SHOWNOACTIVATE);
+                            info!("[show_float_panel] Window shown with SW_SHOWNOACTIVATE (no focus steal)");
+                        } else {
+                            warn!("[show_float_panel] Not a Win32 window, falling back to show()");
+                            float_window.show().map_err(|e| format!("Failed to show float panel: {}", e))?;
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("[show_float_panel] Failed to get window handle: {:?}, falling back to show()", e);
+                    float_window.show().map_err(|e| format!("Failed to show float panel: {}", e))?;
+                }
+            }
+        }
 
-        // Show float panel window (preview is integrated inside)
-        float_window
-            .show()
-            .map_err(|e| format!("Failed to show float panel: {}", e))?;
+        // 非 Windows 平台使用标准 show()
+        #[cfg(not(windows))]
+        {
+            float_window
+                .show()
+                .map_err(|e| format!("Failed to show float panel: {}", e))?;
+        }
+
         info!("[show_float_panel] Float panel shown successfully");
 
         // Mark as shown
@@ -696,14 +726,7 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
         }
     } else {
         info!("Float panel already visible, keeping current height, only updating state");
-        // 窗口已显示，只更新状态，不改变窗口高度
-        let _ = float_window.set_always_on_top(false);
     }
-
-    // 无论窗口是否已显示，最后都重新置顶（确保在置顶窗口组的顶部）
-    let _ = float_window.set_always_on_top(true);
-    // 不获取焦点，保持用户当前应用的焦点
-    // let _ = float_window.set_focus();
 
     info!("Float panel shown successfully");
     Ok(())

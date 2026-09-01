@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-clear-block-rule"
+description = "Enables the clear_block_rule command without any pre-configured scope."
+commands.allow = ["clear_block_rule"]
+
+[[permission]]
+identifier = "deny-clear-block-rule"
+description = "Denies the clear_block_rule command without any pre-configured scope."
+commands.deny = ["clear_block_rule"]

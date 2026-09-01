@@ -52,6 +52,8 @@
     "opener:default",
     "keyhook:allow-start-listen",
     "keyhook:allow-stop-listen",
-    "keyhook:allow-is-listening"
+    "keyhook:allow-is-listening",
+    "keyhook:allow-set-shortcut-block",
+    "keyhook:allow-clear-block-rule"
   ]
 }

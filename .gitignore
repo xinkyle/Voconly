@@ -16,6 +16,7 @@ node_modules/
 docs/
 
 # Tauri/Rust 构建输出
+**/target/
 src-tauri/target/
 src-tauri/target-doc/
 src-tauri/target-check-temp/

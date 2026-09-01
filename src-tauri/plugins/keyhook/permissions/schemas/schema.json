@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the clear_block_rule command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-clear-block-rule",
+          "markdownDescription": "Enables the clear_block_rule command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the clear_block_rule command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-clear-block-rule",
+          "markdownDescription": "Denies the clear_block_rule command without any pre-configured scope."
+        },
+        {
           "description": "Enables the is_listening command without any pre-configured scope.",
           "type": "string",
           "const": "allow-is-listening",
@@ -305,6 +317,18 @@
           "type": "string",
           "const": "deny-is-listening",
           "markdownDescription": "Denies the is_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_shortcut_block command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-shortcut-block",
+          "markdownDescription": "Enables the set_shortcut_block command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_shortcut_block command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-shortcut-block",
+          "markdownDescription": "Denies the set_shortcut_block command without any pre-configured scope."
         },
         {
           "description": "Enables the start_listen command without any pre-configured scope.",

@@ -5973,10 +5973,22 @@
           "markdownDescription": "Denies the unregister_all command without any pre-configured scope."
         },
         {
+          "description": "Enables the clear_block_rule command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:allow-clear-block-rule",
+          "markdownDescription": "Enables the clear_block_rule command without any pre-configured scope."
+        },
+        {
           "description": "Enables the is_listening command without any pre-configured scope.",
           "type": "string",
           "const": "keyhook:allow-is-listening",
           "markdownDescription": "Enables the is_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_shortcut_block command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:allow-set-shortcut-block",
+          "markdownDescription": "Enables the set_shortcut_block command without any pre-configured scope."
         },
         {
           "description": "Enables the start_listen command without any pre-configured scope.",
@@ -5991,10 +6003,22 @@
           "markdownDescription": "Enables the stop_listen command without any pre-configured scope."
         },
         {
+          "description": "Denies the clear_block_rule command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:deny-clear-block-rule",
+          "markdownDescription": "Denies the clear_block_rule command without any pre-configured scope."
+        },
+        {
           "description": "Denies the is_listening command without any pre-configured scope.",
           "type": "string",
           "const": "keyhook:deny-is-listening",
           "markdownDescription": "Denies the is_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_shortcut_block command without any pre-configured scope.",
+          "type": "string",
+          "const": "keyhook:deny-set-shortcut-block",
+          "markdownDescription": "Denies the set_shortcut_block command without any pre-configured scope."
         },
         {
           "description": "Denies the start_listen command without any pre-configured scope.",
