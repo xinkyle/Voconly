@@ -16,8 +16,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITEE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan gitee.com >> ~/.ssh/known_hosts
+
       - name: Push to Gitee
         run: |
-          git remote add gitee https://xingkyle:${{ secrets.GITEE_TOKEN }}@gitee.com/xingkyle/Voconly.git
+          git remote add gitee git@gitee.com:xingkyle/Voconly.git
           git push gitee --all --force
           git push gitee --tags --force
