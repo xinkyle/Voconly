@@ -38,7 +38,6 @@ mod catalog;
 mod commands;
 mod config;
 mod crash_report;
-mod debug_audio; // TEMPORARY: Debug audio module for testing
 mod dictionary;
 mod history;
 mod llm;
@@ -1143,15 +1142,14 @@ async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Stop VAD-based recording and save audio asynchronously
-/// Returns immediately without waiting for file save to complete
+/// Stop VAD-based recording
 #[tauri::command]
 async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
     info!("[Capture] Stopping VAD recording...");
 
     let state = app.state::<AppState>();
 
-    // 获取流式模式状态（流式模式下音频已通过流式转录处理，不需要保存文件）
+    // 获取流式模式状态
     let is_streaming_mode = state
         .streaming_mode
         .lock()
@@ -1163,7 +1161,7 @@ async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
 
     let capture = capture_guard.as_mut().ok_or("No active recording")?;
 
-    // Stop recording and get samples
+    // Stop recording
     info!("[Capture] Calling capture.stop()...");
     let samples = capture
         .stop()
@@ -1194,9 +1192,9 @@ async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
     }
     info!("[Capture] is_recording flag set to false");
 
-    // 流式模式下音频已通过流式转录处理，不需要检查 samples
+    // 流式模式下音频已通过流式转录处理
     if is_streaming_mode {
-        info!("[Capture] Streaming mode: audio already processed, skipping file save");
+        info!("[Capture] Streaming mode: audio already processed");
         return Ok(());
     }
 
@@ -1205,17 +1203,7 @@ async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
         return Err("No audio recorded".to_string());
     }
 
-    // 【关键优化】异步保存文件，不阻塞返回
-    // 克隆样本数据用于后台保存
-    let samples_clone = samples.clone();
-    std::thread::spawn(move || {
-        if let Some(path) = debug_audio::save_last_recording(&samples_clone, 16000) {
-            info!("[LastRecording] Audio saved asynchronously to: {:?}", path);
-        }
-    });
-
-    // 立即返回，不等待文件保存完成
-    info!("[Capture] Returning immediately (file save in background)");
+    info!("[Capture] Recording stopped successfully");
     Ok(())
 }
 
