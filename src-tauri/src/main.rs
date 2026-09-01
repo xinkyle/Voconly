@@ -1150,6 +1150,15 @@ async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
     info!("[Capture] Stopping VAD recording...");
 
     let state = app.state::<AppState>();
+
+    // 获取流式模式状态（流式模式下音频已通过流式转录处理，不需要保存文件）
+    let is_streaming_mode = state
+        .streaming_mode
+        .lock()
+        .map(|guard| *guard)
+        .unwrap_or(false);
+    info!("[Capture] streaming_mode: {}", is_streaming_mode);
+
     let mut capture_guard = state.audio_capture.lock().map_err(|e| e.to_string())?;
 
     let capture = capture_guard.as_mut().ok_or("No active recording")?;
@@ -1185,6 +1194,13 @@ async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
     }
     info!("[Capture] is_recording flag set to false");
 
+    // 流式模式下音频已通过流式转录处理，不需要检查 samples
+    if is_streaming_mode {
+        info!("[Capture] Streaming mode: audio already processed, skipping file save");
+        return Ok(());
+    }
+
+    // 非流式模式：检查是否有录音数据
     if samples.is_empty() {
         return Err("No audio recorded".to_string());
     }
