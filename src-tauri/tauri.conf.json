@@ -17,7 +17,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
@@ -43,7 +43,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQwMjY1MTJEN0MwMjZCNEYKUldSUGF3SjhMVkVtMEMxYmQwNGdqT0lmeEVGRFlOeWxlQWZiY28xaWZobzNpd1hkOTViVmtWRloK",
       "endpoints": [
-        "https://github.com/xinkyle/Voconly/releases/latest/download/latest.json"
+        "https://cdn.jsdelivr.net/gh/xinkyle/Voconly@main/update/latest.json"
       ]
     }
   }

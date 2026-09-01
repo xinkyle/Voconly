@@ -38,7 +38,7 @@ dist/
 *.pdb
 
 # Tauri updater 生成的版本信息文件（发布时自动生成）
-latest.json
+/latest.json
 
 
 # IDE 和编辑器
