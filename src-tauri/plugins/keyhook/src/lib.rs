@@ -32,8 +32,6 @@ pub struct BlockRule {
     pub block_down: bool,
     /// 是否拦截 keyup 事件
     pub block_up: bool,
-    /// 是否拦截修饰键的单独按下（用于快捷键拦截）
-    pub block_modifier_alone: bool,
 }
 
 impl Default for BlockRule {
@@ -42,7 +40,6 @@ impl Default for BlockRule {
             keycodes: HashSet::new(),
             block_down: false,
             block_up: false,
-            block_modifier_alone: false,
         }
     }
 }
