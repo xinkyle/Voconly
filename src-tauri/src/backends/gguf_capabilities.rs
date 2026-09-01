@@ -352,11 +352,11 @@ impl GgufCapabilities {
             if KNOWN_ARCHES.contains(&arch_lower.as_str()) {
                 // ✅ 新逻辑：从 GGUF Header 读取所有能力
                 // 如果 GGUF 缺失某些字段，使用架构默认值作为 fallback
+                // 【强制非流式模式】所有模型都不使用流式转录
                 return GgufCapabilities {
                     verdict: Compatibility::Compatible,
                     architecture: Some(arch_lower.clone()),
-                    supports_streaming: meta.get_bool(KEY_CAP_STREAMING)
-                        .or_else(|| get_default_streaming(&arch_lower)),
+                    supports_streaming: Some(false),  // 强制禁用流式
                     supports_translation: meta.get_bool(KEY_CAP_TRANSLATE)
                         .or_else(|| get_default_translation(&arch_lower)),
                     supports_language_detect: meta.get_bool(KEY_CAP_LANG_DETECT)
@@ -397,7 +397,7 @@ impl GgufCapabilities {
         GgufCapabilities {
             verdict,
             architecture,
-            supports_streaming,
+            supports_streaming: Some(false),  // 强制禁用流式
             supports_translation,
             supports_language_detect,
             languages,
