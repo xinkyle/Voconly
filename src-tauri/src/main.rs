@@ -27,7 +27,7 @@ use windows::Win32::UI::HiDpi::{
     SetThreadDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 #[cfg(windows)]
-use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowTextW, ShowWindow, SW_SHOWNOACTIVATE};
+use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowTextW, SetWindowPos, ShowWindow, HWND_TOPMOST, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW};
 
 use audio::AudioCapture;
 
@@ -625,6 +625,37 @@ pub struct FloatPanelState {
     pub segment_transcribe: Option<bool>,
 }
 
+/// Forces a window to be topmost using Win32 API (Windows only)
+/// This is more reliable than Tauri's set_always_on_top which can be overridden
+#[cfg(windows)]
+fn force_overlay_topmost(window: &WebviewWindow) {
+    use raw_window_handle::HasWindowHandle;
+
+    let window_clone = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        match window_clone.window_handle() {
+            Ok(handle) => {
+                unsafe {
+                    if let raw_window_handle::RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                        let hwnd = HWND(win32_handle.hwnd.get() as *mut std::ffi::c_void);
+                        // Force Z-order: make this window topmost without changing size/pos or stealing focus
+                        let _ = SetWindowPos(
+                            hwnd,
+                            HWND_TOPMOST,
+                            0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                        );
+                        info!("[force_overlay_topmost] Window set as topmost via Win32 API");
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("[force_overlay_topmost] Failed to get window handle: {:?}", e);
+            }
+        }
+    });
+}
+
 /// Show the float panel at the bottom center of the screen
 #[tauri::command]
 async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), String> {
@@ -702,6 +733,10 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
                     float_window.show().map_err(|e| format!("Failed to show float panel: {}", e))?;
                 }
             }
+
+            // 【关键】在显示窗口后强制重新设置 topmost
+            // 这解决了 Tauri 的 always_on_top 在 Windows 上不可靠的问题
+            force_overlay_topmost(&float_window);
         }
 
         // 非 Windows 平台使用标准 show()
@@ -725,6 +760,10 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
         }
     } else {
         info!("Float panel already visible, keeping current height, only updating state");
+
+        // 即使窗口已显示，也要重新强制置顶（防止被其他窗口覆盖）
+        #[cfg(windows)]
+        force_overlay_topmost(&float_window);
     }
 
     info!("Float panel shown successfully");
