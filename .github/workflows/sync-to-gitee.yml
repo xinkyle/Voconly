@@ -20,6 +20,6 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          git remote add gitee https://${GITEE_TOKEN}@gitee.com/xingkyle/Voconly.git
+          git remote add gitee https://xingkyle:${GITEE_TOKEN}@gitee.com/xingkyle/Voconly.git
           git push gitee --all --force
           git push gitee --tags --force
