@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Download, Sparkles, Monitor, Apple, Terminal } from 'lucide-react';
+import { Download, Sparkles, Monitor, Apple } from 'lucide-react';
 import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
@@ -25,12 +25,6 @@ export default function Hero() {
     {
       name: 'macOS',
       icon: Apple,
-      href: GITHUB_RELEASE_URL,
-      available: false,
-    },
-    {
-      name: 'Linux',
-      icon: Terminal,
       href: GITHUB_RELEASE_URL,
       available: false,
     },
