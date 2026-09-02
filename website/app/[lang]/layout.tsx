@@ -83,6 +83,14 @@ export default function LangLayout({
     <html lang={lang} className="dark">
       <head>
         <StructuredData lang={lang} path="/" />
+        {/* Umami Analytics - 隐私友好的访问统计 */}
+        {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
+          <script
+            defer
+            src="https://cloud.umami.is/script.js"
+            data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+          />
+        )}
       </head>
       <body className={`${dmSerif.variable} ${dmSans.variable} antialiased`}>
         <I18nProvider initialLang={lang}>
