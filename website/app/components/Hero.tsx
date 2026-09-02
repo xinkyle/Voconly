@@ -159,7 +159,7 @@ export default function Hero() {
               />
               <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl">
                 <img
-                  src={lang === 'zh' ? '/demo_cn.gif' : '/demo_en.gif'}
+                  src={lang === 'zh' ? '/demo-cn.webp' : '/demo-en.webp'}
                   alt="Voconly Demo"
                   className="w-full h-auto"
                 />

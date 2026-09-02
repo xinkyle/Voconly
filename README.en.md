@@ -5,7 +5,7 @@
 > Supports Whisper, SenseVoice, Parakeet ,Qwen-asr speech recognition models.
 > Perfect for content creation, email drafting, meeting records, quick note-taking.
 
-![Voconly Demo](demo_en.gif)
+![Voconly Demo](demo-en.webp)
 
 [Download Now](https://github.com/xinkyle/Voconly/releases) | [Website](https://www.voconly.com) | [Use Cases](#use-cases) | [Contributing](#contributing)
 

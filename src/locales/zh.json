@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Voconly",
-    "loading": "应用正在加载..."
+    "loading": "应用正在加载...",
+    "tagline": "说出你的想法，让 AI 优化你的表达"
   },
   "nav": {
     "home": "主页",

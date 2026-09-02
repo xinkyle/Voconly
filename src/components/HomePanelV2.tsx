@@ -671,7 +671,7 @@ export default function HomePanelV2({
       {/* 头部区域：品牌 + 模型状态 */}
       <header className="mb-2">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900">Voconly</h1>
-        <p className="text-sm text-gray-500 mt-1">说出你的想法，让 AI 优化你的表达</p>
+        <p className="text-sm text-gray-500 mt-1">{t('app.tagline')}</p>
 
         {/* 模型状态栏 */}
         <div className="flex items-center gap-2 mt-4">

@@ -4,7 +4,7 @@
 > 它将语音在本地转换为文字，并通过 AI 进行润色、翻译、整理和结构化处理，让你在任何应用中用说话代替键盘输入。无需上传音频，不依赖云端服务，保护你的隐私。
 > 支持 Whisper、SenseVoice、Parakeet、Qwen-Asr 等语音识别模型。适用于内容创作、邮件撰写、会议记录、灵感速记等场景。
 
-![Voconly演示](demo_cn.gif)
+![Voconly演示](demo-cn.webp)
 
 [立即下载](https://github.com/xinkyle/Voconly/releases) | [官网](https://www.voconly.com) | [使用场景](#使用场景) | [参与贡献](#参与贡献)
 

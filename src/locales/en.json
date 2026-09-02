@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Voconly",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "tagline": "Speak your mind, let AI refine your words"
   },
   "nav": {
     "home": "Home",
