@@ -1,11 +1,11 @@
 {
-  "version": "0.5.3",
-  "pub_date": "2026-09-01T12:00:00Z",
-  "notes": "## [0.5.3] - 2026-09-01\n\n### 新功能\n1. **药丸窗口支持置顶**，使用 Win32 API 强制窗口始终在最前，解决 Tauri 的 always_on_top 不可靠问题。\n\n### 其他\n1. **更新检查优化**，改用 jsDelivr CDN 加速版本检查，国内外访问都快。\n\n---\n\n### New Features\n1. **Pill window always on top** - Using Win32 API to force window to stay on top, fixing unreliable Tauri always_on_top behavior.\n\n### Other\n1. **Update check optimized** - Using jsDelivr CDN for faster version checks in both China and overseas.",
+  "version": "0.5.4",
+  "pub_date": "2026-09-02T12:00:00Z",
+  "notes": "## [0.5.4] - 2026-09-02\n\n### 优化\n1. **应用图标圆角化处理**，统一任务栏、托盘和桌面快捷方式图标样式，使用高质量 Lanczos3 算法生成多尺寸图标。\n\n2. **添加 Gitee 发布支持**，新增自动上传脚本，支持将版本发布到 Gitee 平台。\n\n3. **更新检查优化**，添加 GitHub raw 作为备用更新源，提高更新检查成功率。\n\n4. **Demo 文件格式优化**，将 GIF 格式替换为 WebP 格式，提升加载速度和画质。\n\n---\n\n### Improvements\n1. **Rounded app icons** - Unified icon style across taskbar, system tray, and desktop shortcuts using high-quality Lanczos3 algorithm.\n\n2. **Added Gitee release support** - New automated upload script for publishing releases to Gitee platform.\n\n3. **Update check optimization** - Added GitHub raw as backup update source to improve update check reliability.\n\n4. **Demo file format optimization** - Replaced GIF with WebP format for better loading speed and image quality.",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSUGF3SjhMVkVtMEplUDJLMnA2NDFRMzJudjM2UXN3WXpzM3ZLMDQ3QlhZcjBKNitQLzlrdmFKd2N1RllveTBqUHEwNTZldkN3STFhNFpGSkJvYUJEL3ExZDZBOS8wRlFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjYxNzQ2CWZpbGU6Vm9jb25seV8wLjUuM194NjQtc2V0dXAuZXhlCkhGRkJ1anlPWm5zZWNlSHd4TVZiOTgzU0M4VXVCallEakpaUEV1cjY0aVAwVk9QTUlyRWdFSlFiYnpoeFNXM3JLRW9HZjRyTTlGMG54Z01hLzd4VkNBPT0K",
-      "url": "https://github.com/xinkyle/Voconly/releases/download/v0.5.3/Voconly_0.5.3_x64-setup.exe"
+      "signature": "待构建后更新",
+      "url": "https://github.com/xinkyle/Voconly/releases/download/v0.5.4/Voconly_0.5.4_x64-setup.exe"
     }
   }
 }
