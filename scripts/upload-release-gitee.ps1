@@ -197,11 +197,13 @@ foreach ($File in $FilesToUpload) {
         # 检查 curl 是否可用
         $null = Get-Command curl -ErrorAction Stop
 
-        # 使用 curl 上传
-        $CurlResult = curl -s -X POST `
-            -H "Content-Type: multipart/form-data" `
+        # 获取文件的绝对路径
+        $AbsoluteFilePath = (Resolve-Path $File).Path
+
+        # 使用 curl 上传（Windows 上使用 curl.exe）
+        $CurlResult = & curl.exe -s -X POST `
             -F "access_token=$GiteeToken" `
-            -F "file=@$File" `
+            -F "file=@$AbsoluteFilePath" `
             $UploadUrl 2>&1
 
         if ($LASTEXITCODE -eq 0) {
@@ -211,7 +213,7 @@ foreach ($File in $FilesToUpload) {
             Write-Host "  curl output: $CurlResult" -ForegroundColor Gray
         }
     } catch {
-        Write-Host "  [ERROR] curl not found. Please install curl or use alternative method" -ForegroundColor Red
+        Write-Host "  [ERROR] curl not found or upload failed: $_" -ForegroundColor Red
         Write-Host "  You can manually upload files at: https://gitee.com/$GiteeOwner/$GiteeRepo/releases/edit/$ReleaseId" -ForegroundColor Yellow
         break
     }
