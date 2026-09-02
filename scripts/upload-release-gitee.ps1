@@ -170,12 +170,13 @@ $CreateBody = @{
     tag_name = "v$Version"
     name = "v$Version"
     body = $ReleaseNotes
+    target_commitish = "main"
     prerelease = $false
 }
 
 Write-Host "Creating release v$Version..." -ForegroundColor Gray
 try {
-    $ReleaseResponse = Invoke-RestMethod -Uri $CreateReleaseUrl -Method Post -Body $CreateBody
+    $ReleaseResponse = Invoke-RestMethod -Uri $CreateReleaseUrl -Method Post -Body $CreateBody -ContentType "application/x-www-form-urlencoded"
     $ReleaseId = $ReleaseResponse.id
     Write-Host "[OK] Release created (ID: $ReleaseId)" -ForegroundColor Green
 } catch {
