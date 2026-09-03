@@ -246,12 +246,12 @@ export default function SettingsPrompt() {
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('settings.prompt.title')}</h1>
-        <p className="text-sm text-gray-600">{t('settings.prompt.subtitle')}</p>
+        <p className="text-sm text-gray-500">{t('settings.prompt.subtitle')}</p>
       </div>
 
       {/* Preset Type Buttons */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-500 mb-2">
           {t('settings.prompt.selectPreset')}
         </label>
         <div className="flex flex-wrap gap-2 mb-4">
@@ -342,17 +342,17 @@ export default function SettingsPrompt() {
 
       {/* Prompt Editor */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-500 mb-2">
           {t('settings.prompt.editPrompt')}
         </label>
         <textarea
           value={currentPromptValue}
           onChange={(e) => handlePromptChange(e.target.value)}
           rows={12}
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
           placeholder={t('llmConfig.promptPlaceholder')}
         />
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-400">
           {t('llmConfig.promptTip')}
         </p>
       </div>
