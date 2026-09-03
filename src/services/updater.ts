@@ -298,7 +298,7 @@ export async function downloadAndInstallUpdate(
       throw new Error('No update available');
     }
 
-    const { downloadUrl, signature, version } = checkResult.versionInfo;
+    const { downloadUrl, version } = checkResult.versionInfo;
 
     if (!downloadUrl) {
       throw new Error('No download URL available');
