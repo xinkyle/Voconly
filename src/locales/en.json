@@ -387,7 +387,11 @@
     "savedModelDesc": "Click 'Test Connection' to refresh model list",
     "llamaCppLabel": "Llama.cpp (Local LLM)",
     "contextLimit": "Context Length",
-    "contextLimitDesc": "Model context window size, affects max text length (default 4096)"
+    "contextLimitDesc": "Model context window size, affects max text length (default 4096)",
+    "connectingToOllama": "Connecting to Ollama...",
+    "cannotConnectOllama": "Cannot connect to Ollama",
+    "ensureOllamaRunning": "Please ensure Ollama is running and try again",
+    "retryConnect": "Retry Connection"
   },
   "dictionary": {
     "title": "User Dictionary",

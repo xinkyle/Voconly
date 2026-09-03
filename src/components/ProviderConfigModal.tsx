@@ -25,9 +25,15 @@ export default function ProviderConfigModal({
   const meta = provider.meta;
   const existingInstance = provider.instance;
   const isLlamaCpp = meta.id === 'llama_cpp';
+  const isOllama = meta.id === 'ollama';
 
-  // 是否已配置（有 apiKey 和 defaultModel）
-  const isConfigured = existingInstance?.apiKey && existingInstance?.defaultModel;
+  // 是否已配置
+  // - ollama: 只需要有 defaultModel（不需要 apiKey，因为是本地部署）
+  // - 其他云端 provider: 需要有 apiKey 和 defaultModel
+  // - llama.cpp: 有 nGpuLayers 配置即可（模型通过文件扫描）
+  const isConfigured = isOllama
+    ? !!existingInstance?.defaultModel
+    : (existingInstance?.apiKey && existingInstance?.defaultModel);
 
   // Form state
   const [apiKey, setApiKey] = useState(existingInstance?.apiKey || '');
@@ -39,8 +45,7 @@ export default function ProviderConfigModal({
     existingInstance?.nGpuLayers ?? -1
   );
 
-  // Context limit state（本地 Provider 配置）
-  const isLocalProvider = isLlamaCpp || meta.id === 'ollama';
+  // Context limit state（仅 llama.cpp 使用）
   const [contextLimit, setContextLimit] = useState<number>(
     existingInstance?.contextLimit ?? 4096
   );
@@ -57,12 +62,26 @@ export default function ProviderConfigModal({
   // API key validation error
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
+  // 是否正在自动连接（首次进入时）
+  const [autoConnecting, setAutoConnecting] = useState(false);
+
   // 已配置时，自动加载模型列表
   useEffect(() => {
     if (isConfigured && !isLlamaCpp) {
       loadModelsFromProvider();
     }
-  }, [isConfigured, isLlamaCpp]);
+  }, [isConfigured, isLlamaCpp, isOllama]);
+
+  // 对于 Ollama，首次进入时自动尝试连接
+  useEffect(() => {
+    if (isOllama && !isConfigured && !testResult && !autoConnecting) {
+      // 自动尝试连接
+      setAutoConnecting(true);
+      handleConnect().finally(() => {
+        setAutoConnecting(false);
+      });
+    }
+  }, [isOllama, isConfigured, testResult, autoConnecting]);
 
   // llama.cpp 时检测 GPU
   useEffect(() => {
@@ -78,14 +97,15 @@ export default function ProviderConfigModal({
 
   // 从 Provider 加载模型列表
   const loadModelsFromProvider = async () => {
-    if (!existingInstance?.apiKey) return;
+    // ollama 不需要 apiKey（本地部署），其他 provider 需要
+    if (!isOllama && !existingInstance?.apiKey) return;
 
     setTesting(true);
     try {
       const models = await fetchProviderModels(
         meta.id,
         meta.baseUrl,
-        existingInstance.apiKey
+        isOllama ? undefined : existingInstance?.apiKey
       );
       if (models && models.length > 0) {
         setAvailableModels(models);
@@ -222,8 +242,9 @@ export default function ProviderConfigModal({
 
   // Save config
   const handleSave = async () => {
-    // 本地 provider 不需要选择模型
-    if (!isLocalProvider && !selectedModel) {
+    // llama.cpp 使用本地文件扫描，不需要选择模型
+    // ollama 和其他云端 provider 必须选择模型
+    if (!isLlamaCpp && !selectedModel) {
       return;
     }
 
@@ -234,9 +255,12 @@ export default function ProviderConfigModal({
         enabled: true,
         baseUrl: isLlamaCpp ? '' : meta.baseUrl,
         apiKey: isLlamaCpp ? undefined : apiKey || undefined,
-        defaultModel: isLocalProvider ? undefined : selectedModel,
+        // llama.cpp 使用本地文件扫描，不需要保存 defaultModel
+        // ollama 和其他云端 provider 需要保存用户选择的模型
+        defaultModel: isLlamaCpp ? undefined : selectedModel,
         nGpuLayers: isLlamaCpp ? nGpuLayers : undefined,
-        contextLimit: isLocalProvider ? contextLimit : undefined,
+        // contextLimit 只适用于 llama.cpp，ollama 自己管理上下文
+        contextLimit: isLlamaCpp ? contextLimit : undefined,
       };
 
       await onSave(meta.id, instance);
@@ -365,21 +389,33 @@ export default function ProviderConfigModal({
                   </div>
                 )}
 
-                {/* Context Limit for Ollama */}
-                {meta.id === 'ollama' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t('provider.contextLimit')}
-                    </label>
-                    <input
-                      type="number"
-                      value={contextLimit}
-                      onChange={(e) => setContextLimit(parseInt(e.target.value) || 4096)}
-                      min={512}
-                      max={32768}
-                      step={512}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                    />
+                {/* Loading state for auto-connect */}
+                {(testing || autoConnecting) && !testResult && (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin"></div>
+                    <p className="text-sm text-gray-600">{t('provider.connectingToOllama')}</p>
+                  </div>
+                )}
+
+                {/* Empty state / Connection error for Ollama */}
+                {isOllama && testResult === 'error' && !testing && !autoConnecting && (
+                  <div className="flex flex-col items-center justify-center py-6 space-y-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium text-gray-700">{t('provider.cannotConnectOllama')}</p>
+                      <p className="text-xs text-gray-500">{t('provider.ensureOllamaRunning')}</p>
+                      <p className="text-xs text-gray-400">{meta.baseUrl}</p>
+                    </div>
+                    <button
+                      onClick={handleConnect}
+                      className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      {t('provider.retryConnect')}
+                    </button>
                   </div>
                 )}
 
@@ -424,8 +460,8 @@ export default function ProviderConfigModal({
                   </div>
                 )}
 
-                {/* Connection error */}
-                {testResult === 'error' && (
+                {/* Connection error for non-Ollama providers */}
+                {!isOllama && testResult === 'error' && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50">
                     <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -486,7 +522,7 @@ export default function ProviderConfigModal({
                 {!isConfigured && testResult === 'success' && (
                   <button
                     onClick={handleSave}
-                    disabled={saving || (!isLocalProvider && !selectedModel)}
+                    disabled={saving || (!isLlamaCpp && !selectedModel)}
                     className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {saving ? t('common.saving') : t('provider.saveAndSelect')}
@@ -496,7 +532,7 @@ export default function ProviderConfigModal({
                 {isConfigured && (
                   <button
                     onClick={handleSave}
-                    disabled={saving || (!isLocalProvider && !selectedModel)}
+                    disabled={saving || (!isLlamaCpp && !selectedModel)}
                     className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {saving ? t('common.saving') : t('common.save')}

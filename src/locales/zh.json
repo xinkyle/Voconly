@@ -387,7 +387,11 @@
     "savedModelDesc": "点击「测试连接」可刷新模型列表",
     "llamaCppLabel": "Llama.cpp (本地大语言模型专用)",
     "contextLimit": "上下文长度",
-    "contextLimitDesc": "模型的上下文窗口大小，影响可处理的文本长度（默认 4096）"
+    "contextLimitDesc": "模型的上下文窗口大小，影响可处理的文本长度（默认 4096）",
+    "connectingToOllama": "正在连接 Ollama...",
+    "cannotConnectOllama": "无法连接到 Ollama",
+    "ensureOllamaRunning": "请确保 Ollama 正在运行，然后重试",
+    "retryConnect": "重试连接"
   },
   "dictionary": {
     "title": "用户词典",

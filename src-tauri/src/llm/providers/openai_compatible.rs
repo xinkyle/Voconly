@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use super::super::config::{AuthType, LlmConfig, LlmProviderInstance, ProviderMeta};
 use super::super::provider::{LlmProvider, LlmResponse};
+use super::policy::{get_disabled_thinking_options, get_thinking_control_protocol};
 
 /// OpenAI 兼容 Provider
 pub struct OpenAiCompatibleProvider {
@@ -284,7 +285,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
 
         // 构建请求体
         // 对于 Ollama，添加 options.num_ctx 参数
-        let body = if self.meta.id == "ollama" {
+        let mut body = if self.meta.id == "ollama" {
             let num_ctx = self.instance.context_limit.unwrap_or(4096);
             log::info!("[{}] Ollama options: num_ctx={}", self.meta.label, num_ctx);
             serde_json::json!({
@@ -310,6 +311,21 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 "temperature": config.temperature,
             })
         };
+
+        // 应用思考模式控制策略
+        // 对于在线 Provider，自动禁用思考模式以提高响应速度
+        if let Some(protocol) = get_thinking_control_protocol(&self.meta.id) {
+            let params = get_disabled_thinking_options(protocol);
+            if let Some(obj) = body.as_object_mut() {
+                for (key, value) in params {
+                    obj.insert(key, value);
+                }
+            }
+            log::info!(
+                "[{}] 禁用思考模式: protocol={:?}, provider={}",
+                self.meta.label, protocol, self.meta.id
+            );
+        }
 
         log::info!(
             "[{}] Full request body: {}",
