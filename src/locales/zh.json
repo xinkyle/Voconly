@@ -264,7 +264,7 @@
     "asrRequired": "需要下载语音模型",
     "asrRequiredDesc": "请从下方选择并下载一个语音模型，这是使用语音输入的必要条件",
     "llmTitle": "本地大语言模型",
-    "llmSubtitle": "本地运行的 AI 模型，用于场景文案优化（可选）。下载后需在 AI 服务中选择 Llama.cpp 配置使用。",
+    "llmSubtitle": "本地运行的 AI 模型，用于场景文案优化（可选）。下载后需在 AI 服务中选择 Llama.cpp 配置使用。\n如需更多本地模型，建议使用 Ollama。",
     "gpuRecommended": "建议使用 GPU",
     "gpuWarning": "本地大模型在 GPU 上运行速度更快。如果没有 GPU，CPU 也能运行但速度较慢。",
     "noLlmModels": "暂无可用的大模型",

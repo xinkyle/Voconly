@@ -264,7 +264,7 @@
     "asrRequired": "ASR Model Required",
     "asrRequiredDesc": "Please select and download a speech model from below. This is required to use voice input.",
     "llmTitle": "Local LLM Models",
-    "llmSubtitle": "Locally-run AI models for scene text optimization (optional). After downloading, configure Llama.cpp in AI Services to use.",
+    "llmSubtitle": "Locally-run AI models for scene text optimization (optional). After downloading, configure Llama.cpp in AI Services to use.\nFor more local models, we recommend using Ollama.",
     "gpuRecommended": "GPU Recommended",
     "gpuWarning": "Local LLMs run faster on GPU. CPU works but is slower.",
     "noLlmModels": "No LLM models available",
