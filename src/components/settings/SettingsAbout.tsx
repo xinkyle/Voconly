@@ -22,7 +22,7 @@ interface SettingsAboutProps {
 }
 
 export default function SettingsAbout({ onUpdateAvailable }: SettingsAboutProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -47,7 +47,7 @@ export default function SettingsAbout({ onUpdateAvailable }: SettingsAboutProps)
       const version = await getCurrentVersion();
       setCurrentVersion(version);
 
-      const result = await checkForUpdates();
+      const result = await checkForUpdates(i18n.language);
 
       if (result.hasUpdate && result.versionInfo) {
         setUpdateVersionInfo(result.versionInfo);

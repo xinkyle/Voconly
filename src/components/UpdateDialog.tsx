@@ -99,7 +99,8 @@ export default function UpdateDialog({
       setError(null);
 
       try {
-        const result = await checkForUpdates();
+        // 传入当前语言，用于选择下载源（中文用 Gitee，其他用 GitHub）
+        const result = await checkForUpdates(i18n.language);
 
         if (result.hasUpdate && result.versionInfo) {
           setVersionInfo(result.versionInfo);
@@ -145,12 +146,13 @@ export default function UpdateDialog({
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
+      // 传入当前语言，用于选择下载源（中文用 Gitee，其他用 GitHub）
       await downloadAndInstallUpdate((p) => {
         // Use flushSync to ensure progress updates are rendered immediately
         flushSync(() => {
           setProgress(p);
         });
-      });
+      }, i18n.language);
       // After successful install, the app will relaunch automatically
     } catch (err) {
       flushSync(() => {
@@ -177,7 +179,8 @@ export default function UpdateDialog({
     const doCheck = async () => {
       setDialogState('checking');
       try {
-        const result = await checkForUpdates();
+        // 传入当前语言，用于选择下载源
+        const result = await checkForUpdates(i18n.language);
         if (result.hasUpdate && result.versionInfo) {
           setVersionInfo(result.versionInfo);
           setDialogState('available');
@@ -190,7 +193,7 @@ export default function UpdateDialog({
       }
     };
     doCheck();
-  }, [onClose]);
+  }, [onClose, i18n.language]);
 
   // Don't render if closed
   if (!isOpen) return null;

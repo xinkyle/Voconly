@@ -126,7 +126,7 @@ const navItems: NavItem[] = [
 type SettingsTab = 'shortcut' | 'prompt' | 'system' | 'about';
 
 function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { showToast } = useToast();
   const [activeNav, setActiveNav] = useState('home');
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('shortcut');
@@ -235,8 +235,8 @@ function App() {
           return;
         }
 
-        // Check for updates
-        const result = await checkForUpdates();
+        // Check for updates (传入当前语言选择下载源)
+        const result = await checkForUpdates(i18n.language);
 
         if (result.hasUpdate && result.versionInfo) {
           setUpdateVersionInfo(result.versionInfo);
@@ -245,7 +245,7 @@ function App() {
 
         // If there's a pending downloaded update, mark as has update
         if (state.downloadComplete && state.downloadedFile) {
-          const result = await checkForUpdates();
+          const result = await checkForUpdates(i18n.language);
           if (result.versionInfo) {
             setUpdateVersionInfo(result.versionInfo);
             setHasUpdate(true);

@@ -126,13 +126,25 @@ function isNewerVersion(current: string, remote: string): boolean {
 
 /**
  * 从 GitHub/Gitee API 获取最新 release 信息
- * 优先 Gitee（中国用户），失败则用 GitHub
+ * 根据当前语言选择 API 源：
+ * - 中文用户 → Gitee（国内下载更快）
+ * - 其他语言用户 → GitHub（国际用户）
  */
-async function fetchLatestRelease(): Promise<ReleaseInfo> {
-  const urls = [
-    'https://gitee.com/api/v5/repos/xingkyle/Voconly/releases/latest',
-    'https://api.github.com/repos/xinkyle/Voconly/releases/latest',
-  ];
+async function fetchLatestRelease(language?: string): Promise<ReleaseInfo> {
+  // 根据语言选择 API 源
+  const isChineseUser = language?.startsWith('zh') ?? false;
+
+  const urls = isChineseUser
+    ? [
+        'https://gitee.com/api/v5/repos/xingkyle/Voconly/releases/latest',  // 首选 Gitee
+        'https://api.github.com/repos/xinkyle/Voconly/releases/latest',      // 备用 GitHub
+      ]
+    : [
+        'https://api.github.com/repos/xinkyle/Voconly/releases/latest',       // 首选 GitHub
+        'https://gitee.com/api/v5/repos/xingkyle/Voconly/releases/latest',   // 备用 Gitee
+      ];
+
+  log.info(`[Updater] Language: ${language}, using ${isChineseUser ? 'Gitee' : 'GitHub'} as primary source`);
 
   const errors: string[] = [];
 
@@ -187,7 +199,11 @@ async function fetchLatestJson(url: string): Promise<LatestJson> {
 /**
  * 检查更新（新逻辑：动态获取最新版本信息）
  */
-export async function checkForUpdates(): Promise<UpdateCheckResult> {
+/**
+ * 检查更新
+ * @param language 当前语言，用于选择下载源（中文用户用 Gitee，其他用 GitHub）
+ */
+export async function checkForUpdates(language?: string): Promise<UpdateCheckResult> {
   log.info('[Updater] Checking for updates (dynamic mode)...');
 
   try {
@@ -195,8 +211,8 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
     const currentVersion = await getCurrentVersion();
     log.info(`[Updater] Current version: ${currentVersion}`);
 
-    // 从 GitHub/Gitee API 获取最新 release 信息
-    const release = await fetchLatestRelease();
+    // 从 GitHub/Gitee API 获取最新 release 信息（根据语言选择源）
+    const release = await fetchLatestRelease(language);
 
     // 从 release 中提取版本号（去掉 v 前缀）
     const remoteVersion = release.tag_name.replace(/^v/, '');
@@ -265,15 +281,17 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
  * 下载并安装更新
  * 使用 Rust 端的下载安装功能，支持自定义下载 URL
  * @param onProgress 进度回调
+ * @param language 当前语言，用于选择下载源
  */
 export async function downloadAndInstallUpdate(
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
+  language?: string
 ): Promise<void> {
   log.info('[Updater] Starting download and install...');
 
   try {
-    // 先检查更新，获取下载信息
-    const checkResult = await checkForUpdates();
+    // 先检查更新，获取下载信息（传入语言选择下载源）
+    const checkResult = await checkForUpdates(language);
 
     if (!checkResult.hasUpdate || !checkResult.versionInfo?.downloadUrl) {
       log.warn('[Updater] No update available or no download URL');
