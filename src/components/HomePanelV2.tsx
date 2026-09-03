@@ -798,7 +798,7 @@ export default function HomePanelV2({
         <div className="flex justify-center items-stretch">
           {/* 总时长 */}
           <div className="text-center px-8 py-1">
-            <div className="text-base font-semibold text-gray-800 tabular-nums">
+            <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {formatDuration(stats.totalDuration)}
             </div>
             <div className="text-xs text-gray-400 mt-1.5">
@@ -811,7 +811,7 @@ export default function HomePanelV2({
 
           {/* 总字数 */}
           <div className="text-center px-8 py-1">
-            <div className="text-base font-semibold text-gray-800 tabular-nums">
+            <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {(stats.totalWords ?? 0).toLocaleString()}
             </div>
             <div className="text-xs text-gray-400 mt-1.5">
@@ -824,7 +824,7 @@ export default function HomePanelV2({
 
           {/* 总记录 */}
           <div className="text-center px-8 py-1">
-            <div className="text-base font-semibold text-gray-800 tabular-nums">
+            <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {stats.totalCount}
             </div>
             <div className="text-xs text-gray-400 mt-1.5">
@@ -837,7 +837,7 @@ export default function HomePanelV2({
 
           {/* 今日 */}
           <div className="text-center px-8 py-1">
-            <div className="text-base font-semibold text-gray-800 tabular-nums">
+            <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {stats.todayCount}
             </div>
             <div className="text-xs text-gray-400 mt-1.5">{t('memory.statsToday')}</div>
