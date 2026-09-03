@@ -1,4 +1,6 @@
-// #![windows_subsystem = "windows"]  // 开发时显示 CMD 控制台窗口
+// Windows: 隐藏 CMD 控制台窗口
+// macOS/Linux: 不需要此属性
+#![cfg_attr(windows, windows_subsystem = "windows")]
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -381,9 +383,81 @@ fn is_terminal_window() -> bool {
     }
 }
 
-#[cfg(not(windows))]
+/// Detect if the current foreground application is a terminal on macOS
+/// Uses NSWorkspace to get the frontmost application's bundle identifier
+#[cfg(target_os = "macos")]
 fn is_terminal_window() -> bool {
-    // On non-Windows platforms, default to Ctrl+V
+    use cocoa::foundation::NSString;
+    use objc::{class, msg_send, sel, sel_impl};
+
+    unsafe {
+        // Get NSWorkspace shared instance
+        let workspace: *mut std::ffi::c_void = msg_send![class!(NSWorkspace), sharedWorkspace];
+        if workspace.is_null() {
+            info!("[is_terminal_window] Failed to get NSWorkspace");
+            return false;
+        }
+
+        // Get the frontmost application (NSRunningApplication)
+        let frontmost_app: *mut std::ffi::c_void = msg_send![workspace, frontmostApplication];
+        if frontmost_app.is_null() {
+            info!("[is_terminal_window] No frontmost application");
+            return false;
+        }
+
+        // Get bundle identifier (NSString)
+        let bundle_id: *mut std::ffi::c_void = msg_send![frontmost_app, bundleIdentifier];
+        if bundle_id.is_null() {
+            info!("[is_terminal_window] No bundle identifier");
+            return false;
+        }
+
+        // Convert to Rust string
+        let bundle_str = NSString::UTF8String(bundle_id as *const std::ffi::c_void);
+        if bundle_str.is_null() {
+            return false;
+        }
+
+        let c_str = std::ffi::CStr::from_ptr(bundle_str);
+        let bundle_id_str = c_str.to_string_lossy().to_lowercase();
+
+        // macOS terminal bundle identifiers
+        let terminal_bundles = [
+            "com.apple.terminal",         // macOS Terminal.app
+            "com.googlecode.iterm2",      // iTerm2
+            "io.alacritty",               // Alacritty
+            "com.github.wez.wezterm",     // WezTerm
+            "dev.warp.warp-stable",       // Warp
+            "com.mitchellh.ghostty",      // Ghostty
+            "org.hammerspoon.Hammerspoon",// Hammerspoon (often used with terminal)
+            "com.kovidgoyal.kitty",       // Kitty
+            "net.kovidgoyal.kitty",       // Kitty (alternative)
+            "com.github.alacritty",       // Alacritty (alternative)
+            "org.vim.macvim",             // MacVim (terminal-like)
+            "com.apple.dt.Xcode",         // Xcode (has terminal)
+        ];
+
+        for terminal_bundle in terminal_bundles {
+            if bundle_id_str.contains(terminal_bundle) {
+                info!(
+                    "[is_terminal_window] Detected terminal by bundle: {}",
+                    bundle_id_str
+                );
+                return true;
+            }
+        }
+
+        info!(
+            "[is_terminal_window] Not a terminal. Bundle: {}",
+            bundle_id_str
+        );
+        false
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn is_terminal_window() -> bool {
+    // On other platforms (Linux, etc.), default to Ctrl+V
     false
 }
 
@@ -1019,6 +1093,48 @@ async fn enable_autostart() -> Result<(), String> {
 
         info!("Autostart enabled successfully via registry");
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
+
+        let plist_content = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.voconly.desktop</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>"#,
+            exe_path.display()
+        );
+
+        // 确保 LaunchAgents 目录存在
+        if let Some(parent) = plist_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建 LaunchAgents 目录失败: {}", e))?;
+        }
+
+        std::fs::write(&plist_path, plist_content)
+            .map_err(|e| format!("写入 plist 文件失败: {}", e))?;
+
+        info!("Autostart enabled successfully via LaunchAgent");
+    }
+
     Ok(())
 }
 
@@ -1045,6 +1161,22 @@ async fn disable_autostart() -> Result<(), String> {
             return Err("Failed to open registry key for writing".to_string());
         }
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        if plist_path.exists() {
+            std::fs::remove_file(&plist_path)
+                .map_err(|e| format!("删除 plist 文件失败: {}", e))?;
+            info!("Autostart disabled successfully via LaunchAgent removal");
+        } else {
+            info!("LaunchAgent plist not found, nothing to disable");
+        }
+    }
+
     Ok(())
 }
 
@@ -1061,6 +1193,16 @@ async fn is_autostart_enabled() -> Result<bool, String> {
             return Ok(result.is_ok());
         }
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        return Ok(plist_path.exists());
+    }
+
     Ok(false)
 }
 
@@ -1626,17 +1768,6 @@ fn main() {
         "[STARTUP] 控制台日志过滤器构建完成, 耗时: {}ms",
         console_filter_start.elapsed().as_millis()
     );
-
-    // Load config first to initialize model manager
-    #[cfg(windows)]
-    unsafe {
-        let dpi_start = Instant::now();
-        let _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        info!(
-            "[STARTUP] DPI 设置完成, 耗时: {}ms",
-            dpi_start.elapsed().as_millis()
-        );
-    }
 
     // Load config first to initialize model manager
     let config_start = Instant::now();

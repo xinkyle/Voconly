@@ -83,6 +83,10 @@ tempfile = "3"
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS 上 Metal 加速由 transcribe-rs 自动处理
 transcribe-cpp = { version = "0.1.3", default-features = false, features = ["metal"] }
+# macOS 终端检测：获取当前活动应用程序
+objc = "0.2"
+cocoa = "0.26"
+# macOS 崩溃报告：信号处理
 libc = "0.2"
 
 # Patch transcribe-rs to fix Whisper context leakage issue
