@@ -794,7 +794,7 @@ export default function HomePanelV2({
       </section>
 
       {/* 统计卡片 - 底部区域 */}
-      <section className="mt-8">
+      <section className="mt-4">
         <div className="flex justify-center items-stretch">
           {/* 总时长 */}
           <div className="text-center px-8 py-1">
