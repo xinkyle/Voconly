@@ -16,7 +16,7 @@ interface SettingsSystemProps {
 
 export default function SettingsSystem({ config, onSave }: SettingsSystemProps) {
   const { t, i18n } = useTranslation();
-  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart || false);
+  const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart ?? true);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
   const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'low');
   const [asrIdleTimeout, setAsrIdleTimeout] = useState<number>(config.asrIdleTimeoutSeconds ?? 300);
@@ -41,7 +41,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
 
   // Sync state when config changes
   useEffect(() => {
-    setAutostartEnabled(config.autoStart || false);
+    setAutostartEnabled(config.autoStart ?? true);
     setCheckUpdates(config.checkUpdates ?? false);
     setPreviewHeight(config.previewHeight ?? 'low');
     setSelectedMic(config.defaultMicrophone || '');
