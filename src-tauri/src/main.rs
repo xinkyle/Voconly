@@ -790,6 +790,10 @@ async fn hide_float_panel(app: AppHandle, reason: Option<String>) -> Result<(), 
 
     // Get the float panel window and hide it
     if let Some(float_window) = app.get_webview_window("float-panel") {
+        // 【关键修复】先将窗口大小设置为最小，避免隐藏后仍遮挡鼠标事件
+        // 透明窗口即使隐藏后，其区域仍可能接收鼠标事件
+        let _ = float_window.set_size(PhysicalSize::new(1, 1));
+
         float_window
             .hide()
             .map_err(|e| format!("Failed to hide float panel: {}", e))?;
@@ -2040,8 +2044,12 @@ fn main() {
             let app_handle = app.handle().clone();
 
             // Build tray and store in app state
+            // 使用 include_image! 加载高质量 ICO 图标（包含所有尺寸）
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
+                .expect("Failed to load tray icon");
+
             let built_tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| {

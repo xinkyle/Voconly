@@ -85,7 +85,7 @@ body {
 /* 高度填满窗口，由 Rust 控制窗口高度（60px 或 300px） */
 .float-panel-wrapper {
   --pill-width-ratio: 1; /* 宽度比例变量，可通过 .compact 类调整为 0.6 */
-  --base-pill-width: min(373px, 90vw); /* 基础宽度，限制最大 373px 或视口 90% */
+  --base-pill-width: min(260px, 90vw); /* 药丸宽度 260px */
 
   background: #16161a;
   border-radius: 16px;
@@ -96,8 +96,8 @@ body {
 
   /* DPI 感知尺寸：基于视口百分比，同时限制范围 */
   width: calc(var(--base-pill-width) * var(--pill-width-ratio));
-  min-width: min(267px, 80vw); /* 最小宽度保护 */
-  max-width: min(373px, 95vw); /* 最大宽度限制，防止溢出 */
+  min-width: min(200px, 80vw); /* 最小宽度保护 */
+  max-width: min(260px, 95vw); /* 最大宽度限制 */
 
   /* 高度填满窗口，由 Rust 动态控制 */
   height: 100%;
@@ -121,6 +121,8 @@ body {
 /* 状态栏固定在底部，预览区从上方"生长出来"，避免窗口变大时状态栏滑动 */
 .float-panel-wrapper.expanded-mode {
   justify-content: flex-end; /* 状态栏在底部，预览区在上方 */
+  --base-pill-width: min(260px, 90vw); /* 展开模式与药丸同宽 */
+  max-width: min(260px, 95vw); /* 展开模式下最大宽度 */
 }
 
 /* 预览区域 - 融合在药丸上方 */

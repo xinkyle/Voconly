@@ -15,6 +15,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(windows)]
 use windows::Win32::System::Diagnostics::Debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS};
 
+#[cfg(target_os = "macos")]
+use libc::{signal, SIGABRT, SIGBUS, SIGFPE, SIGSEGV};
+
 /// Get the crash report directory path
 fn get_crash_report_dir() -> Option<PathBuf> {
     crash_reports_dir().ok()
@@ -82,6 +85,10 @@ pub fn init_crash_reporter() {
     // Install native exception handler on Windows
     #[cfg(windows)]
     install_exception_filter();
+
+    // Install signal handlers on macOS
+    #[cfg(target_os = "macos")]
+    install_signal_handlers();
 
     info!("[CrashReport] Crash reporter initialized");
 }
@@ -190,6 +197,75 @@ fn describe_exception_code(code: u32) -> &'static str {
         0xE06D7363 => "CPP_EXCEPTION (throw)",
         _ => "UNKNOWN_EXCEPTION",
     }
+}
+
+#[cfg(target_os = "macos")]
+/// Install signal handlers for macOS
+fn install_signal_handlers() {
+    unsafe {
+        signal(SIGSEGV, sig_handler as usize);
+        signal(SIGABRT, sig_handler as usize);
+        signal(SIGFPE, sig_handler as usize);
+        signal(SIGBUS, sig_handler as usize);
+    }
+    info!("[CrashReport] macOS signal handlers installed");
+}
+
+#[cfg(target_os = "macos")]
+/// Signal handler callback for macOS
+extern "C" fn sig_handler(sig: i32) {
+    let report_content = generate_macos_signal_report(sig);
+    write_crash_report(&report_content);
+
+    // Also log to stderr in case file write failed
+    eprintln!("\n!!! APPLICATION CRASH !!!\n{}", report_content);
+
+    // Re-raise the signal to terminate the process
+    unsafe {
+        libc::signal(sig, libc::SIG_DFL);
+        libc::raise(sig);
+    }
+}
+
+#[cfg(target_os = "macos")]
+/// Generate crash report from macOS signal info
+fn generate_macos_signal_report(sig: i32) -> String {
+    let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S");
+
+    let signal_name = match sig {
+        libc::SIGSEGV => "SIGSEGV - Segmentation fault (memory access violation)",
+        libc::SIGABRT => "SIGABRT - Abort signal (usually from assert or abort())",
+        libc::SIGFPE => "SIGFPE - Floating point exception (division by zero, overflow)",
+        libc::SIGBUS => "SIGBUS - Bus error (unaligned memory access, hardware fault)",
+        _ => "UNKNOWN SIGNAL",
+    };
+
+    let mut report = format!(
+        "=== VCONLY CRASH REPORT ===\n\
+         Timestamp: {}\n\
+         Platform: macOS\n\
+         Signal: {} ({}).\n\n",
+        timestamp, sig, signal_name
+    );
+
+    // Try to get stack trace using std::backtrace (Rust 1.65+)
+    let backtrace = std::backtrace::Backtrace::capture();
+    if backtrace.status() == std::backtrace::BacktraceStatus::Captured {
+        report.push_str("Stack Trace:\n");
+        report.push_str(&format!("{}\n", backtrace));
+    } else {
+        report.push_str("Stack Trace: Not available\n");
+    }
+
+    // Thread information
+    let thread_name = std::thread::current()
+        .name()
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    report.push_str(&format!("\nThread: {}\n", thread_name));
+
+    report.push_str("\n=== END OF CRASH REPORT ===\n");
+    report
 }
 
 /// Generate crash report for Rust panic
