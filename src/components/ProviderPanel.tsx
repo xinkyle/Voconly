@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderWithConfig, GlobalModelConfig, AppConfig } from '../types';
-import { getProviderList, saveProviderConfig, checkProviderConnection } from '../services/llm';
+import { getProviderList, saveProviderConfig } from '../services/llm';
 import { loadConfig, saveConfig } from '../services/config';
 import { createLogger } from '../services/log';
 import ProviderConfigModal from './ProviderConfigModal';
-import LlamaCppConfigModal from './LlamaCppConfigModal';
 import { useToast } from './ui/Toast';
 
 const log = createLogger('ProviderPanel');
@@ -27,7 +26,6 @@ const PROVIDER_LOGO_MAP: Record<string, string> = {
   siliconflow: 'siliconflow.png',
   yi: 'yi.png',
   custom: 'custom.png',
-  llama_cpp: 'llamacpp.png',
 };
 
 // Get provider logo path
@@ -74,7 +72,7 @@ function CloudProviderCard({ provider, isSelected, onSelect, onConfigure, onEdit
             )}
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm text-gray-800 truncate">
-                {provider.meta.id === 'llama_cpp' ? t('provider.llamaCppLabel') : provider.meta.label}
+                {provider.meta.label}
               </h3>
               <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.meta.description}</p>
             </div>
@@ -136,7 +134,6 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<ProviderWithConfig | null>(null);
   const [showProviderModal, setShowProviderModal] = useState(false);
-  const [showLlamaCppModal, setShowLlamaCppModal] = useState(false);
 
   // Load providers and global config
   useEffect(() => {
@@ -172,22 +169,7 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
     // Provider is configured - set as active provider
     try {
       const config = await loadConfig();
-      let model = provider?.instance?.defaultModel || '';
-
-      // For llama_cpp without defaultModel, auto-detect first available model
-      if (providerId === 'llama_cpp' && !model) {
-        log.info('[ProviderPanel] llama.cpp has no defaultModel, detecting available models...');
-        const connectionResult = await checkProviderConnection('llama_cpp', '', undefined);
-        if (connectionResult.available && connectionResult.models.length > 0) {
-          model = connectionResult.models[0];
-          log.info(`[ProviderPanel] Auto-selected first model: ${model}`);
-        } else {
-          // No models available, open config modal
-          log.info('[ProviderPanel] No models available, opening config modal');
-          handleProviderConfigure(providerId);
-          return;
-        }
-      }
+      const model = provider?.instance?.defaultModel || '';
 
       const newConfig = {
         ...config,
@@ -208,7 +190,7 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
       showToast({
         type: 'success',
         title: t('modelConfig.providerSelected'),
-        description: providerId === 'llama_cpp' ? '本地大模型' : (provider?.meta.label || providerId),
+        description: provider?.meta.label || providerId,
       });
     } catch (err) {
       log.error(`Failed to select provider: ${err}`);
@@ -223,13 +205,8 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
   const handleProviderConfigure = (providerId: string) => {
     const provider = providers.find((p) => p.meta.id === providerId);
     if (provider) {
-      if (providerId === 'llama_cpp') {
-        setSelectedProvider(provider);
-        setShowLlamaCppModal(true);
-      } else {
-        setSelectedProvider(provider);
-        setShowProviderModal(true);
-      }
+      setSelectedProvider(provider);
+      setShowProviderModal(true);
     }
   };
 
@@ -251,24 +228,9 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
 
       {/* Provider List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Local LLM (llama_cpp) first */}
+        {/* Cloud providers (excluding siliconflow) */}
         {providers
-          .filter((provider) => provider.meta.id === 'llama_cpp')
-          .map((provider) => (
-            <CloudProviderCard
-              key={provider.meta.id}
-              provider={provider}
-              isSelected={globalModelConfig?.llm?.providerId === provider.meta.id}
-              onSelect={() => handleProviderSelect(provider.meta.id)}
-              onConfigure={() => handleProviderConfigure(provider.meta.id)}
-              onEdit={() => handleProviderConfigure(provider.meta.id)}
-              t={t}
-            />
-          ))}
-
-        {/* Cloud providers */}
-        {providers
-          .filter((provider) => provider.meta.id !== 'llama_cpp')
+          .filter((provider) => provider.meta.id !== 'siliconflow')
           .map((provider) => (
             <CloudProviderCard
               key={provider.meta.id}
@@ -317,48 +279,6 @@ export default function ProviderPanel({ onConfigChange }: ProviderPanelProps) {
               type: 'success',
               title: t('modelConfig.providerSaved'),
               description: selectedProvider.meta.label,
-            });
-          }}
-        />
-      )}
-
-      {/* Llama.cpp Config Modal */}
-      {showLlamaCppModal && selectedProvider && (
-        <LlamaCppConfigModal
-          provider={selectedProvider}
-          onClose={() => {
-            setShowLlamaCppModal(false);
-            setSelectedProvider(null);
-          }}
-          onSave={async (providerId, modelId, instance) => {
-            // 保存 Provider 实例配置
-            await saveProviderConfig(providerId, instance);
-            // 更新全局模型配置
-            const config = await loadConfig();
-            const newConfig = {
-              ...config,
-              globalModelConfig: {
-                ...config.globalModelConfig,
-                llm: {
-                  ...config.globalModelConfig.llm,
-                  providerId,
-                  model: modelId,
-                },
-              },
-            };
-            await saveConfig(newConfig);
-            setGlobalModelConfig(newConfig.globalModelConfig);
-            // Notify parent component
-            onConfigChange?.(newConfig);
-            // 刷新 Provider 列表
-            const list = await getProviderList();
-            setProviders(list);
-            setShowLlamaCppModal(false);
-            setSelectedProvider(null);
-            showToast({
-              type: 'success',
-              title: t('modelConfig.providerSaved'),
-              description: t('provider.llamaCppLabel'),
             });
           }}
         />

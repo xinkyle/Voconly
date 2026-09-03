@@ -262,7 +262,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         let instance_max_tokens = self.instance.max_tokens.unwrap_or(1024);
 
         let dynamic_max_tokens = if self.meta.id == "ollama" {
-            // Ollama 是本地模型，使用 1.5 倍（和 llama_cpp.rs 保持一致）
+            // Ollama 是本地模型，使用 1.5 倍
             // 但也要考虑 context_limit 和 instance.max_tokens
             let computed = (input_chars * 3 / 2).max(100) as u32;
             let limit = self.instance.context_limit.unwrap_or(4096);

@@ -7,7 +7,6 @@ pub mod config;
 pub mod dictionary;
 pub mod file_ops;
 pub mod llm;
-pub mod llm_models;
 pub mod model_manager;
 pub mod paths;
 pub mod performance;

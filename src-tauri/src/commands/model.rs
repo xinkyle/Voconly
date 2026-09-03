@@ -1,9 +1,8 @@
 use crate::catalog::QuantVariant;
 use crate::config::AppServices;
-use crate::llm_models::{scan_available_llm_models, LlmModelPreset};
 use crate::model_manager::LoadedModelInfo;
 use crate::presets::{get_asr_presets, scan_available_asr_models, ModelPreset};
-use crate::utils::downloader::{get_llm_model_path, get_model_storage_dir};
+use crate::utils::downloader::get_model_storage_dir;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -243,19 +242,6 @@ pub async fn scan_asr_models() -> Result<Vec<ModelPreset>, String> {
     info!("Scanning ASR models from storage directory");
     let models = scan_available_asr_models();
     info!("Found {} ASR models", models.len());
-    Ok(models)
-}
-
-/// Scan available LLM models from storage directory
-///
-/// Returns a list of all discovered GGUF models, including:
-/// - Preset models (matching hardcoded presets, with download URLs)
-/// - User models (custom models found on disk, without download URLs)
-#[tauri::command]
-pub async fn scan_llm_models() -> Result<Vec<LlmModelPreset>, String> {
-    info!("Scanning LLM models from storage directory");
-    let models = scan_available_llm_models();
-    info!("Found {} LLM models", models.len());
     Ok(models)
 }
 

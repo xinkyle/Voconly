@@ -34,7 +34,7 @@ See text as you speak, with results ready the moment you finish. Automatic optim
 
 ### Flexible LLM Support
 
-- Local models: Run via Llama.cpp
+- Local models: Run via Ollama
 - Cloud APIs: Support for multiple providers
 - Built-in processing modes: light polish, translation, professional polish, meeting secretary
 - Custom presets: Configure processing logic as needed

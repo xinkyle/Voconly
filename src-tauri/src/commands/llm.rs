@@ -3,15 +3,9 @@
 
 use crate::commands::performance::LlmPerformanceState;
 use crate::config::AppServices;
-#[cfg(feature = "local_llm")]
-use crate::llm::clear_model_cache;
 use crate::llm::{
     get_provider_meta_list, LlmConfig, LlmProfile, LlmProgressEvent, LlmProviderInstance,
     LlmResponse, LlmService, ProviderMeta, ProviderModelsCache, UserPromptPresets,
-};
-use crate::llm_models::{get_llm_model_presets, scan_available_llm_models, LlmModelPreset};
-use crate::utils::downloader::{
-    download_model_with_source, get_llm_model_path, llm_model_exists, DownloadResult,
 };
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -41,25 +35,6 @@ pub struct LlmHealthResponse {
     pub models: Vec<String>,
     /// 错误信息（如果有）
     pub error: Option<String>,
-}
-
-/// LLM 模型列表响应（预设 + 状态）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LlmModelWithStatus {
-    pub preset: LlmModelPreset,
-    pub downloaded: bool,
-    pub path: Option<String>,
-    pub size_mb: Option<u64>,
-}
-
-/// LLM 模型下载请求
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DownloadLlmModelRequest {
-    pub preset_id: String,
-    pub preferred_source: Option<String>,
-    pub prefer_china: Option<bool>,
 }
 
 /// 从全局配置构建 LlmConfig 的辅助函数
@@ -832,19 +807,12 @@ pub fn save_llm_profile(
 
     let mut config = services.config.lock().unwrap();
 
-    // 获取原来的 profile（保存前），用于判断是否需要清除本地模型
+    // 获取原来的 profile（保存前）
     let old_profile = config
         .llm_profiles
         .iter()
         .find(|p| p.scene_id == profile.scene_id)
         .cloned();
-
-    // 判断是否从本地模型切换到远程 provider
-    let was_local_llm = old_profile
-        .as_ref()
-        .map(|p| p.provider_id.as_deref() == Some("llama_cpp"))
-        .unwrap_or(false);
-    let is_now_remote = profile.provider_id.as_deref() != Some("llama_cpp");
 
     // 查找是否存在该场景的 profile
     if let Some(existing) = config
@@ -867,50 +835,11 @@ pub fn save_llm_profile(
         config.llm_profiles.push(profile.clone());
     }
 
-    // 如果从本地模型切换到远程 provider，检查是否需要清除本地模型缓存
-    let should_clear_cache = was_local_llm && is_now_remote;
-
     // 保存到文件
     let config_path = crate::config::get_config_path()?;
     let content =
         serde_json::to_string_pretty(&*config).map_err(|e| format!("序列化配置失败: {}", e))?;
     std::fs::write(&config_path, content).map_err(|e| format!("保存配置失败: {}", e))?;
-
-    // 在释放锁后清除缓存（避免锁冲突）
-    drop(config);
-
-    // 如果从本地模型切换到远程 provider，检查其他场景是否还在使用本地模型
-    if should_clear_cache {
-        // 重新获取锁检查其他场景
-        let config = services.config.lock().unwrap();
-        let other_scenes_using_local_llm = config
-            .llm_profiles
-            .iter()
-            .filter(|p| p.scene_id != profile.scene_id) // 排除当前场景
-            .filter(|p| p.enabled) // 只检查启用的 profile
-            .filter(|p| p.provider_id.as_deref() == Some("llama_cpp")) // 使用本地模型的
-            .count();
-
-        info!(
-            "[LLM] 检查本地模型使用情况: 其他场景使用本地模型数量 = {}",
-            other_scenes_using_local_llm
-        );
-
-        if other_scenes_using_local_llm == 0 {
-            // 没有其他场景使用本地模型，清除缓存
-            #[cfg(feature = "local_llm")]
-            {
-                info!("[LLM] 没有其他场景使用本地模型，清除本地模型缓存");
-                clear_model_cache();
-            }
-            #[cfg(not(feature = "local_llm"))]
-            {
-                info!("[LLM] local_llm feature 未启用，跳过清除缓存");
-            }
-        } else {
-            info!("[LLM] 其他场景仍在使用本地模型，保留缓存");
-        }
-    }
 
     info!("[LLM] Profile saved successfully");
     Ok(profile)
@@ -973,23 +902,6 @@ pub fn get_provider_list(
         .into_iter()
         .map(|meta| {
             let instance = config.llm_providers.get(&meta.id).cloned();
-
-            // llama.cpp 默认处于已配置状态（确保本地 LLM 加载功能始终可用）
-            let instance = if meta.id == "llama_cpp" && instance.is_none() {
-                Some(LlmProviderInstance {
-                    meta_id: "llama_cpp".to_string(),
-                    enabled: true,
-                    base_url: "".to_string(),
-                    api_key: None,
-                    default_model: None,
-                    n_gpu_layers: None, // 前端会根据 GPU 检测结果自动设置
-                    context_limit: None,
-                    max_tokens: None,
-                })
-            } else {
-                instance
-            };
-
             ProviderWithConfig { meta, instance }
         })
         .collect();
@@ -1096,50 +1008,6 @@ pub async fn check_provider_connection(
 ) -> Result<LlmHealthResponse, String> {
     info!("[LLM] Checking connection for provider: {}", provider_id);
 
-    // 特殊处理 llama.cpp - 检查模型文件而非 HTTP 连接
-    if provider_id == "llama_cpp" {
-        #[cfg(feature = "local_llm")]
-        {
-            // 扫描目录获取已存在的 .gguf 文件
-            let available_models = scan_available_llm_models();
-
-            if available_models.is_empty() {
-                return Ok(LlmHealthResponse {
-                    available: false,
-                    provider: "llama.cpp".to_string(),
-                    models: vec![],
-                    error: Some(
-                        "未找到 GGUF 模型文件，请下载或手动放置模型到 llm_models 目录".to_string(),
-                    ),
-                });
-            }
-
-            let model_ids: Vec<String> = available_models.iter().map(|m| m.id.clone()).collect();
-            info!(
-                "[LLM] Found {} GGUF models: {:?}",
-                model_ids.len(),
-                model_ids
-            );
-
-            return Ok(LlmHealthResponse {
-                available: true,
-                provider: "llama.cpp".to_string(),
-                models: model_ids,
-                error: None,
-            });
-        }
-
-        #[cfg(not(feature = "local_llm"))]
-        {
-            return Ok(LlmHealthResponse {
-                available: false,
-                provider: "llama.cpp".to_string(),
-                models: vec![],
-                error: Some("local_llm feature 未启用，请重新编译启用该功能".to_string()),
-            });
-        }
-    }
-
     // 获取 Provider 元数据
     let meta = get_provider_meta_list()
         .into_iter()
@@ -1180,201 +1048,6 @@ pub async fn check_provider_connection(
     })
 }
 
-// ============== LLM 模型管理命令 ==============
-
-/// 获取 LLM 模型列表（已存在的文件 + 可下载的预设）
-#[tauri::command]
-pub fn get_llm_model_list() -> Result<Vec<LlmModelWithStatus>, String> {
-    info!("[LLM] Getting LLM model list");
-
-    // 1. 扫描目录获取已存在的 .gguf 文件
-    let available_models = scan_available_llm_models();
-    info!(
-        "[LLM] Found {} available models in directory",
-        available_models.len()
-    );
-
-    // 2. 获取预设列表（用于下载源信息）
-    let presets = get_llm_model_presets();
-
-    // 3. 构建结果列表
-    let mut result: Vec<LlmModelWithStatus> = Vec::new();
-
-    // 添加已存在的模型（全部 downloaded=true）
-    for model in available_models {
-        let path = crate::utils::downloader::get_llm_model_path(&model.id)
-            .ok()
-            .map(|p| p.to_string_lossy().to_string());
-
-        let size_mb = path
-            .as_ref()
-            .and_then(|p| std::fs::metadata(p).ok().map(|m| m.len() / (1024 * 1024)));
-
-        result.push(LlmModelWithStatus {
-            preset: model,
-            downloaded: true,
-            path,
-            size_mb,
-        });
-    }
-
-    // 添加未下载的预设（downloaded=false）
-    for preset in presets {
-        // 检查是否已经在已存在列表中
-        if !result.iter().any(|m| m.preset.id == preset.id) {
-            result.push(LlmModelWithStatus {
-                preset,
-                downloaded: false,
-                path: None,
-                size_mb: None,
-            });
-        }
-    }
-
-    info!(
-        "[LLM] Total {} models ({} downloaded, {} presets)",
-        result.len(),
-        result.iter().filter(|m| m.downloaded).count(),
-        result.iter().filter(|m| !m.downloaded).count()
-    );
-
-    Ok(result)
-}
-
-/// 下载 LLM 模型
-#[tauri::command]
-pub async fn download_llm_model(
-    app: AppHandle,
-    services: tauri::State<'_, AppServices>,
-    request: DownloadLlmModelRequest,
-) -> Result<DownloadResult, String> {
-    info!("[LLM] Downloading LLM model: {}", request.preset_id);
-
-    let presets = get_llm_model_presets();
-    let preset = presets
-        .into_iter()
-        .find(|p| p.id == request.preset_id)
-        .ok_or_else(|| format!("未找到 LLM 模型预设: {}", request.preset_id))?;
-
-    let result = download_model_with_source(
-        app,
-        services,
-        request.preset_id.clone(),
-        preset.download_urls.clone(),
-        request.preferred_source,
-        request.prefer_china,
-    )
-    .await?;
-
-    // Note: Download status is determined by filesystem scanning, not config persistence
-
-    info!(
-        "[LLM] Download result: success={}, path={:?}",
-        result.success, result.path
-    );
-    Ok(result)
-}
-
-/// 删除已下载的 LLM 模型
-#[tauri::command]
-pub fn delete_llm_model(preset_id: String) -> Result<(), String> {
-    info!("[LLM] Deleting LLM model: {}", preset_id);
-
-    let path = get_llm_model_path(&preset_id)?;
-
-    if path.exists() {
-        std::fs::remove_file(&path).map_err(|e| format!("删除模型文件失败: {}", e))?;
-        info!("[LLM] Model file deleted: {:?}", path);
-    } else {
-        info!("[LLM] Model file not found: {:?}", path);
-    }
-
-    Ok(())
-}
-
-/// 检查 LLM 模型是否已下载
-#[tauri::command]
-pub fn check_llm_model_exists(preset_id: String) -> bool {
-    llm_model_exists(&preset_id)
-}
-
-/// 获取 LLM 模型存储路径
-#[tauri::command]
-pub fn get_llm_model_storage_path_cmd(preset_id: String) -> Result<String, String> {
-    let path = get_llm_model_path(&preset_id)?;
-    Ok(path.to_string_lossy().to_string())
-}
-
-// ============== GPU 检测命令 ==============
-
-/// GPU 信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GpuInfo {
-    /// GPU 是否可用
-    pub available: bool,
-    /// GPU 类型 (cuda, metal, vulkan)
-    pub gpu_type: String,
-    /// 最大设备数
-    pub max_devices: usize,
-    /// 推荐的 GPU 层数 (-1 = 全部，0 = CPU)
-    pub recommended_layers: i32,
-}
-
-/// 检测 GPU 可用性
-#[tauri::command]
-pub fn detect_gpu() -> GpuInfo {
-    #[cfg(feature = "local_llm")]
-    {
-        let max_devices = llama_cpp_4::max_devices();
-
-        // 检测 GPU 类型
-        let gpu_type = {
-            #[cfg(feature = "cuda")]
-            {
-                "cuda".to_string()
-            }
-            #[cfg(all(not(feature = "cuda"), feature = "metal"))]
-            {
-                "metal".to_string()
-            }
-            #[cfg(all(not(feature = "cuda"), not(feature = "metal"), feature = "vulkan"))]
-            {
-                "vulkan".to_string()
-            }
-            #[cfg(all(not(feature = "cuda"), not(feature = "metal"), not(feature = "vulkan")))]
-            {
-                "none".to_string()
-            }
-        };
-
-        let available = max_devices > 0 && gpu_type != "none";
-
-        info!(
-            "[LLM] GPU detection: available={}, type={}, max_devices={}",
-            available, gpu_type, max_devices
-        );
-
-        GpuInfo {
-            available,
-            gpu_type,
-            max_devices,
-            // 如果 GPU 可用，推荐全部层加载；否则 CPU
-            recommended_layers: if available { -1 } else { 0 },
-        }
-    }
-
-    #[cfg(not(feature = "local_llm"))]
-    {
-        GpuInfo {
-            available: false,
-            gpu_type: "none".to_string(),
-            max_devices: 0,
-            recommended_layers: 0,
-        }
-    }
-}
-
 // ============== Provider 模型缓存命令 ==============
 
 /// 获取 Provider 的缓存模型列表
@@ -1409,32 +1082,6 @@ pub async fn refresh_provider_models(
     provider_id: String,
 ) -> Result<Vec<String>, String> {
     info!("[LLM] Refreshing models for provider: {}", provider_id);
-
-    // 特殊处理 llama.cpp - 扫描本地文件而非 API
-    if provider_id == "llama_cpp" {
-        #[cfg(feature = "local_llm")]
-        {
-            let available_models = scan_available_llm_models();
-            let model_ids: Vec<String> = available_models.iter().map(|m| m.id.clone()).collect();
-
-            // 保存到缓存
-            let data_dir = app_handle
-                .path()
-                .app_data_dir()
-                .map_err(|e| format!("获取数据目录失败: {}", e))?;
-            let mut cache = ProviderModelsCache::load(&data_dir);
-            cache.update(&provider_id, model_ids.clone());
-            cache.save(&data_dir)?;
-
-            info!("[LLM] Cached {} models for llama.cpp", model_ids.len());
-            return Ok(model_ids);
-        }
-
-        #[cfg(not(feature = "local_llm"))]
-        {
-            return Err("local_llm feature 未启用".to_string());
-        }
-    }
 
     // 获取 provider 配置
     let (meta, instance) = {

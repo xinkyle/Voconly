@@ -2,15 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type {
-  AsrModelWithStatus,
-  LlmModelWithStatus,
-  LlmModelPreset,
-} from '../services/config';
-import type { Model, LlmProviderInstance, GlobalModelConfig } from '../types';
+import type { AsrModelWithStatus } from '../services/config';
+import type { Model, GlobalModelConfig } from '../types';
 import {
   getAsrModelList,
-  getLlmModelList,
   getCustomAsrModelDirs,
   addCustomAsrModelDir,
   removeCustomAsrModelDir,
@@ -18,63 +13,15 @@ import {
   saveConfig,
   parseModelId,
 } from '../services/config';
-import { getProviderList, saveProviderConfig, detectGpu } from '../services/llm';
 import { createLogger } from '../services/log';
-import type { DownloadProgress, DownloadCompleteEvent } from '../services/downloader';
-import { subscribeToDownloadComplete, cancelModelDownload } from '../services/downloader';
+import type { DownloadProgress } from '../services/downloader';
+import { subscribeToDownloadComplete } from '../services/downloader';
 import { useToast } from './ui/Toast';
 import { Info } from 'lucide-react';
 import AsrModelList from './AsrModelList';
 import { getFullModelId } from '../types';
 
 const log = createLogger('ModelConfigPanel');
-
-// Get model size (formatted: GB for >= 1GB, MB for < 1GB)
-// Reuse logic from HomePanel.tsx
-function getModelSize(model: AsrModelWithStatus | LlmModelWithStatus): string {
-  // Use actual size from disk if available
-  if (model.sizeMb) {
-    const mb = model.sizeMb;
-    if (mb >= 1024) {
-      return `${(mb / 1024).toFixed(1)}GB`;
-    }
-    return `${mb}MB`;
-  }
-  // Or use preset size
-  if (model.preset.size) {
-    const sizeStr = model.preset.size.toUpperCase();
-    if (sizeStr.includes('GB') || sizeStr.includes('MB')) {
-      return model.preset.size;
-    }
-  }
-  return '';
-}
-
-// Default LLM models
-const DEFAULT_LLM_MODELS: (LlmModelPreset & { descriptionKey: string })[] = [
-  {
-    id: 'Qwen3-4B-Instruct-2507-Q4_K_M',
-    name: 'Qwen3-4B-Instruct-2507 Q4_K_M',
-    size: '~2.5GB',
-    downloadUrls: [],
-    nGpuLayers: -1,
-    nCtx: 4096,
-    recommended: true,
-    description: '',
-    descriptionKey: 'models.descriptions.qwen3b',
-  },
-  {
-    id: 'Qwen3.5-9B-Q4_K_M',
-    name: 'Qwen3.5-9B-Q4_K_M',
-    size: '~6GB',
-    downloadUrls: [],
-    nGpuLayers: -1,
-    nCtx: 4096,
-    recommended: false,
-    description: '',
-    descriptionKey: 'models.descriptions.qwen7b',
-  },
-];
 
 interface ModelConfigPanelProps {
   downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
@@ -86,103 +33,11 @@ interface ModelConfigPanelProps {
 }
 
 // Icons
-const DownloadIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
-
 const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
   </svg>
 );
-
-// LLM Model Card Component
-interface LlmModelCardProps {
-  model: LlmModelWithStatus;
-  isSelected: boolean; // 当前是否正在使用
-  isDownloading: boolean;
-  downloadProgress?: DownloadProgress;
-  onDownload: () => void;
-  onDownloadCancel?: () => void;
-  t: (key: string) => string;
-}
-
-function LlmModelCard({ model, isSelected, isDownloading, downloadProgress, onDownload, onDownloadCancel, t }: LlmModelCardProps) {
-  const isDownloaded = model.downloaded;
-  const knownModel = DEFAULT_LLM_MODELS.find((m) => m.id === model.preset.id);
-  const description = knownModel ? t(knownModel.descriptionKey) : model.preset.description;
-
-  return (
-    <div className="group relative rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all duration-200 overflow-hidden">
-      {/* Full-card progress background */}
-      {isDownloading && (
-        <div className="absolute inset-0 overflow-hidden rounded-xl">
-          <div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-100/60 to-blue-50/40 transition-all duration-300 ease-out"
-            style={{ width: `${downloadProgress?.percentage ?? 0}%` }}
-          />
-          <div className="absolute inset-y-0 left-0 right-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-        </div>
-      )}
-
-      <div className="relative px-3 py-2 z-10">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0 pr-6">
-            {/* Model Name */}
-            <h3 className="font-semibold text-sm text-gray-800">
-              {model.preset.name}
-              {getModelSize(model) && <span className="text-gray-400 font-normal ml-1">({getModelSize(model)})</span>}
-            </h3>
-            {/* Description */}
-            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{description}</p>
-          </div>
-
-          {/* Status/Action - 右侧标签样式，与 ASR 模型列表一致 */}
-          <div className="relative flex-shrink-0 z-10 flex items-center gap-2">
-            {isDownloaded ? (
-              isSelected ? (
-                // 已选中（当前使用）：显示勾勾 + "当前使用"
-                <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
-                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{t('models.currentUse')}</span>
-                </div>
-              ) : (
-                // 已下载未选中：显示"已下载"
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>{t('models.downloaded')}</span>
-                </div>
-              )
-            ) : isDownloading ? (
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-xs font-medium text-blue-600">{downloadProgress?.percentage || 0}%</span>
-                {onDownloadCancel && (
-                  <button
-                    onClick={onDownloadCancel}
-                    className="text-xs text-red-500 hover:text-red-600 underline"
-                  >
-                    {t('models.cancel')}
-                  </button>
-                )}
-              </div>
-            ) : (
-              // 未下载：显示下载按钮
-              <button
-                onClick={onDownload}
-                className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-600 transition-colors"
-              >
-                <DownloadIcon className="w-3.5 h-3.5" />
-                <span>{t('models.download')}</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function ModelConfigPanel({
   downloadStates = {},
@@ -198,7 +53,6 @@ export default function ModelConfigPanel({
 
   // State
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
-  const [llmModels, setLlmModels] = useState<LlmModelWithStatus[]>([]);
   const [customDirs, setCustomDirs] = useState<string[]>([]);
   const [globalModelConfig, setGlobalModelConfig] = useState<GlobalModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -209,18 +63,16 @@ export default function ModelConfigPanel({
     const loadData = async () => {
       setLoading(true);
       try {
-        const [asrResult, llmResult, customDirsResult, configResult] = await Promise.all([
+        const [asrResult, customDirsResult, configResult] = await Promise.all([
           getAsrModelList(),
-          getLlmModelList(),
           getCustomAsrModelDirs(),
           loadConfig(),
         ]);
         setAsrModels(asrResult);
-        setLlmModels(llmResult);
         setCustomDirs(customDirsResult);
         setGlobalModelConfig(configResult.globalModelConfig || null);
         log.info(
-          `Loaded ${asrResult.length} ASR models, ${llmResult.length} LLM models, ${customDirsResult.length} custom dirs`
+          `Loaded ${asrResult.length} ASR models, ${customDirsResult.length} custom dirs`
         );
       } catch (err) {
         log.error(`Failed to load model data: ${err}`);
@@ -234,57 +86,12 @@ export default function ModelConfigPanel({
   // Reload on download complete
   useEffect(() => {
     let mounted = true;
-    const unlisten = subscribeToDownloadComplete((event: DownloadCompleteEvent) => {
+    const unlisten = subscribeToDownloadComplete(() => {
       if (!mounted) return;
-
-      // Check if this is an LLM model download (non-ASR model)
-      const downloadedModelId = event.modelId;
-      const isLlmDownload = downloadedModelId && !downloadedModelId.startsWith('whisper') &&
-                            !downloadedModelId.startsWith('sensevoice') &&
-                            !downloadedModelId.startsWith('moonshine') &&
-                            !downloadedModelId.startsWith('parakeet');
-
-      Promise.all([getAsrModelList(), getLlmModelList(), getProviderList()])
-        .then(async ([asrResult, llmResult, providerList]) => {
+      getAsrModelList()
+        .then((asrResult) => {
           if (!mounted) return;
           setAsrModels(asrResult);
-          setLlmModels(llmResult);
-
-          // Auto-configure llama.cpp provider if an LLM model was downloaded and llama.cpp is not configured
-          if (isLlmDownload) {
-            const llamaProvider = providerList.find(p => p.meta.id === 'llama_cpp');
-            const downloadedModel = llmResult.find(m => m.downloaded);
-
-            if (llamaProvider && !llamaProvider.instance?.enabled && downloadedModel) {
-              log.info(`[ModelConfig] Auto-configuring llama.cpp with downloaded model: ${downloadedModel.preset.id}`);
-
-              try {
-                // Detect GPU for optimal n_gpu_layers
-                let nGpuLayers = -1; // Default: try GPU
-                try {
-                  const gpuInfo = await detectGpu();
-                  if (gpuInfo.available && gpuInfo.recommendedLayers > 0) {
-                    nGpuLayers = gpuInfo.recommendedLayers;
-                  }
-                } catch (e) {
-                  log.warn(`[ModelConfig] GPU detection failed, using default: ${e}`);
-                }
-
-                const instance: LlmProviderInstance = {
-                  metaId: 'llama_cpp',
-                  enabled: true,
-                  baseUrl: '',
-                  defaultModel: downloadedModel.preset.id,
-                  nGpuLayers: nGpuLayers,
-                };
-
-                await saveProviderConfig('llama_cpp', instance);
-                log.info(`[ModelConfig] llama.cpp auto-configured successfully`);
-              } catch (err) {
-                log.error(`[ModelConfig] Failed to auto-configure llama.cpp: ${err}`);
-              }
-            }
-          }
         })
         .catch((err) => log.error(`Failed to reload models: ${err}`));
     });
@@ -340,41 +147,6 @@ export default function ModelConfigPanel({
       });
     }
   }, [globalModelConfig, onConfigUpdate, showToast, t]);
-
-  const handleLlmDownload = (model: LlmModelWithStatus) => {
-    if (onDownload) {
-      // Build a Model object from LlmModelWithStatus
-      const modelObj: Model = {
-        id: model.preset.id,
-        name: model.preset.name,
-        backend: 'Whisper', // Placeholder, not used for LLM
-        size: model.preset.size,
-        downloaded: model.downloaded,
-        downloadUrls: model.preset.downloadUrls || [],
-        languages: [],
-        description: model.preset.description,
-        modelType: 'llm',
-      };
-      onDownload(modelObj);
-    }
-  };
-
-  const handleDownloadCancel = async (modelId: string) => {
-    try {
-      log.info(`Canceling download for model: ${modelId}`);
-      const success = await cancelModelDownload(modelId);
-      if (success) {
-        log.info(`Download cancelled successfully for ${modelId}`);
-        if (onDownloadCancel) {
-          onDownloadCancel(modelId);
-        }
-      } else {
-        log.warn(`No active download found for ${modelId}`);
-      }
-    } catch (error) {
-      log.error(`Failed to cancel download: ${error}`);
-    }
-  };
 
   // Handle import custom ASR model directory
   const handleImportCustomDir = async () => {
@@ -552,46 +324,6 @@ export default function ModelConfigPanel({
             modelQuantPrefs={modelQuantPrefs}
             onQuantPrefChange={onQuantPrefChange}
           />
-        </div>
-      </section>
-
-      {/* Section 2: Local LLM Models */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">{t('modelConfig.llmTitle')}</h2>
-              <p className="text-sm text-gray-500 mt-0.5 whitespace-pre-line">{t('modelConfig.llmSubtitle')}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {llmModels.map((model) => (
-              <LlmModelCard
-                key={model.preset.id}
-                model={model}
-                isSelected={globalModelConfig?.llm?.model === model.preset.id}
-                isDownloading={downloadStates[model.preset.id]?.downloading ?? false}
-                downloadProgress={downloadStates[model.preset.id]?.progress}
-                onDownload={() => handleLlmDownload(model)}
-                onDownloadCancel={() => handleDownloadCancel(model.preset.id)}
-                t={t}
-              />
-            ))}
-          </div>
-
-          {llmModels.length === 0 && (
-            <div className="p-8 bg-gray-50 border border-gray-200 rounded-xl text-center">
-              <p className="text-gray-500">{t('modelConfig.noLlmModels')}</p>
-            </div>
-          )}
         </div>
       </section>
 

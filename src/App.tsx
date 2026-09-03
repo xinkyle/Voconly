@@ -1543,8 +1543,14 @@ function App() {
                 }}
               />
             )}
-            {activeNav === 'dictionary' && (
-              <SettingsDictionary />
+            {activeNav === 'dictionary' && config && (
+              <SettingsDictionary
+                config={config}
+                onSave={async (newConfig) => {
+                  setConfig(newConfig);
+                  await saveConfig(newConfig);
+                }}
+              />
             )}
             {activeNav === 'provider' && (
               <ProviderPanel

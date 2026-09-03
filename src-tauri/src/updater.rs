@@ -421,9 +421,6 @@ pub fn exit_app(app_handle: tauri::AppHandle) {
         }
     }
 
-    // 清理 LLM 模型缓存
-    crate::llm::clear_model_cache();
-
     info!("[ExitApp] 所有资源清理完成，退出应用");
     app_handle.exit(0);
 }

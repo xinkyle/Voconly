@@ -456,8 +456,6 @@ dependencies = [
  "cexpr",
  "clang-sys",
  "itertools",
- "log",
- "prettyplease",
  "proc-macro2",
  "quote",
  "regex",
@@ -3376,31 +3374,6 @@ name = "litemap"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
-
-[[package]]
-name = "llama-cpp-4"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1fa79b6477f95d40d5744cebd27251c04b429e15a61d422a703fa086685e882"
-dependencies = [
- "enumflags2",
- "llama-cpp-sys-4",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
-name = "llama-cpp-sys-4"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5501617116a1889a433e69fb6d86200c93c73865612e888a314d19dade668c6d"
-dependencies = [
- "bindgen",
- "cc",
- "cmake",
- "glob",
- "winreg 0.56.0",
-]
 
 [[package]]
 name = "lock_api"
@@ -7297,7 +7270,6 @@ dependencies = [
  "indexmap 2.13.0",
  "lazy_static",
  "libc",
- "llama-cpp-4",
  "log",
  "ndarray",
  "once_cell",
@@ -8389,16 +8361,6 @@ checksum = "cb5a765337c50e9ec252c2069be9bf91c7df47afb103b642ba3a53bf8101be97"
 dependencies = [
  "cfg-if",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "winreg"
-version = "0.56.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
-dependencies = [
- "cfg-if",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

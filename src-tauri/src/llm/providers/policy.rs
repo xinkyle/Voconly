@@ -14,7 +14,7 @@ pub enum ThinkingControlProtocol {
 
 /// 根据 provider ID 返回思考控制协议
 /// 这是一个简化版本，直接按 provider 类型判断
-/// 返回 None 表示该 provider 不需要处理（如 Gemini, Claude, llama_cpp）
+/// 返回 None 表示该 provider 不需要处理（如 Gemini, Claude）
 pub fn get_thinking_control_protocol(provider_id: &str) -> Option<ThinkingControlProtocol> {
     match provider_id {
         // DeepSeek 风格：使用 thinking 对象
@@ -26,13 +26,13 @@ pub fn get_thinking_control_protocol(provider_id: &str) -> Option<ThinkingContro
         "qwen" => Some(ThinkingControlProtocol::EnableThinking),
 
         // OpenAI 风格：使用 reasoning_effort
-        // 包括: openai, ollama, groq, cerebras, openrouter, siliconflow, custom, yi
+        // 包括: openai, ollama, groq, cerebras, openrouter, custom, yi
         // 以及其他未知 provider
-        "openai" | "ollama" | "groq" | "cerebras" | "openrouter" | "siliconflow" | "custom"
+        "openai" | "ollama" | "groq" | "cerebras" | "openrouter" | "custom"
         | "yi" => Some(ThinkingControlProtocol::ReasoningEffort),
 
         // 这些 provider 走不同的 API 路径，不在这里处理
-        "gemini" | "claude" | "llama_cpp" => None,
+        "gemini" | "claude" => None,
 
         // 其他未识别的 provider，使用 OpenAI 风格
         _ => Some(ThinkingControlProtocol::ReasoningEffort),

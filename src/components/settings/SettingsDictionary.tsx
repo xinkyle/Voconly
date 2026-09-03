@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  getUserDictionary,
-  saveUserDictionary,
-} from '../../services/dictionary';
+import { saveUserDictionary } from '../../services/dictionary';
 import { createLogger } from '../../services/log';
 import { useToast } from '../ui/Toast';
+import type { AppConfig, UserDictionary } from '../../types';
 
 // 创建日志记录器
 const log = createLogger('SettingsDictionary');
@@ -13,40 +11,44 @@ const log = createLogger('SettingsDictionary');
 // 默认阈值
 const DEFAULT_THRESHOLD = 0.13;
 
-export default function SettingsDictionary() {
+interface SettingsDictionaryProps {
+  config: AppConfig;
+  onSave: (config: AppConfig) => void;
+}
+
+export default function SettingsDictionary({ config, onSave }: SettingsDictionaryProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
-  const [enabled, setEnabled] = useState(false);
-  const [wordsText, setWordsText] = useState('');
-  const [loading, setLoading] = useState(true);
+
+  // 从 config.userDictionary 读取初始值
+  const dictionary = config.userDictionary;
+  const [enabled, setEnabled] = useState(dictionary?.enabled ?? false);
+  const [wordsText, setWordsText] = useState(() => {
+    if (!dictionary?.entries) return '';
+    const lines = dictionary.entries.map(e => {
+      if (e.aliases && e.aliases.length > 0) {
+        return `${e.word} (${e.aliases.join(', ')})`;
+      }
+      return e.word;
+    });
+    return lines.join('\n');
+  });
   const [error, setError] = useState<string | null>(null);
 
-  // 加载词典配置
+  // 当 config.userDictionary 变化时同步状态
   useEffect(() => {
-    loadDictionary();
-  }, []);
-
-  const loadDictionary = async () => {
-    setLoading(true);
-    try {
-      const result = await getUserDictionary();
-      setEnabled(result.enabled);
-      // 从 entries 格式化为每行一个词条
-      const lines = result.entries.map(e => {
+    const dict = config.userDictionary;
+    if (dict) {
+      setEnabled(dict.enabled);
+      const lines = dict.entries.map(e => {
         if (e.aliases && e.aliases.length > 0) {
           return `${e.word} (${e.aliases.join(', ')})`;
         }
         return e.word;
       });
       setWordsText(lines.join('\n'));
-      log.debug(`Loaded dictionary: ${result.entries.length} entries`);
-    } catch (err) {
-      log.error(`Failed to load dictionary: ${err}`);
-      setError(t('dictionary.loadError'));
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [config.userDictionary]);
 
   // 解析文本为词条数组，只按换行和逗号分隔（空格保留在词内）
   const parseWordsText = (text: string): { word: string }[] => {
@@ -85,17 +87,24 @@ export default function SettingsDictionary() {
         });
       }
 
-      await saveUserDictionary({
+      const newDictionary: UserDictionary = {
         enabled: newEnabled,
         entries: deduped,
         threshold: DEFAULT_THRESHOLD,
         rawText: dedupedText,
-      });
+      };
+
+      // 同时保存到后端（独立存储）和 config
+      await saveUserDictionary(newDictionary);
+
+      // 更新 config
+      const newConfig = { ...config, userDictionary: newDictionary };
+      onSave(newConfig);
     } catch (err) {
       log.error(`Failed to save dictionary: ${err}`);
       setError(t('dictionary.saveError'));
     }
-  }, [t, showToast]);
+  }, [config, onSave, t, showToast]);
 
   // 编辑后更新本地状态并保存
   const handleWordsChange = async (value: string) => {
@@ -115,16 +124,6 @@ export default function SettingsDictionary() {
       title: newEnabled ? t('dictionary.enabledToast') : t('dictionary.disabledToast'),
     });
   };
-
-  // 渲染加载状态
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500">{t('dictionary.loading')}</p>
-      </div>
-    );
-  }
 
   return (
     <div>

@@ -73,15 +73,16 @@ export default function ProviderSelectModal({
     }
   };
 
-  // Separate providers into configured and not configured
+  // Separate providers into configured and not configured (exclude siliconflow)
   const configuredProviders = useMemo(() =>
-    providers.filter(p => p.instance && p.instance.enabled),
+    providers.filter(p => p.instance && p.instance.enabled && p.meta.id !== 'siliconflow'),
     [providers]
   );
 
   const unconfiguredProviders = useMemo(() => {
-    const popular = providers.filter(p => !p.instance && p.meta.popular);
-    const more = providers.filter(p => !p.instance && !p.meta.popular);
+    const excluded = ['siliconflow'];
+    const popular = providers.filter(p => !p.instance && p.meta.popular && !excluded.includes(p.meta.id));
+    const more = providers.filter(p => !p.instance && !p.meta.popular && !excluded.includes(p.meta.id));
     return [...popular, ...more];
   }, [providers]);
 
@@ -254,7 +255,7 @@ function ProviderCard({ provider, selected, onClick, onEdit }: ProviderCardProps
           ? (selected ? 'pr-12' : 'pr-8')
           : ''
       }`}>
-        {provider.meta.id === 'llama_cpp' ? 'Llama.cpp (本地大语言模型专用)' : provider.meta.label}
+        {provider.meta.label}
       </div>
 
       {/* Description - only for unconfigured providers */}

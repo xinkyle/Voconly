@@ -43,7 +43,7 @@ pub struct LlmProviderInstance {
     pub base_url: String, // 用户自定义或默认
     pub api_key: Option<String>,
     pub default_model: Option<String>,
-    /// GPU 层数（仅 llama.cpp 有效，0 = CPU，-1 = 全部层）
+    /// GPU 层数（已废弃，保留向后兼容）
     #[serde(default)]
     pub n_gpu_layers: Option<i32>,
     /// 上下文长度限制（仅本地 Provider 有效，影响模型加载参数和文本长度检查）
@@ -208,17 +208,6 @@ pub fn get_provider_meta_list() -> Vec<ProviderMeta> {
             description: "Ultra-fast inference".to_string(),
         },
         ProviderMeta {
-            id: "siliconflow".to_string(),
-            label: "SiliconFlow".to_string(),
-            icon: "💧".to_string(),
-            base_url: "https://api.siliconflow.cn/v1".to_string(),
-            allow_base_url_edit: false,
-            requires_api_key: true,
-            auth_type: AuthType::Bearer,
-            popular: false,
-            description: "Model aggregation platform".to_string(),
-        },
-        ProviderMeta {
             id: "yi".to_string(),
             label: "Yi".to_string(),
             icon: "🌟".to_string(),
@@ -240,17 +229,6 @@ pub fn get_provider_meta_list() -> Vec<ProviderMeta> {
             popular: false,
             description: "Custom API endpoint".to_string(),
         },
-        ProviderMeta {
-            id: "llama_cpp".to_string(),
-            label: "llama.cpp".to_string(),
-            icon: "🤖".to_string(),
-            base_url: "".to_string(),
-            allow_base_url_edit: false,
-            requires_api_key: false,
-            auth_type: AuthType::None,
-            popular: true,
-            description: "Local LLM loader for GGUF models with GPU acceleration".to_string(),
-        },
     ]
 }
 
@@ -263,7 +241,6 @@ pub enum LlmProviderType {
     DeepSeek,
     Gemini,
     Custom,
-    LlamaCpp,
 }
 
 impl Default for LlmProviderType {
@@ -281,7 +258,6 @@ impl LlmProviderType {
             LlmProviderType::DeepSeek => "deepseek".to_string(),
             LlmProviderType::Gemini => "gemini".to_string(),
             LlmProviderType::Custom => "custom".to_string(),
-            LlmProviderType::LlamaCpp => "llama_cpp".to_string(),
         }
     }
 
@@ -292,7 +268,6 @@ impl LlmProviderType {
             "openai" => LlmProviderType::OpenAI,
             "deepseek" => LlmProviderType::DeepSeek,
             "gemini" => LlmProviderType::Gemini,
-            "llama_cpp" => LlmProviderType::LlamaCpp,
             _ => LlmProviderType::Custom,
         }
     }

@@ -66,7 +66,7 @@ pub enum ModelType {
 /// - `supports_auto_detect`: Whether the model supports automatic language detection
 ///
 /// # LLM-specific Fields (None for ASR models)
-/// - `n_gpu_layers`: GPU layer count for llama.cpp (-1 = all layers)
+/// - `n_gpu_layers`: GPU layer count for local models (-1 = all layers)
 /// - `n_ctx`: Context window size
 /// - `recommended`: Whether this model is recommended
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -114,7 +114,7 @@ pub struct ModelPreset {
     pub speed_score: Option<f32>,
 
     // LLM-specific fields (None for ASR models)
-    /// GPU layer count for llama.cpp (-1 = all layers, 0 = CPU only)
+    /// GPU layer count for local models (-1 = all layers, 0 = CPU only)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n_gpu_layers: Option<i32>,
     /// Context window size

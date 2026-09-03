@@ -349,7 +349,7 @@ export default function SettingsPrompt() {
           value={currentPromptValue}
           onChange={(e) => handlePromptChange(e.target.value)}
           rows={12}
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
           placeholder={t('llmConfig.promptPlaceholder')}
         />
         <p className="mt-2 text-xs text-gray-400">

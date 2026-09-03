@@ -501,27 +501,6 @@ export async function scanAsrModels(): Promise<ModelPreset[]> {
   return invoke<ModelPreset[]>('scan_asr_models');
 }
 
-/**
- * Scan available LLM models from storage directory
- * Returns both preset models (with download URLs) and user models (without download URLs)
- */
-export async function scanLlmModels(): Promise<LlmModelPreset[]> {
-  return invoke<LlmModelPreset[]>('scan_llm_models');
-}
-
-/**
- * LLM Model Preset (matches Rust LlmModelPreset)
- */
-export interface LlmModelPreset {
-  id: string;
-  name: string;
-  size: string;
-  description: string;
-  downloadUrls: RustDownloadSource[];
-  nGpuLayers: number;
-  nCtx: number;
-  recommended: boolean;
-}
 
 /**
  * ASR Model with Status (matches Rust AsrModelWithStatus)
@@ -569,15 +548,6 @@ export function getQuantLabel(quant: string): 'low' | 'medium' | 'high' | undefi
   return QUANT_LABELS[quant];
 }
 
-/**
- * LLM Model with Status (matches Rust LlmModelWithStatus)
- */
-export interface LlmModelWithStatus {
-  preset: LlmModelPreset;
-  downloaded: boolean;
-  path?: string;
-  sizeMb?: number;
-}
 
 /**
  * Get ASR model list with download status
@@ -585,14 +555,6 @@ export interface LlmModelWithStatus {
  */
 export async function getAsrModelList(): Promise<AsrModelWithStatus[]> {
   return invoke<AsrModelWithStatus[]>('get_asr_model_list');
-}
-
-/**
- * Get LLM model list with download status
- * Returns combined list of downloaded models and preset models not yet downloaded
- */
-export async function getLlmModelList(): Promise<LlmModelWithStatus[]> {
-  return invoke<LlmModelWithStatus[]>('get_llm_model_list');
 }
 
 /**

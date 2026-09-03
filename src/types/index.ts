@@ -5,14 +5,6 @@ export type BackendType = 'Whisper' | 'Onnx';
 // ============== 预览窗口高度档位 ==============
 export type PreviewHeight = 'high' | 'medium' | 'low';
 
-// ============== GPU 信息 ==============
-export interface GpuInfo {
-  available: boolean;
-  gpuType: string;  // cuda, metal, vulkan, none
-  maxDevices: number;
-  recommendedLayers: number;  // -1 = 全部层，0 = CPU
-}
-
 // ============== 加载策略 ==============
 // 加载策略类型 - 所有模型均为常驻内存模式
 export type LoadStrategy = { type: 'Always' };
@@ -279,7 +271,7 @@ export interface LlmProviderInstance {
   baseUrl: string;     // 用户自定义或默认
   apiKey?: string;
   defaultModel?: string;
-  nGpuLayers?: number;  // GPU 层数（仅 llama.cpp 有效，-1 = 全部，0 = CPU）
+  nGpuLayers?: number;  // GPU 层数（用于本地模型加速，-1 = 全部，0 = CPU）
   contextLimit?: number; // 上下文长度限制（仅本地 Provider 有效，默认 4096）
   maxTokens?: number; // 最大输出 tokens（本地模型默认 1024）
 }

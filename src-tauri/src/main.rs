@@ -41,7 +41,6 @@ mod crash_report;
 mod dictionary;
 mod history;
 mod llm;
-mod llm_models;
 mod log_settings;
 mod model_manager;
 mod paths;
@@ -1808,7 +1807,6 @@ fn main() {
             commands::model::switch_asr_model,
             commands::model::is_model_loaded,
             commands::model::scan_asr_models,
-            commands::model::scan_llm_models,
             commands::model::get_asr_model_list,
             // Custom ASR model directory commands
             commands::model::get_custom_asr_model_dirs,
@@ -1833,13 +1831,6 @@ fn main() {
             // Provider model cache commands
             commands::llm::get_cached_provider_models,
             commands::llm::refresh_provider_models,
-            // LLM model management commands
-            commands::llm::get_llm_model_list,
-            commands::llm::download_llm_model,
-            commands::llm::delete_llm_model,
-            commands::llm::check_llm_model_exists,
-            commands::llm::get_llm_model_storage_path_cmd,
-            commands::llm::detect_gpu,
             // New download commands
             download_model_with_source,
             download_model_from_url,
@@ -2097,9 +2088,6 @@ fn main() {
                                     }
                                 }
                             }
-
-                            // 清理 LLM 模型缓存
-                            llm::clear_model_cache();
 
                             info!("[Quit] 所有资源清理完成，退出应用");
                             app.exit(0);

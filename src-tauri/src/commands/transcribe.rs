@@ -589,9 +589,6 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
         }
     }
 
-    // 2. 清理 LLM MODEL_CACHE
-    crate::llm::clear_model_cache();
-
     info!("[Cleanup] 所有资源清理完成");
     Ok(())
 }

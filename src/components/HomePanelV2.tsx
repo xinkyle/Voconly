@@ -671,11 +671,7 @@ export default function HomePanelV2({
 
   // 获取 Provider 友好显示名称
   const getProviderDisplayName = (providerId: string): string => {
-    // llama.cpp 显示为"本地大模型"/"Local LLM"，更易于理解
-    if (providerId === 'llama_cpp') {
-      return t('home.localLlm');
-    }
-    // 其他 Provider 使用原有 label
+    // 使用 Provider 的 label
     return currentProvider?.meta.label || providerId;
   };
 
