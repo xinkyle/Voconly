@@ -333,13 +333,14 @@ export async function downloadAndInstallUpdate(
       log.info(`[Updater] Download complete: ${filePath}`);
 
       // 安装更新
+      // 安装程序会以 /P /UPDATE /R 参数启动，完成后会自动启动新版本
       await invoke('install_update', { filePath });
 
-      // 更新状态
-      log.info('[Updater] Update installed, relaunching...');
+      log.info('[Updater] Installer launched, exiting current app...');
 
-      // 重启应用
-      await relaunch();
+      // 退出当前应用，让安装程序完成覆盖安装
+      // 安装程序完成后会自动启动新版本（因为传了 /R 参数）
+      await invoke('exit_app');
     } finally {
       unlisten?.();
     }

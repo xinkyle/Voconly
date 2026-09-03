@@ -206,7 +206,16 @@ pub async fn download_update(
 
     // 确保下载目录存在
     let download_dir = get_download_dir()?;
-    ensure_parent_dir_exists(&download_dir)?;
+    info!("Download directory: {}", download_dir.display());
+
+    // 确保目录存在（包括 updates 目录本身）
+    if !download_dir.exists() {
+        fs::create_dir_all(&download_dir).map_err(|e| {
+            let err_msg = format!("创建下载目录失败: {} (路径: {})", e, download_dir.display());
+            warn!("{}", err_msg);
+            err_msg
+        })?;
+    }
 
     // Sanitize file name to prevent path traversal
     let safe_file_name = std::path::Path::new(&file_name)
@@ -318,21 +327,23 @@ pub fn install_update(file_path: String) -> Result<(), String> {
     // Windows: 静默安装升级（参考 Tauri 内置 updater 的方式）
     // /P = Passive mode：显示进度条，无用户交互，自动关闭
     // /UPDATE = Update mode：跳过卸载旧版本的对话框，直接覆盖安装，保留快捷方式
+    // /R = 自动启动应用（安装完成后）
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
 
         info!("Launching installer in passive update mode...");
         info!("File path: {}", path.display());
-        info!("Arguments: /P /UPDATE");
+        info!("Arguments: /P /UPDATE /R");
 
         let spawn_result = Command::new(&path)
             .arg("/P") // Passive mode：有进度条，无交互
             .arg("/UPDATE") // Update mode：直接覆盖安装
+            .arg("/R") // 安装完成后自动启动应用
             .spawn();
 
         match spawn_result {
-            Ok(_) => info!("Installer launched successfully with /P /UPDATE"),
+            Ok(_) => info!("Installer launched successfully with /P /UPDATE /R"),
             Err(e) => {
                 warn!("Failed to launch installer: {}", e);
                 return Err(format!("Failed to launch installer: {}", e));

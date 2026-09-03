@@ -1663,6 +1663,41 @@ fn main() {
         log_level_start.elapsed().as_millis()
     );
 
+    // 根据配置自动注册/取消注册开机自启动
+    // 确保系统注册表状态与配置文件一致
+    let autostart_start = Instant::now();
+    let auto_start_enabled = config.auto_start.unwrap_or(true);
+    #[cfg(windows)]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        if let Ok(key) = hkcu.open_subkey_with_flags(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            KEY_WRITE,
+        ) {
+            if auto_start_enabled {
+                // 配置要求开启自启动，注册到系统
+                let exe_path = std::env::current_exe()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if !exe_path.is_empty() {
+                    let _ = key.set_value("Voconly", &exe_path);
+                    info!("[STARTUP] 开机自启动已注册（配置: true）");
+                }
+            } else {
+                // 配置要求关闭自启动，从系统移除
+                let _ = key.delete_value("Voconly");
+                info!("[STARTUP] 开机自启动已移除（配置: false）");
+            }
+        }
+    }
+    info!(
+        "[STARTUP] 开机自启动同步完成, 耗时: {}ms",
+        autostart_start.elapsed().as_millis()
+    );
+
     let model_mgr_start = Instant::now();
     let config_arc = std::sync::Arc::new(Mutex::new(config.clone()));
     let app_services = commands::transcribe::init_model_manager(config_arc.clone());

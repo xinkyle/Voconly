@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// 当前配置版本
 /// 当配置结构发生重大变化时，递增此版本号
 /// 旧版本配置会被自动备份并重置为默认配置
-const CONFIG_VERSION: u32 = 2;
+const CONFIG_VERSION: u32 = 3;
 
 /// 版本检测是否已执行的标志
 /// 确保版本检测只在应用启动时执行一次

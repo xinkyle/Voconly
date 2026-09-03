@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { enableAutostart, disableAutostart, isAutostartEnabled } from '../../services/autostart';
+import { enableAutostart, disableAutostart } from '../../services/autostart';
 import { getMicrophones, requestMicrophonePermission } from '../../services/audio';
 import { invoke } from '../../utils/tauri';
 import { createLogger } from '../../services/log';
@@ -32,13 +32,6 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   // Log directory state
   const [logDir, setLogDir] = useState<string>('');
 
-  // Load current autostart status on mount
-  useEffect(() => {
-    loadAutostartStatus();
-    loadMicrophones();
-    loadLogDir();
-  }, []);
-
   // Sync state when config changes
   useEffect(() => {
     setAutostartEnabled(config.autoStart ?? true);
@@ -46,20 +39,14 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     setPreviewHeight(config.previewHeight ?? 'low');
     setSelectedMic(config.defaultMicrophone || '');
     setAsrIdleTimeout(config.asrIdleTimeoutSeconds ?? 300);
+    setLoading(false);
   }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);
 
-  const loadAutostartStatus = async () => {
-    setLoading(true);
-    try {
-      const enabled = await isAutostartEnabled();
-      setAutostartEnabled(enabled);
-    } catch (err) {
-      log.error(`Failed to load autostart status: ${err}`);
-      setError(t('settings.system.loadAutostartError'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load microphones and log dir on mount
+  useEffect(() => {
+    loadMicrophones();
+    loadLogDir();
+  }, []);
 
   const loadMicrophones = async () => {
     setMicLoading(true);

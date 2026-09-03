@@ -281,7 +281,7 @@ export default function UpdateDialog({
               <h3 className="text-sm font-medium text-gray-900 mb-2">
                 {t('update.changelog')}
               </h3>
-              <div className="text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="text-sm text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto pr-2">
                 {parseBilingualNotes(versionInfo.body, i18n.language)}
               </div>
             </div>
