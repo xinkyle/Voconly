@@ -392,9 +392,9 @@ pub enum PreviewHeight {
     /// 高 - 显示更多内容
     High,
     /// 中 - 适中显示
-    #[default]
     Medium,
     /// 低 - 仅显示约3行
+    #[default]
     Low,
 }
 
@@ -587,7 +587,7 @@ impl Default for AppConfig {
             log_level: Some("warn".to_string()),
             user_dictionary: UserDictionary::default(),
             segment_transcribe: true, // 默认开启分段转录
-            preview_height: PreviewHeight::default(), // 默认中等高度
+            preview_height: PreviewHeight::default(), // 默认低高度
             version_info_url: None, // 默认使用 updater.rs 中的内置 URL
             #[allow(deprecated)]
             llm_models: Vec::new(),
