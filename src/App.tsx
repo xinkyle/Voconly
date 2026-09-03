@@ -1585,6 +1585,7 @@ function App() {
                   setActiveNav('provider');
                 }}
                 tryRegisterShortcut={registerShortcutWithResult}
+                checkConflict={checkShortcutConflict}
                 triggerSelectModelSceneId={triggerSelectModelSceneId}
                 onTriggerSelectModelCleared={() => setTriggerSelectModelSceneId(null)}
                 onScenesSave={handleSaveScenes}

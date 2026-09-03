@@ -13,6 +13,7 @@ import { getProviderList, getLlmPromptPresets } from '../services/llm';
 import { listen } from '@tauri-apps/api/event';
 import AsrModelSelectModal from './AsrModelSelectModal';
 import ShortcutErrorModal from './ShortcutErrorModal';
+import SceneForm from './SceneForm';
 import { Tutorial } from './Tutorial';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
@@ -94,6 +95,7 @@ interface HomePanelV2Props {
   onNavigateToSettings?: () => void;
   onNavigateToLlmSettings?: () => void;
   tryRegisterShortcut?: (shortcut: string, sceneId: string) => Promise<{ success: boolean; errorType?: string; error?: string }>;
+  checkConflict?: (shortcut: string, excludeSceneId?: string) => string | null;
   triggerSelectModelSceneId?: string | null;
   onTriggerSelectModelCleared?: () => void;
   onScenesSave?: (scenes: Scene[]) => void;
@@ -114,6 +116,7 @@ export default function HomePanelV2({
   onNavigateToSettings: _onNavigateToSettings,
   onNavigateToLlmSettings,
   tryRegisterShortcut,
+  checkConflict,
   triggerSelectModelSceneId: _triggerSelectModelSceneId,
   onTriggerSelectModelCleared: _onTriggerSelectModelCleared,
   onScenesSave,
@@ -138,6 +141,10 @@ export default function HomePanelV2({
     activeDays: 0,
   });
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // 场景编辑对话框状态
+  const [showForm, setShowForm] = useState(false);
+  const [editingScene, setEditingScene] = useState<Scene | null>(null);
 
   // 快捷键监听状态
   const [listeningSceneId, setListeningSceneId] = useState<string | null>(null);
@@ -598,6 +605,30 @@ export default function HomePanelV2({
     }, 5000);
   }, []);
 
+  // 打开场景编辑对话框
+  const handleEditScene = useCallback((scene: Scene) => {
+    setEditingScene(scene);
+    setShowForm(true);
+  }, []);
+
+  // 保存场景编辑
+  const handleSaveScene = useCallback((scene: Scene) => {
+    const newScenes = localScenes.map(s => (s.id === scene.id ? scene : s));
+    setLocalScenes(newScenes);
+    localScenesRef.current = newScenes;
+    setShowForm(false);
+    setEditingScene(null);
+    if (onScenesSave) {
+      onScenesSave(newScenes);
+    }
+  }, [localScenes, onScenesSave]);
+
+  // 取消场景编辑
+  const handleCancelSceneForm = useCallback(() => {
+    setShowForm(false);
+    setEditingScene(null);
+  }, []);
+
   // 键盘事件监听 - 用于捕获快捷键
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -751,14 +782,20 @@ export default function HomePanelV2({
                 const { prefix, main } = parseShortcutForDisplay(scene.shortcut, t);
 
                 return (
-                  <button
+                  <div
                     key={scene.id}
                     id={index === 0 ? 'scene-card-first' : undefined}
-                    className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl px-16 py-10 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[320px] w-[340px]"
-                    onClick={() => handleShortcutClick(scene.id)}
+                    className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl px-16 py-10 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[340px] w-[360px] cursor-pointer shadow-sm"
+                    onClick={() => handleEditScene(scene)}
                   >
                     {/* 键帽样式快捷键 */}
-                    <div className="relative mb-5">
+                    <div
+                      className="relative mb-5 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShortcutClick(scene.id);
+                      }}
+                    >
                       {/* 键帽底座 - 浅灰色层 */}
                       <div className="absolute top-[72px] left-1/2 -translate-x-1/2 w-[72px] h-3 rounded-b-lg bg-gray-400 transition-all duration-150 group-hover:bg-gray-500 group-hover:-translate-y-0.5"></div>
 
@@ -801,7 +838,7 @@ export default function HomePanelV2({
                         {t(`llmConfig.promptTypeDescs.${promptType}`)}
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -897,6 +934,17 @@ export default function HomePanelV2({
       {showTutorial && (
         <Tutorial
           onComplete={handleTutorialComplete}
+        />
+      )}
+
+      {/* Scene Edit Form */}
+      {showForm && editingScene && (
+        <SceneForm
+          scene={editingScene}
+          onSave={handleSaveScene}
+          onCancel={handleCancelSceneForm}
+          checkConflict={checkConflict}
+          setPaused={setPaused}
         />
       )}
     </div>
