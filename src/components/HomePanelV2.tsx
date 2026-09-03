@@ -201,6 +201,32 @@ export default function HomePanelV2({
       });
   }, []);
 
+  // 监听历史记录更新事件，刷新统计数据
+  useEffect(() => {
+    const handleHistoryUpdate = () => {
+      log.debug('Received history-updated event, refreshing stats');
+      getFullStats()
+        .then(s => {
+          setStats({
+            totalDuration: s?.totalDuration ?? 0,
+            totalWords: s?.totalWords ?? 0,
+            totalCount: s?.totalCount ?? 0,
+            todayCount: s?.todayCount ?? 0,
+            activeDays: s?.activeDays ?? 0,
+          });
+        })
+        .catch(err => {
+          log.error(`Failed to refresh stats: ${err}`);
+        });
+    };
+
+    window.addEventListener('history-updated', handleHistoryUpdate);
+
+    return () => {
+      window.removeEventListener('history-updated', handleHistoryUpdate);
+    };
+  }, []);
+
   // 加载 ASR 模型列表
   useEffect(() => {
     const loadAsrModels = async () => {

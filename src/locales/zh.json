@@ -395,20 +395,23 @@
   },
   "dictionary": {
     "title": "用户词典",
-    "subtitle": "添加专有名词，修正语音识别结果",
+    "subtitle": "添加专有名词，让 LLM 在处理时正确识别和使用",
     "loading": "正在加载词典配置...",
     "loadError": "加载词典配置失败",
     "saveError": "保存词典配置失败",
     "enable": "启用用户词典",
-    "enableDesc": "使用模糊匹配修正语音识别结果中的专有名词",
+    "enableDesc": "在 LLM 处理时注入词典，确保专有名词被正确识别",
     "wordList": "词汇列表",
-    "wordListDesc": "支持换行、空格或逗号分隔，编辑后自动保存",
-    "placeholder": "输入词汇，支持换行、空格或逗号分隔，例如：\nChatGPT Claude GitHub\n或者：ChatGPT, Claude, GitHub",
+    "wordListDesc": "每行一个词汇，或用逗号分隔",
+    "placeholder": "每行输入一个词汇，例如：\nClaude Code\nChatGPT\nGitHub\n\n或用逗号分隔：Claude Code, ChatGPT, GitHub",
     "enableFirst": "请先启用用户词典",
     "totalWords": "共 {{count}} 个词汇",
     "dedupToast": "已自动去重 {{count}} 个重复词汇",
     "tip": "提示：词典使用模糊匹配算法，可以识别发音相似的词汇。例如添加 \"ChatGPT\" 后，识别结果中的 \"Chat G P T\" 或 \"chatgpt\" 都会被修正为 \"ChatGPT\"。",
-    "comingSoon": "功能开发中"
+    "comingSoon": "功能开发中",
+    "active": "已启用",
+    "enabledToast": "词典已启用，LLM 将参考词典处理文本",
+    "disabledToast": "词典已禁用"
   },
   "llmConfig": {
     "title": "LLM 配置",

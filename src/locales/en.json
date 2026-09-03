@@ -395,20 +395,23 @@
   },
   "dictionary": {
     "title": "User Dictionary",
-    "subtitle": "Add proper nouns to correct speech recognition results",
+    "subtitle": "Add proper nouns for LLM to recognize and use correctly",
     "loading": "Loading dictionary configuration...",
     "loadError": "Failed to load dictionary configuration",
     "saveError": "Failed to save dictionary configuration",
     "enable": "Enable User Dictionary",
-    "enableDesc": "Use fuzzy matching to correct proper nouns in speech recognition results",
+    "enableDesc": "Inject dictionary during LLM processing for correct noun recognition",
     "wordList": "Word List",
-    "wordListDesc": "Supports newline, space, or comma separation. Auto-saves on edit",
-    "placeholder": "Enter words, supports newline, space, or comma separation, e.g.:\nChatGPT Claude GitHub\nOr: ChatGPT, Claude, GitHub",
+    "wordListDesc": "One word per line, or comma-separated",
+    "placeholder": "Enter one word per line, e.g.:\nClaude Code\nChatGPT\nGitHub\n\nOr comma-separated: Claude Code, ChatGPT, GitHub",
     "enableFirst": "Please enable user dictionary first",
     "totalWords": "{{count}} words total",
     "dedupToast": "Automatically removed {{count}} duplicate word(s)",
     "tip": "Tip: The dictionary uses fuzzy matching to identify similar sounding words. For example, after adding \"ChatGPT\", \"Chat G P T\" or \"chatgpt\" in recognition results will be corrected to \"ChatGPT\".",
-    "comingSoon": "Coming Soon"
+    "comingSoon": "Coming Soon",
+    "active": "Active",
+    "enabledToast": "Dictionary enabled. LLM will reference it when processing text",
+    "disabledToast": "Dictionary disabled"
   },
   "llmConfig": {
     "title": "LLM Configuration",

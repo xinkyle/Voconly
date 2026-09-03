@@ -975,6 +975,9 @@ function App() {
         setHistory(prev => [newRecord, ...prev]);
         log.debug(`Saved to history: ${JSON.stringify(newRecord)}`);
 
+        // 通知首页刷新统计数据
+        window.dispatchEvent(new CustomEvent('history-updated'));
+
         // 结束处理流程，药丸保持显示错误状态
         return;
       }
@@ -1040,6 +1043,9 @@ function App() {
       stepStart = recordTime('历史记录保存', stepStart);
       setHistory(prev => [newRecord, ...prev]);
       log.debug(`Saved to history: ${JSON.stringify(newRecord)}`);
+
+      // 通知首页刷新统计数据
+      window.dispatchEvent(new CustomEvent('history-updated'));
 
       // Print timing summary
       const totalDuration = Date.now() - totalStart;

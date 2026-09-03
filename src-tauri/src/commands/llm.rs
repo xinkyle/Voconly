@@ -413,6 +413,35 @@ pub async fn llm_process_text_for_scene(
         }
     };
 
+    // 注入用户词典到提示词
+    let user_prompt = {
+        let config = services.config.lock().unwrap();
+        let dict = &config.user_dictionary;
+
+        if dict.enabled && !dict.entries.is_empty() {
+            // 构建词典提示
+            let dict_words: Vec<String> = dict.entries.iter().map(|e| {
+                if e.aliases.is_empty() {
+                    e.word.clone()
+                } else {
+                    format!("{} (别名: {})", e.word, e.aliases.join(", "))
+                }
+            }).collect();
+
+            let dict_prompt = format!(
+                "\n\n[用户词典 - 请确保以下词汇被正确识别和使用]\n{}",
+                dict_words.join("\n")
+            );
+
+            info!("[LLM] Injecting dictionary with {} entries", dict.entries.len());
+
+            // 追加词典提示到用户提示词
+            format!("{}{}", user_prompt, dict_prompt)
+        } else {
+            user_prompt
+        }
+    };
+
     info!("[LLM] User prompt type: {}", if custom_prompt.is_some() { "custom" } else { &prompt_type });
     info!(
         "[LLM] User prompt template (with placeholder): {}",
@@ -632,6 +661,35 @@ pub async fn llm_process_text_for_scene_with_progress(
                             .unwrap_or_else(|| "{{text}}".to_string())
                     })
             }
+        }
+    };
+
+    // 注入用户词典到提示词
+    let user_prompt = {
+        let config = services.config.lock().unwrap();
+        let dict = &config.user_dictionary;
+
+        if dict.enabled && !dict.entries.is_empty() {
+            // 构建词典提示
+            let dict_words: Vec<String> = dict.entries.iter().map(|e| {
+                if e.aliases.is_empty() {
+                    e.word.clone()
+                } else {
+                    format!("{} (别名: {})", e.word, e.aliases.join(", "))
+                }
+            }).collect();
+
+            let dict_prompt = format!(
+                "\n\n[用户词典 - 请确保以下词汇被正确识别和使用]\n{}",
+                dict_words.join("\n")
+            );
+
+            info!("[LLM] Injecting dictionary with {} entries", dict.entries.len());
+
+            // 追加词典提示到用户提示词
+            format!("{}{}", user_prompt, dict_prompt)
+        } else {
+            user_prompt
         }
     };
 

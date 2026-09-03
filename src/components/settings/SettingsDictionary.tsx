@@ -12,8 +12,6 @@ const log = createLogger('SettingsDictionary');
 
 // 默认阈值
 const DEFAULT_THRESHOLD = 0.13;
-// 每行显示的词语数量
-const WORDS_PER_LINE = 12;
 
 export default function SettingsDictionary() {
   const { t } = useTranslation();
@@ -33,16 +31,15 @@ export default function SettingsDictionary() {
     try {
       const result = await getUserDictionary();
       setEnabled(result.enabled);
-      // 从 entries 格式化为固定列数显示
-      const allEntries: { word: string }[] = [];
-      for (const entry of result.entries) {
-        allEntries.push({ word: entry.word });
-        if (entry.aliases && entry.aliases.length > 0) {
-          allEntries.push(...entry.aliases.map(a => ({ word: a })));
+      // 从 entries 格式化为每行一个词条
+      const lines = result.entries.map(e => {
+        if (e.aliases && e.aliases.length > 0) {
+          return `${e.word} (${e.aliases.join(', ')})`;
         }
-      }
-      setWordsText(formatWordsForDisplay(allEntries));
-      log.debug(`Loaded dictionary: ${result.entries.length} entries, ${allEntries.length} total words`);
+        return e.word;
+      });
+      setWordsText(lines.join('\n'));
+      log.debug(`Loaded dictionary: ${result.entries.length} entries`);
     } catch (err) {
       log.error(`Failed to load dictionary: ${err}`);
       setError(t('dictionary.loadError'));
@@ -51,24 +48,13 @@ export default function SettingsDictionary() {
     }
   };
 
-  // 解析文本为词条数组，支持空格、逗号或换行分隔
+  // 解析文本为词条数组，只按换行和逗号分隔（空格保留在词内）
   const parseWordsText = (text: string): { word: string }[] => {
     return text
-      .split(/[\n,\s]+/)  // 支持换行、逗号、空格分隔
+      .split(/[\n,]+/)  // 只按换行和逗号分隔
       .map(word => word.trim())
       .filter(word => word.length > 0)
       .map(word => ({ word }));
-  };
-
-  // 将词条数组格式化为固定列数显示（用于展示）
-  const formatWordsForDisplay = (entries: { word: string }[]): string => {
-    const words = entries.map(e => e.word);
-    const lines: string[] = [];
-    for (let i = 0; i < words.length; i += WORDS_PER_LINE) {
-      const lineWords = words.slice(i, i + WORDS_PER_LINE);
-      lines.push(lineWords.join(', '));
-    }
-    return lines.join('\n');
   };
 
   // 保存词典配置
@@ -88,7 +74,7 @@ export default function SettingsDictionary() {
       }
 
       const removedCount = entries.length - deduped.length;
-      const dedupedText = formatWordsForDisplay(deduped);
+      const dedupedText = deduped.map(e => e.word).join('\n');
 
       // 更新显示文本为去重后的版本，避免重复触发
       if (removedCount > 0) {
@@ -121,10 +107,12 @@ export default function SettingsDictionary() {
 
   // 切换启用状态
   const handleToggleEnabled = async () => {
-    // 暂时未开放，弹出提示
+    const newEnabled = !enabled;
+    setEnabled(newEnabled);
+    await saveDictionary(newEnabled, wordsText);
     showToast({
-      type: 'info',
-      title: t('dictionary.comingSoon'),
+      type: 'success',
+      title: newEnabled ? t('dictionary.enabledToast') : t('dictionary.disabledToast'),
     });
   };
 
@@ -144,9 +132,11 @@ export default function SettingsDictionary() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <h2 className="text-xl font-semibold text-gray-900">{t('dictionary.title')}</h2>
-          <span className="px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
-            {t('dictionary.comingSoon')}
-          </span>
+          {enabled && (
+            <span className="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+              {t('dictionary.active')}
+            </span>
+          )}
         </div>
         <p className="text-sm text-gray-600">{t('dictionary.subtitle')}</p>
       </div>
