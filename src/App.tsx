@@ -836,7 +836,7 @@ function App() {
             }
           }
 
-          log.debug(`[LLM] Final prompt: ${finalPrompt?.substring(0, 100)}...`);
+          log.debug(`[LLM] Final prompt: ${finalPrompt}`);
 
           const response = await processTextForSceneWithProgress(scene.id, recognizedText, finalPrompt);
           if (response.success) {

@@ -77,11 +77,10 @@ function getModelQuant(modelId: string, asrModels?: AsrModelWithStatus[], t?: (k
   return null;
 }
 
-// 格式化时长
+// 格式化时长（只显示分钟数）
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}`;
 }
 
 interface HomePanelV2Props {
@@ -744,7 +743,7 @@ export default function HomePanelV2({
           </div>
 
           {enabledScenes.length > 0 ? (
-            <div id="scene-cards-area" className="flex flex-wrap gap-10 justify-center">
+            <div id="scene-cards-area" className="flex flex-wrap gap-14 justify-center">
               {enabledScenes.map((scene, index) => {
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
@@ -755,7 +754,7 @@ export default function HomePanelV2({
                   <button
                     key={scene.id}
                     id={index === 0 ? 'scene-card-first' : undefined}
-                    className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl p-12 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[260px] w-[280px]"
+                    className="group relative flex flex-col items-center bg-gray-100 border border-gray-200 rounded-2xl px-16 py-10 text-center transition-all duration-200 hover:border-gray-300 hover:shadow-lg min-w-[320px] w-[340px]"
                     onClick={() => handleShortcutClick(scene.id)}
                   >
                     {/* 键帽样式快捷键 */}

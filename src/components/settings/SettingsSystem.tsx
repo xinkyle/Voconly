@@ -18,7 +18,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const { t, i18n } = useTranslation();
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart || false);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
-  const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'medium');
+  const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'low');
   const [asrIdleTimeout, setAsrIdleTimeout] = useState<number>(config.asrIdleTimeoutSeconds ?? 300);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,7 +43,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   useEffect(() => {
     setAutostartEnabled(config.autoStart || false);
     setCheckUpdates(config.checkUpdates ?? false);
-    setPreviewHeight(config.previewHeight ?? 'medium');
+    setPreviewHeight(config.previewHeight ?? 'low');
     setSelectedMic(config.defaultMicrophone || '');
     setAsrIdleTimeout(config.asrIdleTimeoutSeconds ?? 300);
   }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);

@@ -845,7 +845,7 @@ async fn set_float_panel_height(
             // 根据高度档位设置不同的展开高度
             let target_height = if expanded {
                 match preview_height.as_deref() {
-                    Some("low") => 140u32,    // 低：约3行
+                    Some("low") => 150u32,    // 低：约3行
                     Some("medium") => 280u32, // 中：适中
                     _ => 500u32,              // 高（默认）：500px
                 }
