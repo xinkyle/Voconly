@@ -311,9 +311,9 @@ export default function HomePanelV2({
           setAsrLoading(!loaded);
           setAsrModelLoaded(loaded);
           if (loaded) {
-            log.info(`ASR model ${modelId} is already loaded`);
+            log.debug(`ASR model ${modelId} is already loaded`);
           } else {
-            log.info(`ASR model ${modelId} is not loaded yet`);
+            log.debug(`ASR model ${modelId} is not loaded yet`);
             // 如果未加载，等待一段时间后再次检查（后端可能正在预加载）
             setTimeout(async () => {
               if (!mounted) return;
@@ -323,7 +323,7 @@ export default function HomePanelV2({
                   setAsrLoading(!reloaded);
                   setAsrModelLoaded(reloaded);
                   if (reloaded) {
-                    log.info(`ASR model ${modelId} loaded after retry`);
+                    log.debug(`ASR model ${modelId} loaded after retry`);
                   }
                 }
               } catch (e) {

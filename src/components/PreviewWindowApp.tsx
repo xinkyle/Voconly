@@ -11,8 +11,8 @@ interface PreviewTextPayload {
 }
 
 export default function PreviewWindowApp() {
-  log.info('===== PreviewWindowApp component mounting =====');
-  log.info('Current window label: "preview" (expected)');
+  log.debug('===== PreviewWindowApp component mounting =====');
+  log.debug('Current window label: "preview" (expected)');
 
   const [text, setText] = useState('');
   const [visible, setVisible] = useState(false);
@@ -21,27 +21,27 @@ export default function PreviewWindowApp() {
 
   // 获取当前窗口并打印信息
   const currentWindow = getCurrentWindow();
-  log.info('getCurrentWindow() returned window object');
-  log.info('Window label: ' + currentWindow.label);
+  log.debug('getCurrentWindow() returned window object');
+  log.debug('Window label: ' + currentWindow.label);
 
   // 监听预览文字更新事件
   useEffect(() => {
-    log.info('===== Setting up preview-text-update listener =====');
-    log.info('Using getCurrentWindow().listen() for event: preview-text-update');
+    log.debug('===== Setting up preview-text-update listener =====');
+    log.debug('Using getCurrentWindow().listen() for event: preview-text-update');
 
     const setupListener = async () => {
       try {
-        log.info('Calling currentWindow.listen()...');
+        log.debug('Calling currentWindow.listen()...');
         const unlisten = await currentWindow.listen<PreviewTextPayload>('preview-text-update', (event) => {
-          log.info('===== RECEIVED preview-text-update event =====');
-          log.info('Event payload: fullText=' + event.payload.fullText.length + ' chars');
-          log.info('Event payload content: "' + event.payload.fullText + '"');
+          log.debug('===== RECEIVED preview-text-update event =====');
+          log.debug('Event payload: fullText=' + event.payload.fullText.length + ' chars');
+          log.debug('Event payload content: "' + event.payload.fullText + '"');
           setText(event.payload.fullText);
           setVisible(true);
           setIsHiding(false);
         });
-        log.info('preview-text-update listener registered SUCCESSFULLY');
-        log.info('unlisten function type: ' + typeof unlisten);
+        log.debug('preview-text-update listener registered SUCCESSFULLY');
+        log.debug('unlisten function type: ' + typeof unlisten);
         return unlisten;
       } catch (err) {
         log.error('===== FAILED to setup preview-text-update listener =====');
@@ -54,7 +54,7 @@ export default function PreviewWindowApp() {
 
     return () => {
       unlistenPromise.then((f) => {
-        log.info('Cleaning up preview-text-update listener');
+        log.debug('Cleaning up preview-text-update listener');
         f();
       });
     };
@@ -62,22 +62,22 @@ export default function PreviewWindowApp() {
 
   // 监听预览窗口隐藏事件
   useEffect(() => {
-    log.info('===== Setting up preview-window-hide listener =====');
+    log.debug('===== Setting up preview-window-hide listener =====');
 
     const setupListener = async () => {
       try {
         const unlisten = await currentWindow.listen<void>('preview-window-hide', () => {
-          log.info('===== RECEIVED preview-window-hide event =====');
+          log.debug('===== RECEIVED preview-window-hide event =====');
           setIsHiding(true);
           // 动画结束后隐藏
           setTimeout(() => {
             setVisible(false);
             setIsHiding(false);
             setText('');
-            log.info('Preview window hidden and text cleared');
+            log.debug('Preview window hidden and text cleared');
           }, 150);
         });
-        log.info('preview-window-hide listener registered SUCCESSFULLY');
+        log.debug('preview-window-hide listener registered SUCCESSFULLY');
         return unlisten;
       } catch (err) {
         log.error('===== FAILED to setup preview-window-hide listener =====');
@@ -90,7 +90,7 @@ export default function PreviewWindowApp() {
 
     return () => {
       unlistenPromise.then((f) => {
-        log.info('Cleaning up preview-window-hide listener');
+        log.debug('Cleaning up preview-window-hide listener');
         f();
       });
     };
@@ -98,16 +98,16 @@ export default function PreviewWindowApp() {
 
   // 监听预览窗口显示事件（用于初始化）
   useEffect(() => {
-    log.info('===== Setting up preview-window-show listener =====');
+    log.debug('===== Setting up preview-window-show listener =====');
 
     const setupListener = async () => {
       try {
         const unlisten = await currentWindow.listen<void>('preview-window-show', () => {
-          log.info('===== RECEIVED preview-window-show event =====');
+          log.debug('===== RECEIVED preview-window-show event =====');
           setVisible(true);
           setIsHiding(false);
         });
-        log.info('preview-window-show listener registered SUCCESSFULLY');
+        log.debug('preview-window-show listener registered SUCCESSFULLY');
         return unlisten;
       } catch (err) {
         log.error('===== FAILED to setup preview-window-show listener =====');
@@ -120,7 +120,7 @@ export default function PreviewWindowApp() {
 
     return () => {
       unlistenPromise.then((f) => {
-        log.info('Cleaning up preview-window-show listener');
+        log.debug('Cleaning up preview-window-show listener');
         f();
       });
     };
@@ -133,15 +133,15 @@ export default function PreviewWindowApp() {
     }
   }, [text]);
 
-  log.info('===== Preview window render =====');
-  log.info('visible=' + visible + ', text="' + text + '"');
+  log.debug('===== Preview window render =====');
+  log.debug('visible=' + visible + ', text="' + text + '"');
 
   if (!visible) {
-    log.info('Not rendering (visible=false)');
+    log.debug('Not rendering (visible=false)');
     return null;
   }
 
-  log.info('Rendering preview window with text');
+  log.debug('Rendering preview window with text');
   return (
     <div className="preview-container">
       <div className={`preview-window ${isHiding ? 'animate-fade-out' : 'animate-fade-in'}`}>

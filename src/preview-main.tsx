@@ -10,13 +10,13 @@ const log = createLogger('PreviewMain');
 // Prevent context menu
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-log.info('===== PREVIEW WINDOW MAIN ENTRY =====');
-log.info('preview-main.tsx executing');
-log.info('Window location: ' + window.location.href);
+log.debug('===== PREVIEW WINDOW MAIN ENTRY =====');
+log.debug('preview-main.tsx executing');
+log.debug('Window location: ' + window.location.href);
 
 // 检查 root 元素是否存在
 const rootElement = document.getElementById('root');
-log.info('Root element exists: ' + (rootElement ? 'YES' : 'NO'));
+log.debug('Root element exists: ' + (rootElement ? 'YES' : 'NO'));
 
 if (!rootElement) {
   log.error('CRITICAL: No root element found! Preview window cannot render.');
@@ -28,4 +28,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 );
 
-log.info('Preview window React root created');
+log.debug('Preview window React root created');
