@@ -148,7 +148,7 @@ export default function HomePanelV2({
 
   // 快捷键监听状态
   const [listeningSceneId, setListeningSceneId] = useState<string | null>(null);
-  const listeningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listeningSceneIdRef = useRef(listeningSceneId);
   const localScenesRef = useRef(localScenes);
   const tryRegisterShortcutRef = useRef(tryRegisterShortcut);
