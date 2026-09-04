@@ -132,7 +132,7 @@ export default function SettingsDictionary({ config, onSave }: SettingsDictionar
         <div className="flex items-center gap-2 mb-2">
           <h2 className="text-xl font-semibold text-gray-900">{t('dictionary.title')}</h2>
           {enabled && (
-            <span className="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium text-white bg-gray-700 rounded-full">
               {t('dictionary.active')}
             </span>
           )}
