@@ -43,9 +43,6 @@ pub struct LlmProviderInstance {
     pub base_url: String, // 用户自定义或默认
     pub api_key: Option<String>,
     pub default_model: Option<String>,
-    /// GPU 层数（已废弃，保留向后兼容）
-    #[serde(default)]
-    pub n_gpu_layers: Option<i32>,
     /// 上下文长度限制（仅本地 Provider 有效，影响模型加载参数和文本长度检查）
     /// 默认值：本地 Provider 为 4096，在线 Provider 为 None（不限制）
     #[serde(default)]
@@ -53,6 +50,18 @@ pub struct LlmProviderInstance {
     /// 最大输出 tokens（None 表示不限制，本地模型默认 1024）
     #[serde(default)]
     pub max_tokens: Option<u32>,
+    /// Keep-alive 时间（仅 Ollama 有效）
+    /// 格式：
+    /// - "0" 或 0：用完即卸载
+    /// - "5m"：保持5分钟（默认）
+    /// - "10m"：保持10分钟
+    /// - "-1"：永久保持
+    #[serde(default = "default_keep_alive")]
+    pub keep_alive: String,
+}
+
+fn default_keep_alive() -> String {
+    "5m".to_string()
 }
 
 impl Default for LlmProviderInstance {
@@ -63,9 +72,9 @@ impl Default for LlmProviderInstance {
             base_url: "http://localhost:11434/v1".to_string(),
             api_key: None,
             default_model: None,
-            n_gpu_layers: None,
             context_limit: None,
             max_tokens: Some(1024), // 本地模型默认 1024
+            keep_alive: default_keep_alive(),
         }
     }
 }
@@ -312,9 +321,9 @@ impl Default for LlmProviderConfig {
 pub struct LlmConfig {
     pub enabled: bool, // 是否启用 LLM 后处理
     pub provider: LlmProviderConfig,
-    pub user_prompt_template: String, // 用户提示词模板，{text} 为占位符
-    pub max_tokens: u32,              // 最大输出 token
-    pub temperature: f32,             // 温度参数
+    pub system_prompt: String, // 系统提示词，定义模型的角色和任务
+    pub max_tokens: u32,       // 最大输出 token
+    pub temperature: f32,      // 温度参数
 }
 
 impl Default for LlmConfig {
@@ -322,7 +331,7 @@ impl Default for LlmConfig {
         Self {
             enabled: false,
             provider: LlmProviderConfig::default(),
-            user_prompt_template: "{text}".to_string(),
+            system_prompt: String::new(),
             max_tokens: 1024,
             temperature: 0.1,
         }

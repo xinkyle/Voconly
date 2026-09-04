@@ -4,8 +4,9 @@
 use crate::commands::performance::LlmPerformanceState;
 use crate::config::AppServices;
 use crate::llm::{
-    get_provider_meta_list, LlmConfig, LlmProfile, LlmProgressEvent, LlmProviderInstance,
-    LlmResponse, LlmService, ProviderMeta, ProviderModelsCache, UserPromptPresets,
+    empty_to_none, get_provider_meta_list, migrate_prompt, LlmConfig, LlmProfile, LlmProgressEvent,
+    LlmProviderInstance, LlmResponse, LlmService, ProviderMeta, ProviderModelsCache,
+    UserPromptPresets,
 };
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,20 @@ pub struct LlmHealthResponse {
     pub models: Vec<String>,
     /// 错误信息（如果有）
     pub error: Option<String>,
+}
+
+/// 根据预设名称获取提示词
+fn get_preset_prompt(presets: Option<&UserPromptPresets>, preset_name: &str) -> String {
+    let result = match preset_name {
+        "lightPolish" => presets.and_then(|p| empty_to_none(&p.light_polish)),
+        "translate" => presets.and_then(|p| empty_to_none(&p.translate)),
+        "professionalPolish" => presets.and_then(|p| empty_to_none(&p.professional_polish)),
+        "meetingSecretary" => presets.and_then(|p| empty_to_none(&p.meeting_secretary)),
+        custom => presets.and_then(|p| {
+            p.custom_presets.get(custom).and_then(|s| empty_to_none(s.as_str()))
+        }),
+    };
+    result.unwrap_or_default().to_string()
 }
 
 /// 从全局配置构建 LlmConfig 的辅助函数
@@ -73,9 +88,9 @@ fn build_llm_config_from_global(
                 base_url: meta.base_url.clone(),
                 api_key: None,
                 default_model: None,
-                n_gpu_layers: None,
                 context_limit: None,
                 max_tokens: None,
+                keep_alive: "5m".to_string(),
             }
         });
 
@@ -93,7 +108,7 @@ fn build_llm_config_from_global(
             model: global_llm.model.clone(),
             timeout_secs: 3600,
         },
-        user_prompt_template: String::new(), // 健康检查不需要提示词
+        system_prompt: String::new(), // 健康检查不需要提示词
         max_tokens: global_llm.max_tokens,
         temperature: global_llm.temperature,
     };
@@ -321,9 +336,9 @@ pub async fn llm_process_text_for_scene(
                     base_url: meta.base_url.clone(),
                     api_key: None,
                     default_model: None,
-                    n_gpu_layers: None,
                     context_limit: None,
                     max_tokens: None,
+                    keep_alive: "5m".to_string(),
                 }
             });
 
@@ -340,11 +355,11 @@ pub async fn llm_process_text_for_scene(
     let user_prompt = if let Some(frontend_prompt) = prompt {
         // 0. 前端传递的提示词最高优先级
         info!("[LLM] Using prompt from frontend");
-        frontend_prompt
+        migrate_prompt(&frontend_prompt)
     } else if let Some(ref custom) = custom_prompt {
         // 1. 场景自定义提示词优先
         info!("[LLM] Using scene custom_prompt");
-        custom.clone()
+        migrate_prompt(custom)
     } else {
         // 2. 根据 prompt_type 查找预设
         let effective_prompt_type = if prompt_type.is_empty() {
@@ -354,37 +369,13 @@ pub async fn llm_process_text_for_scene(
             &prompt_type
         };
 
-        match effective_prompt_type {
-            "lightPolish" => presets.as_ref()
-                .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "translate" => presets.as_ref()
-                .and_then(|p| if p.translate.is_empty() { None } else { Some(&p.translate) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "professionalPolish" => presets.as_ref()
-                .and_then(|p| if p.professional_polish.is_empty() { None } else { Some(&p.professional_polish) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "meetingSecretary" => presets.as_ref()
-                .and_then(|p| if p.meeting_secretary.is_empty() { None } else { Some(&p.meeting_secretary) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            preset_name => {
-                // 尝试从自定义预设中查找
-                presets.as_ref()
-                    .and_then(|p| p.custom_presets.get(preset_name))
-                    .cloned()
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or_else(|| {
-                        // 未找到预设，使用默认 lightPolish
-                        presets.as_ref()
-                            .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
-                            .cloned()
-                            .unwrap_or_else(|| "{{text}}".to_string())
-                    })
-            }
+        let preset_prompt = get_preset_prompt(presets.as_ref(), effective_prompt_type);
+
+        // 如果未找到预设，尝试使用默认 lightPolish
+        if preset_prompt.is_empty() && effective_prompt_type != "lightPolish" {
+            get_preset_prompt(presets.as_ref(), "lightPolish")
+        } else {
+            preset_prompt
         }
     };
 
@@ -438,7 +429,7 @@ pub async fn llm_process_text_for_scene(
             model: llm_config.model.clone(),
             timeout_secs: 3600, // 60分钟，大文本处理需要足够时间
         },
-        user_prompt_template: user_prompt.clone(),
+        system_prompt: user_prompt.clone(),
         max_tokens: llm_config.max_tokens,
         temperature: llm_config.temperature,
     };
@@ -572,9 +563,9 @@ pub async fn llm_process_text_for_scene_with_progress(
                     base_url: meta.base_url.clone(),
                     api_key: None,
                     default_model: None,
-                    n_gpu_layers: None,
                     context_limit: None,
                     max_tokens: None,
+                    keep_alive: "5m".to_string(),
                 }
             });
 
@@ -591,11 +582,11 @@ pub async fn llm_process_text_for_scene_with_progress(
     let user_prompt = if let Some(frontend_prompt) = prompt {
         // 0. 前端传递的提示词最高优先级
         info!("[LLM] Using prompt from frontend");
-        frontend_prompt
+        migrate_prompt(&frontend_prompt)
     } else if let Some(ref custom) = custom_prompt {
         // 1. 场景自定义提示词优先
         info!("[LLM] Using scene custom_prompt");
-        custom.clone()
+        migrate_prompt(custom)
     } else {
         // 2. 根据 prompt_type 查找预设
         let effective_prompt_type = if prompt_type.is_empty() {
@@ -605,37 +596,13 @@ pub async fn llm_process_text_for_scene_with_progress(
             &prompt_type
         };
 
-        match effective_prompt_type {
-            "lightPolish" => presets.as_ref()
-                .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "translate" => presets.as_ref()
-                .and_then(|p| if p.translate.is_empty() { None } else { Some(&p.translate) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "professionalPolish" => presets.as_ref()
-                .and_then(|p| if p.professional_polish.is_empty() { None } else { Some(&p.professional_polish) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            "meetingSecretary" => presets.as_ref()
-                .and_then(|p| if p.meeting_secretary.is_empty() { None } else { Some(&p.meeting_secretary) })
-                .cloned()
-                .unwrap_or_else(|| "{{text}}".to_string()),
-            preset_name => {
-                // 尝试从自定义预设中查找
-                presets.as_ref()
-                    .and_then(|p| p.custom_presets.get(preset_name))
-                    .cloned()
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or_else(|| {
-                        // 未找到预设，使用默认 lightPolish
-                        presets.as_ref()
-                            .and_then(|p| if p.light_polish.is_empty() { None } else { Some(&p.light_polish) })
-                            .cloned()
-                            .unwrap_or_else(|| "{{text}}".to_string())
-                    })
-            }
+        let preset_prompt = get_preset_prompt(presets.as_ref(), effective_prompt_type);
+
+        // 如果未找到预设，尝试使用默认 lightPolish
+        if preset_prompt.is_empty() && effective_prompt_type != "lightPolish" {
+            get_preset_prompt(presets.as_ref(), "lightPolish")
+        } else {
+            preset_prompt
         }
     };
 
@@ -688,7 +655,7 @@ pub async fn llm_process_text_for_scene_with_progress(
             model: llm_config.model.clone(),
             timeout_secs: 3600, // 60分钟，大文本处理需要足够时间
         },
-        user_prompt_template: user_prompt.clone(),
+        system_prompt: user_prompt.clone(),
         max_tokens: llm_config.max_tokens,
         temperature: llm_config.temperature,
     };
@@ -982,9 +949,9 @@ pub async fn fetch_provider_models(
         base_url,
         api_key,
         default_model: None,
-        n_gpu_layers: None,
         context_limit: None,
         max_tokens: None,
+        keep_alive: "5m".to_string(),
     };
 
     // 创建服务并获取模型列表
@@ -1021,9 +988,9 @@ pub async fn check_provider_connection(
         base_url,
         api_key,
         default_model: None,
-        n_gpu_layers: None,
         context_limit: None,
         max_tokens: None,
+        keep_alive: "5m".to_string(),
     };
 
     // 创建服务并检查连接
@@ -1100,9 +1067,9 @@ pub async fn refresh_provider_models(
                 base_url: meta.base_url.clone(),
                 api_key: None,
                 default_model: None,
-                n_gpu_layers: None,
                 context_limit: None,
                 max_tokens: None,
+                keep_alive: "5m".to_string(),
             });
         (meta, instance)
     };

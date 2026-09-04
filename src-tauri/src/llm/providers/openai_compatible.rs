@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use super::super::config::{AuthType, LlmConfig, LlmProviderInstance, ProviderMeta};
 use super::super::provider::{LlmProvider, LlmResponse};
+use super::super::migrate_prompt;
 use super::policy::{get_disabled_thinking_options, get_thinking_control_protocol};
 
 /// OpenAI 兼容 Provider
@@ -228,18 +229,24 @@ impl LlmProvider for OpenAiCompatibleProvider {
 
         log::info!("[{}] Process text URL: {}", self.meta.label, url);
 
-        // 简化的提示词处理：
-        // - 如果提示词包含 {text} 占位符，直接替换，结果作为 user message
-        // - 如果不包含，提示词作为 system prompt，用户文本单独作为 user content
-        let (system_prompt, user_content) = if config.user_prompt_template.contains("{text}") {
-            // 有占位符：替换后作为 user message，无 system prompt
-            let user_msg = config.user_prompt_template.replace("{text}", text);
-            (String::new(), user_msg)
-        } else {
-            // 无占位符：提示词作为 system prompt，用户文本简单包装后作为 user content
-            let user_msg = format!("<content>\n{}\n</content>", text);
-            (config.user_prompt_template.clone(), user_msg)
-        };
+        // 提示词处理：
+        // - 系统提示词定义模型的角色和任务
+        // - 用户文本作为待处理内容
+        let system_prompt = migrate_prompt(&config.system_prompt);
+
+        // 空提示词处理：跳过 LLM，返回原文
+        if system_prompt.is_empty() {
+            log::info!("[{}] No system prompt configured, returning original text", self.meta.label);
+            return Ok(LlmResponse {
+                success: true,
+                text: text.to_string(),
+                error: None,
+                tokens_used: None,
+            });
+        }
+
+        // 用户内容包装（帮助模型区分指令和待处理内容）
+        let user_content = format!("<content>\n{}\n</content>", text);
 
         // 详细日志：显示最终发送给LLM的完整内容
         log::info!("═══════════════════════════════════════════════════════════════");
@@ -247,9 +254,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         log::info!("───────────────────────────────────────────────────────────────");
         log::info!("[System Prompt]:\n{}", system_prompt);
         log::info!("───────────────────────────────────────────────────────────────");
-        log::info!("[User Content (包装后的用户文本)]:\n{}", user_content);
-        log::info!("───────────────────────────────────────────────────────────────");
-        log::info!("[原始用户文本]:\n{}", text);
+        log::info!("[User Content]:\n{}", user_content);
         log::info!("═══════════════════════════════════════════════════════════════");
 
         // 动态计算 max_tokens
@@ -284,10 +289,21 @@ impl LlmProvider for OpenAiCompatibleProvider {
         );
 
         // 构建请求体
-        // 对于 Ollama，添加 options.num_ctx 参数
+        // 对于 Ollama，添加 options.num_ctx、options.num_gpu 和 keep_alive 参数
         let mut body = if self.meta.id == "ollama" {
             let num_ctx = self.instance.context_limit.unwrap_or(4096);
-            log::info!("[{}] Ollama options: num_ctx={}", self.meta.label, num_ctx);
+            let num_gpu = -1; // 自动检测 GPU
+            let keep_alive = if self.instance.keep_alive.is_empty() {
+                "5m".to_string()
+            } else {
+                self.instance.keep_alive.clone()
+            };
+
+            log::info!(
+                "[{}] Ollama options: num_ctx={}, num_gpu={}, keep_alive={}",
+                self.meta.label, num_ctx, num_gpu, keep_alive
+            );
+
             serde_json::json!({
                 "model": config.provider.model,
                 "messages": [
@@ -297,8 +313,10 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 "max_tokens": dynamic_max_tokens,
                 "temperature": config.temperature,
                 "options": {
-                    "num_ctx": num_ctx
-                }
+                    "num_ctx": num_ctx,
+                    "num_gpu": num_gpu
+                },
+                "keep_alive": keep_alive
             })
         } else {
             serde_json::json!({
@@ -316,14 +334,27 @@ impl LlmProvider for OpenAiCompatibleProvider {
         // 对于在线 Provider，自动禁用思考模式以提高响应速度
         if let Some(protocol) = get_thinking_control_protocol(&self.meta.id) {
             let params = get_disabled_thinking_options(protocol);
+            let params_preview: Vec<String> = params
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect();
+
             if let Some(obj) = body.as_object_mut() {
                 for (key, value) in params {
                     obj.insert(key, value);
                 }
             }
+
             log::info!(
-                "[{}] 禁用思考模式: protocol={:?}, provider={}",
-                self.meta.label, protocol, self.meta.id
+                "🔧 [{}] 禁用思考模式: protocol={:?}, 添加参数: [{}]",
+                self.meta.label,
+                protocol,
+                params_preview.join(", ")
+            );
+        } else {
+            log::debug!(
+                "[{}] Provider {} 不需要思考模式控制（使用不同 API）",
+                self.meta.label, self.meta.id
             );
         }
 
@@ -361,7 +392,28 @@ impl LlmProvider for OpenAiCompatibleProvider {
             serde_json::to_string_pretty(&json).unwrap_or_else(|_| "serialize error".to_string())
         );
 
-        let result_text = json["choices"][0]["message"]["content"]
+        // 检测响应中是否包含思考内容（用于调试禁用思考策略是否生效）
+        // DeepSeek 等 API 会在 message 中返回 reasoning_content 字段
+        let message = &json["choices"][0]["message"];
+        let reasoning_content = message.get("reasoning_content").and_then(|v| v.as_str());
+        let has_reasoning = reasoning_content.is_some_and(|s| !s.is_empty());
+
+        if has_reasoning {
+            let reasoning_text = reasoning_content.unwrap();
+            log::warn!(
+                "⚠️ [{}] 检测到思考内容! 禁用思考策略可能未生效。reasoning_content 长度: {}, 预览: {}",
+                self.meta.label,
+                reasoning_text.len(),
+                reasoning_text.chars().take(100).collect::<String>()
+            );
+        } else {
+            log::debug!(
+                "✓ [{}] 未检测到思考内容，禁用思考策略可能已生效",
+                self.meta.label
+            );
+        }
+
+        let result_text = message["content"]
             .as_str()
             .map(String::from)
             .ok_or("无法提取响应文本")?;

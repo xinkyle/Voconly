@@ -36,6 +36,12 @@ export default function ProviderConfigModal({
   const [apiKey, setApiKey] = useState(existingInstance?.apiKey || '');
   const [selectedModel, setSelectedModel] = useState(existingInstance?.defaultModel || '');
 
+  // Ollama 特有配置
+  const [keepAlive, setKeepAlive] = useState(existingInstance?.keepAlive || '5m');
+  const [contextLimit, setContextLimit] = useState(
+    existingInstance?.contextLimit?.toString() || '4096'
+  );
+
   // UI state
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(isConfigured ? 'success' : null);
@@ -194,6 +200,11 @@ export default function ProviderConfigModal({
         baseUrl: meta.baseUrl,
         apiKey: apiKey || undefined,
         defaultModel: selectedModel,
+        // Ollama 特有配置
+        ...(isOllama && {
+          keepAlive: keepAlive,
+          contextLimit: parseInt(contextLimit) || 4096,
+        }),
       };
 
       await onSave(meta.id, instance);
@@ -321,6 +332,53 @@ export default function ProviderConfigModal({
                     {testing ? t('common.loading') : t('provider.noModelsFound')}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Ollama 高级配置 */}
+            {isOllama && testResult === 'success' && (
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <h4 className="text-sm font-medium text-gray-700">
+                  {t('provider.advancedSettings')}
+                </h4>
+
+                {/* Keep Alive 配置 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('provider.keepAlive')}
+                  </label>
+                  <select
+                    value={keepAlive}
+                    onChange={(e) => setKeepAlive(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
+                  >
+                    <option value="0">{t('provider.keepAliveOptions.immediate')}</option>
+                    <option value="2m">{t('provider.keepAliveOptions.short')}</option>
+                    <option value="5m">{t('provider.keepAliveOptions.medium')}</option>
+                    <option value="10m">{t('provider.keepAliveOptions.long')}</option>
+                    <option value="-1">{t('provider.keepAliveOptions.always')}</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('provider.keepAliveDescription')}
+                  </p>
+                </div>
+
+                {/* Context Limit 配置 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('provider.contextLimit')}
+                  </label>
+                  <input
+                    type="number"
+                    value={contextLimit}
+                    onChange={(e) => setContextLimit(e.target.value)}
+                    placeholder="4096"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('provider.contextLimitDescription')}
+                  </p>
+                </div>
               </div>
             )}
 

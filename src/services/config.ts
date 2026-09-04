@@ -121,7 +121,7 @@ interface RustLlmProviderConfig {
 interface RustLlmConfig {
   enabled: boolean;
   provider: RustLlmProviderConfig;
-  userPromptTemplate: string;
+  systemPrompt: string;
   maxTokens: number;
   temperature: number;
 }
@@ -144,9 +144,9 @@ interface RustLlmProviderInstance {
   baseUrl: string;
   apiKey?: string;
   defaultModel?: string;
-  nGpuLayers?: number;
   contextLimit?: number;
   maxTokens?: number;
+  keepAlive?: string; // 新增：Ollama keep_alive 配置
 }
 
 // ============== 转换函数 ==============
@@ -292,7 +292,7 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
         model: 'qwen2.5:3b',
         timeoutSecs: 30,
       },
-      userPromptTemplate: '{text}',
+      systemPrompt: '',
       maxTokens: 1024,
       temperature: 0.3,
     },
@@ -345,7 +345,7 @@ function convertLlmConfigFromRust(rust: RustLlmConfig): LlmConfig {
   return {
     enabled: rust.enabled,
     provider: convertLlmProviderConfigFromRust(rust.provider),
-    userPromptTemplate: rust.userPromptTemplate,
+    systemPrompt: rust.systemPrompt,
     maxTokens: rust.maxTokens,
     temperature: rust.temperature,
   };
@@ -355,7 +355,7 @@ function convertLlmConfigToRust(config: LlmConfig): RustLlmConfig {
   return {
     enabled: config.enabled,
     provider: convertLlmProviderConfigToRust(config.provider),
-    userPromptTemplate: config.userPromptTemplate,
+    systemPrompt: config.systemPrompt,
     maxTokens: config.maxTokens,
     temperature: config.temperature,
   };
@@ -396,9 +396,9 @@ function convertLlmProviderInstanceFromRust(rust: RustLlmProviderInstance): LlmP
     baseUrl: rust.baseUrl,
     apiKey: rust.apiKey,
     defaultModel: rust.defaultModel,
-    nGpuLayers: rust.nGpuLayers,
     contextLimit: rust.contextLimit,
     maxTokens: rust.maxTokens,
+    keepAlive: rust.keepAlive,
   };
 }
 
@@ -409,9 +409,9 @@ function convertLlmProviderInstanceToRust(instance: LlmProviderInstance): RustLl
     baseUrl: instance.baseUrl,
     apiKey: instance.apiKey,
     defaultModel: instance.defaultModel,
-    nGpuLayers: instance.nGpuLayers,
     contextLimit: instance.contextLimit,
     maxTokens: instance.maxTokens,
+    keepAlive: instance.keepAlive,
   };
 }
 

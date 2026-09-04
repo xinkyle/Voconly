@@ -266,14 +266,14 @@ export interface ProviderMeta {
 
 // Provider 实例配置（用户配置）
 export interface LlmProviderInstance {
-  metaId: string;      // 对应 ProviderMeta.id
+  metaId: string; // 对应 ProviderMeta.id
   enabled: boolean;
-  baseUrl: string;     // 用户自定义或默认
+  baseUrl: string; // 用户自定义或默认
   apiKey?: string;
   defaultModel?: string;
-  nGpuLayers?: number;  // GPU 层数（用于本地模型加速，-1 = 全部，0 = CPU）
   contextLimit?: number; // 上下文长度限制（仅本地 Provider 有效，默认 4096）
   maxTokens?: number; // 最大输出 tokens（本地模型默认 1024）
+  keepAlive?: string; // Keep-alive 时间（仅 Ollama 有效，默认 "5m"）
 }
 
 // Provider 列表项（包含配置状态）
@@ -296,7 +296,7 @@ export interface LlmProviderConfig {
 export interface LlmConfig {
   enabled: boolean;
   provider: LlmProviderConfig;
-  userPromptTemplate: string;
+  systemPrompt: string;
   maxTokens: number;
   temperature: number;
 }

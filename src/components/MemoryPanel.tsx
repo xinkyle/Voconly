@@ -191,7 +191,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 leading-relaxed line-clamp-3">
+                          <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">
                             {record.content}
                           </p>
 

@@ -6,6 +6,7 @@ mod progress;
 mod provider;
 mod provider_models_cache;
 mod providers;
+mod utils;
 
 pub use config::{
     get_provider_meta_list, LlmConfig, LlmProfile, LlmProviderConfig, LlmProviderInstance,
@@ -15,6 +16,7 @@ pub use progress::LlmProgressEvent;
 pub use provider::{LlmProvider, LlmResponse};
 pub use provider_models_cache::ProviderModelsCache;
 pub use providers::OpenAiCompatibleProvider;
+pub use utils::{empty_to_none, migrate_prompt};
 
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
@@ -50,9 +52,9 @@ impl LlmService {
             base_url: config.provider.base_url.clone(),
             api_key: config.provider.api_key.clone(),
             default_model: Some(config.provider.model.clone()),
-            n_gpu_layers: None,
             context_limit: None,
             max_tokens: None,
+            keep_alive: "5m".to_string(),
         };
 
         // 使用 OpenAI 兼容 Provider
