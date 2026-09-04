@@ -180,7 +180,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                   {dateRecords.map((record, index) => (
                     <div
                       key={record.id}
-                      className="group bg-white rounded-xl p-3 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer"
+                      className="group bg-white rounded-xl p-3 border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex items-start gap-3">
