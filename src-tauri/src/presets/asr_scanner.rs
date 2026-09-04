@@ -541,7 +541,7 @@ fn scan_gguf_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> 
         });
 
     // 记录能力信息
-    log::info!(
+    log::debug!(
         "[Scanner] 模型 {} 能力: languages={:?}, streaming={:?}, detect={:?}, translate={:?}",
         id,
         languages,

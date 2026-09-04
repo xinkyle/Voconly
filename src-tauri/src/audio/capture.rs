@@ -152,7 +152,7 @@ impl PendingTaskQueue {
             if self.tasks[i].segment_index == segment_index {
                 // 找到了同 index 的任务，替换
                 self.tasks[i] = task;
-                log::info!(
+                log::debug!(
                     "[Queue] Replaced task with same index: {}, queue size: {}",
                     segment_index,
                     self.tasks.len()
@@ -165,11 +165,11 @@ impl PendingTaskQueue {
         if self.tasks.len() >= self.max_size {
             // 队列满，替换尾部
             self.tasks.pop();
-            log::info!("[Queue] Queue full, replaced tail task");
+            log::debug!("[Queue] Queue full, replaced tail task");
         }
 
         self.tasks.push(task);
-        log::info!("[Queue] Added new task, queue size: {}", self.tasks.len());
+        log::debug!("[Queue] Added new task, queue size: {}", self.tasks.len());
     }
 
     /// 取出下一个任务（从头部）
@@ -590,7 +590,7 @@ fn run_consumer(
 
         std::thread::spawn(move || {
             let task_start = std::time::Instant::now();
-            log::info!(
+            log::debug!(
                 "[RecognitionTask] 🟠 任务启动: segment={}, kind={:?}, 音频 {}ms",
                 segment_index, kind, audio_ms
             );
@@ -617,7 +617,7 @@ fn run_consumer(
             };
 
             let total_ms = task_start.elapsed().as_millis();
-            log::info!(
+            log::debug!(
                 "[RecognitionTask] 🟢 任务完成: segment={}, 总耗时 {}ms (音频 {}ms, 比值 {:.2}x)",
                 segment_index, total_ms, audio_ms,
                 total_ms as f64 / audio_ms.max(1) as f64
@@ -737,7 +737,7 @@ fn run_consumer(
                             speech_started = true;
                             speech_start_sample = total_samples_processed;
                             next_partial_sample = total_samples_processed + PARTIAL_INTERVAL_SAMPLES;
-                            log::info!("[Partial/Final] Speech started at sample {}, next_partial={}", speech_start_sample, next_partial_sample);
+                            log::debug!("[Partial/Final] Speech started at sample {}, next_partial={}", speech_start_sample, next_partial_sample);
                         }
 
                         // ===== Partial/Final: 更新样本计数 =====
@@ -745,7 +745,7 @@ fn run_consumer(
 
                         // ===== Partial/Final: Partial 识别触发 =====
                         if speech_started && total_samples_processed >= next_partial_sample {
-                            log::info!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}",
+                            log::debug!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}",
                                 total_samples_processed, next_partial_sample);
 
                             // 递增版本号
@@ -761,7 +761,7 @@ fn run_consumer(
 
                             // 放入队列（同 index 替换，队列满时替换尾部）
                             pending_queue.push(task);
-                            log::info!("[Partial/Final] Queued partial recognition, index={}, version={}, buffer_len={}",
+                            log::debug!("[Partial/Final] Queued partial recognition, index={}, version={}, buffer_len={}",
                                 partial_segment_index, recognition_version, segment_buffer.len());
 
                             next_partial_sample += PARTIAL_INTERVAL_SAMPLES;
@@ -805,7 +805,7 @@ fn run_consumer(
 
                                 // 放入队列
                                 pending_queue.push(task);
-                                log::info!("[Partial/Final] Hard threshold: queued final recognition, index={}, version={}, buffer_len={}",
+                                log::debug!("[Partial/Final] Hard threshold: queued final recognition, index={}, version={}, buffer_len={}",
                                     partial_segment_index, recognition_version, segment_buffer.len());
                             }
 
@@ -902,7 +902,7 @@ fn run_consumer(
                         end_ms: recognition.end_ms,
                     };
                     let _ = app_handle.emit_to("float-panel", "streaming-partial-update", &event);
-                    log::info!("[Partial/Final] Partial result: index={}, version={}, text={}",
+                    log::debug!("[Partial/Final] Partial result: index={}, version={}, text={}",
                         recognition.segment_index, recognition.version, recognition.text);
                 }
                 RecognitionKind::Final => {
@@ -915,7 +915,7 @@ fn run_consumer(
                         end_ms: recognition.end_ms,
                     };
                     let _ = app_handle.emit_to("float-panel", "streaming-final-update", &event);
-                    log::info!("[Partial/Final] Final result: index={}, version={}, text={}",
+                    log::debug!("[Partial/Final] Final result: index={}, version={}, text={}",
                         recognition.segment_index, recognition.version, recognition.text);
 
                     // 【新增】追加到后端 preview_text
@@ -939,7 +939,7 @@ fn run_consumer(
                 }
             }
             active_recognition_threads = active_recognition_threads.saturating_sub(1);
-            log::info!("[Queue] 任务结束, active_threads={}", active_recognition_threads);
+            log::debug!("[Queue] 任务结束, active_threads={}", active_recognition_threads);
         }
 
         // ===== Partial/Final: 从队列取任务执行 =====
@@ -948,7 +948,7 @@ fn run_consumer(
             if let Some(task) = pending_queue.pop() {
                 spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
                 active_recognition_threads += 1;
-                log::info!("[Queue] Started task from queue, active_threads={}, queue_size={}",
+                log::debug!("[Queue] Started task from queue, active_threads={}, queue_size={}",
                     active_recognition_threads, pending_queue.tasks.len());
             }
         }

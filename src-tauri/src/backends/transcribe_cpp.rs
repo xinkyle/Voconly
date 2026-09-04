@@ -349,7 +349,7 @@ impl TranscribeCppBackend {
             .fetch_add(duration_ms, Ordering::Relaxed)
             + duration_ms;
 
-        info!(
+        debug!(
             "[TranscribeCppBackend] Accumulated duration: {}ms / {}ms (this audio: {}ms)",
             total, SESSION_RECREATE_THRESHOLD_MS, duration_ms
         );
@@ -462,7 +462,7 @@ impl SpeechBackend for TranscribeCppBackend {
         // Release session lock before accumulating duration
         drop(session);
 
-        info!(
+        debug!(
             "[TranscribeCpp] 🔷 Session.run: {}ms (音频 {}ms, 实时比 {:.2}x)",
             run_ms,
             (audio.len() / 16),

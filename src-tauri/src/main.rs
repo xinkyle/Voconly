@@ -1,5 +1,5 @@
-#![windows_subsystem = "windows"]  // 隐藏 CMD 控制台窗口
-use log::{error, info, warn};
+// #![windows_subsystem = "windows"]  // 开发时显示 CMD 控制台窗口
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::panic;
@@ -1596,8 +1596,8 @@ fn build_console_filter() -> env_filter::Filter {
             info!("Using RUST_LOG environment variable: {}", spec);
         }
         _ => {
-            // 默认 Warn 级别（发布版本）
-            builder.filter_level(log::LevelFilter::Warn);
+            // 默认 Info 级别（开发时可见关键日志）
+            builder.filter_level(log::LevelFilter::Info);
         }
     }
 
@@ -1622,7 +1622,7 @@ fn main() {
     // 构建控制台日志过滤器
     let console_filter_start = Instant::now();
     let console_filter = build_console_filter();
-    info!(
+    debug!(
         "[STARTUP] 控制台日志过滤器构建完成, 耗时: {}ms",
         console_filter_start.elapsed().as_millis()
     );
@@ -1643,7 +1643,7 @@ fn main() {
     let config = load_config()
         .map(|r| r.config)
         .unwrap_or_else(|_| AppConfig::default());
-    info!(
+    debug!(
         "[STARTUP] 配置加载完成, 耗时: {}ms",
         config_start.elapsed().as_millis()
     );
@@ -1658,7 +1658,7 @@ fn main() {
             );
         }
     }
-    info!(
+    debug!(
         "[STARTUP] 日志级别设置完成, 耗时: {}ms",
         log_level_start.elapsed().as_millis()
     );
@@ -1684,16 +1684,16 @@ fn main() {
                     .unwrap_or_default();
                 if !exe_path.is_empty() {
                     let _ = key.set_value("Voconly", &exe_path);
-                    info!("[STARTUP] 开机自启动已注册（配置: true）");
+                    debug!("[STARTUP] 开机自启动已注册（配置: true）");
                 }
             } else {
                 // 配置要求关闭自启动，从系统移除
                 let _ = key.delete_value("Voconly");
-                info!("[STARTUP] 开机自启动已移除（配置: false）");
+                debug!("[STARTUP] 开机自启动已移除（配置: false）");
             }
         }
     }
-    info!(
+    debug!(
         "[STARTUP] 开机自启动同步完成, 耗时: {}ms",
         autostart_start.elapsed().as_millis()
     );
@@ -1720,7 +1720,7 @@ fn main() {
 
     let performance_state = commands::performance::init_performance_tracker(&app_data_dir);
     let llm_performance_state = commands::performance::init_llm_performance_tracker(&app_data_dir);
-    info!(
+    debug!(
         "[STARTUP] 性能跟踪器初始化完成, 耗时: {}ms",
         perf_start.elapsed().as_millis()
     );
@@ -1731,7 +1731,7 @@ fn main() {
 
     // Set up enhanced panic hook for logging and crash report file
     panic::set_hook(Box::new(crash_report::enhanced_panic_hook));
-    info!(
+    debug!(
         "[STARTUP] 崩溃报告器初始化完成, 耗时: {}ms",
         crash_start.elapsed().as_millis()
     );
@@ -1938,7 +1938,7 @@ fn main() {
                         }
                     }))
                     .expect("Failed to initialize single-instance plugin");
-                info!("[STARTUP] 单实例插件注册完成");
+                debug!("[STARTUP] 单实例插件注册完成");
             }
 
             // Configure WebView2 data directory to Application\WebView
@@ -1948,7 +1948,7 @@ fn main() {
                 .map_err(|e| format!("Failed to get Application directory: {}", e))?;
             std::fs::create_dir_all(&webview_data_dir)
                 .map_err(|e| format!("Failed to create WebView directory: {}", e))?;
-            info!(
+            debug!(
                 "[STARTUP] WebView 数据目录配置完成, 耗时: {}ms",
                 webview_dir_start.elapsed().as_millis()
             );
@@ -1971,7 +1971,7 @@ fn main() {
                 .center()
                 .data_directory(webview_data_dir.clone())
                 .on_page_load(|window, _payload| {
-                    info!("[STARTUP] Main window page loaded, showing window");
+                    debug!("[STARTUP] Main window page loaded, showing window");
                     let _ = window.show();
                 })
                 .build()
@@ -1982,7 +1982,7 @@ fn main() {
             let _ = main_window
                 .set_background_color(Some(tauri::window::Color(0xF5, 0xF5, 0xF7, 0xFF)));
 
-            info!(
+            debug!(
                 "[STARTUP] 主窗口创建完成 (初始隐藏, 页面加载后显示), 耗时: {}ms",
                 main_window_start.elapsed().as_millis()
             );
@@ -2008,7 +2008,7 @@ fn main() {
             .data_directory(webview_data_dir.clone())
             .build()
             .expect("Failed to create float panel window");
-            info!(
+            debug!(
                 "[STARTUP] 悬浮窗口创建完成, 耗时: {}ms",
                 float_window_start.elapsed().as_millis()
             );
@@ -2034,7 +2034,7 @@ fn main() {
             .data_directory(webview_data_dir.clone())
             .build()
             .expect("Failed to create preview window");
-            info!(
+            debug!(
                 "[STARTUP] 预览窗口创建完成, 耗时: {}ms",
                 preview_window_start.elapsed().as_millis()
             );
@@ -2043,12 +2043,12 @@ fn main() {
             let bg_start = Instant::now();
             let _ = float_window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
             let _ = preview_window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
-            info!(
+            debug!(
                 "[STARTUP] WebView 背景透明设置完成, 耗时: {}ms",
                 bg_start.elapsed().as_millis()
             );
 
-            info!(
+            debug!(
                 "[STARTUP] WebView 窗口创建阶段总耗时: {}ms",
                 setup_start.elapsed().as_millis()
             );
@@ -2149,7 +2149,7 @@ fn main() {
                     }
                 })
                 .build(&app_handle)?;
-            info!(
+            debug!(
                 "[STARTUP] 系统托盘创建完成, 耗时: {}ms",
                 tray_start.elapsed().as_millis()
             );
@@ -2160,7 +2160,7 @@ fn main() {
                 Some(state) => match state.tray.lock() {
                     Ok(mut tray_guard) => {
                         *tray_guard = Some(built_tray);
-                        info!(
+                        debug!(
                             "[STARTUP] 托盘存储到 AppState 成功, 耗时: {}ms",
                             tray_store_start.elapsed().as_millis()
                         );
@@ -2183,11 +2183,11 @@ fn main() {
                         // Prevent the window from closing, hide it instead
                         api.prevent_close();
                         let _ = window_clone.hide();
-                        info!("Window hidden to tray on close request");
+                        debug!("Window hidden to tray on close request");
                     }
                 });
             }
-            info!(
+            debug!(
                 "[STARTUP] 窗口关闭事件处理设置完成, 耗时: {}ms",
                 window_event_start.elapsed().as_millis()
             );
@@ -2263,7 +2263,7 @@ fn main() {
             // 每分钟检查一次闲置模型
             let app_for_idle = app.handle().clone();
             std::thread::spawn(move || {
-                info!("[IdleChecker] ASR 模型闲置检测定时器启动");
+                debug!("[IdleChecker] ASR 模型闲置检测定时器启动");
                 loop {
                     // 每分钟检查一次
                     std::thread::sleep(std::time::Duration::from_secs(60));
@@ -2299,7 +2299,7 @@ fn main() {
                     };
 
                     // 打印检查信息
-                    info!(
+                    debug!(
                         "[IdleChecker] ⏱️ 配置超时: {}秒 ({}分钟), 已加载模型: {}, 状态: {:?}",
                         idle_timeout_secs,
                         idle_timeout_secs / 60,
@@ -2309,7 +2309,7 @@ fn main() {
 
                     // 0 表示禁用自动清理
                     if idle_timeout_secs == 0 {
-                        info!("[IdleChecker] 自动清理已禁用，跳过");
+                        debug!("[IdleChecker] 自动清理已禁用，跳过");
                         continue;
                     }
 
@@ -2330,7 +2330,7 @@ fn main() {
 
                     // 如果有模型被卸载，通知前端更新状态
                     if !unloaded_models.is_empty() {
-                        info!(
+                        debug!(
                             "[IdleChecker] ✅ 已卸载 {} 个模型: {:?}",
                             unloaded_models.len(),
                             unloaded_models
@@ -2341,7 +2341,7 @@ fn main() {
                     }
                 }
             });
-            info!("[STARTUP] ASR 模型闲置检测定时器已启动");
+            debug!("[STARTUP] ASR 模型闲置检测定时器已启动");
 
             Ok(())
         })

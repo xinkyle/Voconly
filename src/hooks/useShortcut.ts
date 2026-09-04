@@ -342,11 +342,11 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   // 处理键盘事件
   const handleKeyEvent = useCallback((payload: KeyEventPayload) => {
     // 添加详细日志追踪事件接收
-    log.info(`[handleKeyEvent] 📥 收到键盘事件: keycode=${payload.keycode}, rawCode=${payload.rawCode}, eventType=${payload.eventType}`);
+    log.debug(`[handleKeyEvent] 📥 收到键盘事件: keycode=${payload.keycode}, rawCode=${payload.rawCode}, eventType=${payload.eventType}`);
 
     // 如果暂停，完全跳过处理（编辑快捷键时）
     if (isPausedRef.current) {
-      log.info(`[handleKeyEvent] ⏸️ 快捷键监听已暂停，跳过处理`);
+      log.debug(`[handleKeyEvent] ⏸️ 快捷键监听已暂停，跳过处理`);
       return;
     }
 
@@ -369,7 +369,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
       // 只有新按下的键才检查快捷键匹配
       if (!wasPressed) {
-        log.info(`[handleKeyEvent] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
+        log.debug(`[handleKeyEvent] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
         checkShortcutMatch();
       }
     } else if (eventType === 'up') {
@@ -404,7 +404,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
       // 监听键盘事件
       const unlisten = await events.keyEventPayload.listen((event) => {
-        log.info(`[keyhook listener] 🎉 事件监听器回调被触发`);
+        log.debug(`[keyhook listener] 🎉 事件监听器回调被触发`);
         handleKeyEvent(event.payload);
       });
 
@@ -601,7 +601,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
         return;
       }
 
-      log.info(`[DOM Keydown] 📥 收到键盘事件: ${keyName}`);
+      log.debug(`[DOM Keydown] 📥 收到键盘事件: ${keyName}`);
 
       // 更新按键状态
       const wasPressed = pressedKeysRef.current.has(keyName);
@@ -609,13 +609,13 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
       // 只有新按下的键才检查快捷键匹配
       if (!wasPressed) {
-        log.info(`[DOM Keydown] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
+        log.debug(`[DOM Keydown] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
         const matched = checkShortcutMatchAndBlock();
         if (matched) {
           // 匹配到快捷键，阻止默认行为（防止输入字符）
           e.preventDefault();
           e.stopPropagation();
-          log.info(`[DOM Keydown] 🚫 已阻止按键默认行为: ${keyName}`);
+          log.debug(`[DOM Keydown] 🚫 已阻止按键默认行为: ${keyName}`);
         }
       }
     };

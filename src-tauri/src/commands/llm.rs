@@ -7,7 +7,7 @@ use crate::llm::{
     get_provider_meta_list, LlmConfig, LlmProfile, LlmProgressEvent, LlmProviderInstance,
     LlmResponse, LlmService, ProviderMeta, ProviderModelsCache, UserPromptPresets,
 };
-use log::info;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -123,11 +123,11 @@ pub async fn llm_health_check(
     };
 
     let provider_name = provider_meta.label.clone();
-    info!(
+    debug!(
         "[LLM] Health check - provider: {}, base_url: {}, model: {}",
         provider_name, llm_config.provider.base_url, llm_config.provider.model
     );
-    info!(
+    debug!(
         "[LLM] Full config: enabled={}, temperature={}",
         llm_config.enabled, llm_config.temperature
     );
@@ -188,7 +188,7 @@ pub async fn llm_list_models(services: State<'_, AppServices>) -> Result<Vec<Str
     info!("[LLM] Listing models");
 
     let (llm_config, provider_meta, provider_instance) = build_llm_config_from_global(&services)?;
-    info!(
+    debug!(
         "[LLM] Config - provider: {}, base_url: {}, model: {}",
         provider_meta.label, llm_config.provider.base_url, llm_config.provider.model
     );
@@ -290,11 +290,11 @@ pub async fn llm_process_text_for_scene(
         )
     };
 
-    info!(
+    debug!(
         "[LLM] Global LLM config: provider_id={}, model={}, max_tokens={}, temperature={}",
         llm_config.provider_id, llm_config.model, llm_config.max_tokens, llm_config.temperature
     );
-    info!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
+    debug!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
 
     // 获取 Provider 配置
     let (provider_meta, provider_instance) = {
@@ -541,11 +541,11 @@ pub async fn llm_process_text_for_scene_with_progress(
         )
     };
 
-    info!(
+    debug!(
         "[LLM] Global LLM config: provider_id={}, model={}, max_tokens={}, temperature={}",
         llm_config.provider_id, llm_config.model, llm_config.max_tokens, llm_config.temperature
     );
-    info!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
+    debug!("[LLM] Scene prompt_type: {:?}, custom_prompt: {:?}", prompt_type, custom_prompt.as_ref().map(|p| p.chars().take(50).collect::<String>()));
 
     // 获取 Provider 配置
     let (provider_meta, provider_instance) = {

@@ -18,7 +18,7 @@
 //! 5. Finalizing via `StreamCmd::Finalize`
 //! 6. Canceling via `StreamCmd::Cancel`
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::sync::mpsc;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -93,14 +93,14 @@ pub fn run_stream_worker(
 ) {
     // 【诊断日志】记录锁获取时间
     let lock_start = std::time::Instant::now();
-    info!("[StreamingWorker] ⏳ 正在获取 ModelManager 锁...");
+    debug!("[StreamingWorker] ⏳ 正在获取 ModelManager 锁...");
 
     // 1. 获取模型（Arc 方案：获取后立即释放锁）
     let loaded_model: Arc<LoadedModel> = {
         let mut manager_guard = model_manager.lock().unwrap();
 
         // 【诊断日志】锁获取成功
-        info!("[StreamingWorker] ✅ ModelManager 锁已获取，耗时: {}ms", lock_start.elapsed().as_millis());
+        debug!("[StreamingWorker] ✅ ModelManager 锁已获取，耗时: {}ms", lock_start.elapsed().as_millis());
         let manager = match manager_guard.as_mut() {
             Some(m) => m,
             None => {
@@ -123,12 +123,12 @@ pub fn run_stream_worker(
         };
 
         // 锁在这里释放！Arc<LoadedModel> 不依赖锁的生命周期
-        info!("[StreamingWorker] 🔓 模型已获取，锁即将释放，持有时间: {}ms", lock_start.elapsed().as_millis());
+        debug!("[StreamingWorker] 🔓 模型已获取，锁即将释放，持有时间: {}ms", lock_start.elapsed().as_millis());
         model
     };
 
     // 【诊断日志】锁已释放，但 Arc 仍然有效
-    info!("[StreamingWorker] ✅ 锁已释放，开始流式转录（Arc 引用计数: {}）", Arc::strong_count(&loaded_model));
+    debug!("[StreamingWorker] ✅ 锁已释放，开始流式转录（Arc 引用计数: {}）", Arc::strong_count(&loaded_model));
 
     // 2. 检查流式支持并执行流式操作（不需要持有锁）
     let result = loaded_model.backend.with_stream(|stream| {
@@ -196,7 +196,7 @@ pub fn run_stream_worker(
 
     // 【诊断日志】流式操作完成
     let total_duration = lock_start.elapsed();
-    info!("[StreamingWorker] 🏁 流式转录完成，总耗时: {}ms ({}秒)", total_duration.as_millis(), total_duration.as_secs());
+    debug!("[StreamingWorker] 🏁 流式转录完成，总耗时: {}ms ({}秒)", total_duration.as_millis(), total_duration.as_secs());
 
     // 4. 处理不支持流式的情况
     if result.is_none() {
@@ -240,7 +240,7 @@ pub fn drain_until_finalize(rx: mpsc::Receiver<StreamCmd>) {
 /// * `is_final` - 是否是最终结果
 pub fn emit_streaming_text(app_handle: &AppHandle, text: &StreamText, is_final: bool) {
     let display_text = format!("{}{}", text.committed, text.tentative);
-    info!(
+    debug!(
         "[StreamingWorker] emit_streaming_text: display_text.len()={}, committed.len()={}, tentative.len()={}, is_final={}",
         display_text.len(), text.committed.len(), text.tentative.len(), is_final
     );

@@ -761,11 +761,11 @@ impl ModelManager {
     pub fn get_or_load_model(&mut self, scene_id: &str) -> Result<Arc<LoadedModel>, String> {
         // 使用全局 ASR 模型（忽略 scene_id，保留参数用于向后兼容）
         let model_id = self.get_global_asr_model()?;
-        info!("[ModelManager] 全局 ASR 模型: {} (场景: {})", model_id, scene_id);
+        log::debug!("[ModelManager] 全局 ASR 模型: {} (场景: {})", model_id, scene_id);
 
         // 已加载？返回 Arc 克隆
         if let Some(arc) = self.loaded_models.get(&model_id) {
-            info!("[ModelManager] 模型 {} 已在内存中，返回共享引用", model_id);
+            log::debug!("[ModelManager] 模型 {} 已在内存中，返回共享引用", model_id);
             return Ok(Arc::clone(arc));
         }
 
@@ -867,7 +867,7 @@ impl ModelManager {
 
         match self.load_model(&model_id, false) {
             Ok(_) => info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id),
-            Err(e) => info!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e),
+            Err(e) => warn!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e),
         }
 
         info!(

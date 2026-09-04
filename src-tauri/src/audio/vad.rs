@@ -194,7 +194,7 @@ impl VoiceActivityDetector for SmoothedVad {
         if self.current_sensitivity != SensitivityLevel::Normal {
             self.current_sensitivity = SensitivityLevel::Normal;
             self.hangover_frames = self.normal_hangover_frames;
-            log::info!("[VAD] Reset: sensitivity restored to Normal");
+            log::debug!("[VAD] Reset: sensitivity restored to Normal");
         }
     }
 }

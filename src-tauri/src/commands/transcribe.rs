@@ -5,7 +5,7 @@ use crate::config::{AppConfig, AppServices};
 use crate::dictionary::{DictionaryMatcher, UserDictionary};
 use crate::model_manager::ModelManager;
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
-use log::info;
+use log::{debug, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -94,21 +94,21 @@ fn convert_result(
     let detected_lang = result.language.as_deref().unwrap_or("unknown");
     let is_chinese = contains_chinese(&result.text);
 
-    info!(
+    debug!(
         "[Transcribe] 检测语言字段: {}, 文本是否含中文: {}",
         detected_lang, is_chinese
     );
 
     let mut text = if is_chinese {
-        info!(
+        debug!(
             "[Transcribe] 执行繁体转简体转换，原文长度: {}",
             result.text.len()
         );
         let converted = to_simplified_chinese(&result.text);
-        info!("[Transcribe] 转换完成，结果长度: {}", converted.len());
+        debug!("[Transcribe] 转换完成，结果长度: {}", converted.len());
         converted
     } else {
-        info!("[Transcribe] 非中文，跳过繁体转简体");
+        debug!("[Transcribe] 非中文，跳过繁体转简体");
         result.text.clone()
     };
 
@@ -126,7 +126,7 @@ fn convert_result(
         text = matcher.apply(&text);
         info!("[Transcribe] 词典修正完成");
     } else if dictionary.enabled && !dictionary.entries.is_empty() {
-        info!("[Transcribe] 模型已原生处理热词，跳过后处理修正");
+        debug!("[Transcribe] 模型已原生处理热词，跳过后处理修正");
     }
 
     TranscribeResponse {
@@ -410,7 +410,7 @@ pub fn transcribe_samples_internal(
 ) -> Result<String, String> {
     let total_start = std::time::Instant::now();
     let audio_duration_ms = (samples.len() / 16) as u64; // 16kHz
-    info!(
+    debug!(
         "[Transcribe] 🔵 开始识别: {} 样本, 时长 {}ms, 场景 {}",
         samples.len(),
         audio_duration_ms,
@@ -497,14 +497,14 @@ pub fn transcribe_samples_internal(
         .unwrap_or_else(|| {
             // 兜底：如果前端没有设置偏好，使用 auto
             // 正常情况前端会在选择模型时自动设置推荐语言
-            info!(
+            debug!(
                 "[Transcribe] 模型 {} 没有语言偏好，使用 auto",
                 global_asr_model_id
             );
             "auto".to_string()
         });
 
-    info!(
+    debug!(
         "[Transcribe] 使用语言: {} for 全局 ASR 模型 {}",
         language, global_asr_model_id
     );
@@ -532,7 +532,7 @@ pub fn transcribe_samples_internal(
     let response = convert_result(result, &dictionary, backend_type);
 
     let total_ms = total_start.elapsed().as_millis();
-    info!(
+    debug!(
         "[Transcribe] 🟢 识别完成: 转录 {}ms, 总计 {}ms (音频 {}ms, 比值 {:.2}x)",
         transcribe_ms,
         total_ms,

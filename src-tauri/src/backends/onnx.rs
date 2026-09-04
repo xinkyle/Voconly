@@ -248,5 +248,20 @@ pub fn apply_ort_accelerator(accelerator: &str) {
     // 验证设置是否成功
     let current = accel::get_ort_accelerator();
     log::info!("[OrtAccelerator] 设置后读取的加速器: {:?}", current);
-    log::info!("[OrtAccelerator] ========== GPU 加速器设置完成 ==========");
+
+    // 简洁总结：使用的 GPU 加速器
+    let accelerator_name = match current {
+        accel::OrtAccelerator::CpuOnly => "CPU",
+        accel::OrtAccelerator::Cuda => "CUDA",
+        accel::OrtAccelerator::DirectMl => "DirectML",
+        accel::OrtAccelerator::Rocm => "ROCm",
+        accel::OrtAccelerator::TensorRt => "TensorRT",
+        accel::OrtAccelerator::CoreMl => "CoreML",
+        accel::OrtAccelerator::WebGpu => "WebGPU",
+        accel::OrtAccelerator::Xnnpack => "XNNPACK",
+        accel::OrtAccelerator::Auto => "Auto",
+        // 非穷尽枚举，未来可能新增
+        _ => "Unknown",
+    };
+    log::info!("[OrtAccelerator] GPU 加速器: {}", accelerator_name);
 }

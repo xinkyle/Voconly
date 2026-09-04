@@ -468,7 +468,7 @@ pub fn probe_gguf_capabilities(path: &Path) -> GgufCapabilities {
             Some(langs) => format!("预设({}种)", langs.len()),
             None => "未知".to_string(),
         };
-        log::info!(
+        log::debug!(
             "[GGUF] 从 header 检测到架构: {} (语言: {}), {:?}",
             caps.display_name(),
             lang_info,
@@ -479,7 +479,7 @@ pub fn probe_gguf_capabilities(path: &Path) -> GgufCapabilities {
 
     // 2. 回退到文件名推断
     let caps = probe_from_filename(path);
-    log::info!(
+    log::debug!(
         "[GGUF] 从文件名推断架构: {} (语言: 预设), {:?}",
         caps.display_name(),
         path
@@ -495,7 +495,7 @@ fn probe_from_gguf_header(path: &Path) -> Option<GgufCapabilities> {
     match read_header_metadata(path) {
         Ok(meta) => {
             // 输出 GGUF header 原始能力数据，用于调试
-            log::info!(
+            log::debug!(
                 "[GGUF Header] {:?} -> architecture={:?}, name={:?}, variant={:?}, languages={:?}, streaming={:?}, translate={:?}, lang_detect={:?}",
                 path.file_name().unwrap_or_default(),
                 meta.get_str(KEY_ARCH),
