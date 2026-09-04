@@ -7,7 +7,7 @@
   "nav": {
     "home": "Home",
     "memory": "History Records",
-    "models": "Local Models",
+    "models": "Voice Models",
     "provider": "AI Services",
     "dictionary": "Dictionary",
     "settings": "Settings"
@@ -257,7 +257,7 @@
     "avgDaily": "Avg {{count}}"
   },
   "modelConfig": {
-    "title": "Local Model Configuration",
+    "title": "Voice Model Configuration",
     "subtitle": "Configure voice recognition and LLM models for your needs",
     "asrTitle": "Speech-to-Text Models",
     "asrSubtitle": "Core speech recognition engine, at least one required. Hover over the ⓘ icon for more model download options",
@@ -501,6 +501,7 @@
     "noScenes": "No scenes configured",
     "noScenesHint": "Click \"Add Scene\" to create a voice input scene",
     "selectModel": "Select Model",
+    "voiceModelConfig": "Voice Model Configuration",
     "select": "Select",
     "selected": "Selected",
     "ready": "Ready",

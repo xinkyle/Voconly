@@ -105,7 +105,7 @@ function AsrModelSelectModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
-          <h4 className="font-semibold text-gray-900 text-lg">{t('sceneList.selectModel')}</h4>
+          <h4 className="font-semibold text-gray-900 text-lg">{t('sceneList.voiceModelConfig')}</h4>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
