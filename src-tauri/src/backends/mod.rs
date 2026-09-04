@@ -5,7 +5,8 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BackendType {
     TranscribeCpp, // GGUF 模型（GPU 加速）
-    Onnx,          // ONNX 模型（CPU only）
+    #[cfg(not(feature = "disable-onnx"))]
+    Onnx, // ONNX 模型（CPU only）
 }
 
 impl Default for BackendType {
@@ -26,6 +27,7 @@ impl std::fmt::Display for BackendType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BackendType::TranscribeCpp => write!(f, "transcribe_cpp"),
+            #[cfg(not(feature = "disable-onnx"))]
             BackendType::Onnx => write!(f, "onnx"),
         }
     }
@@ -37,6 +39,7 @@ impl std::str::FromStr for BackendType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "transcribe_cpp" | "transcribecpp" | "transcribe-cpp" => Ok(BackendType::TranscribeCpp),
+            #[cfg(not(feature = "disable-onnx"))]
             "onnx" => Ok(BackendType::Onnx),
             _ => Err(format!("Unknown backend type: {}", s)),
         }
@@ -153,6 +156,7 @@ pub trait StreamingBackend: Send {
 }
 
 /// ONNX模型类型
+#[cfg(not(feature = "disable-onnx"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum OnnxModelType {
     #[default]
@@ -164,7 +168,9 @@ pub enum OnnxModelType {
 }
 
 /// ONNX 后端实现
+#[cfg(not(feature = "disable-onnx"))]
 pub mod onnx;
+#[cfg(not(feature = "disable-onnx"))]
 pub use onnx::OnnxBackend;
 
 /// GGUF metadata parser

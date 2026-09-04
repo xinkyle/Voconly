@@ -7,6 +7,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
+#[cfg(not(feature = "disable-onnx"))]
+use crate::backends::OnnxBackend;
 use crate::config::{AppConfig, DownloadSource, Model, ModelRef};
 use crate::presets::{scan_available_asr_models, get_base_model_id, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
@@ -22,7 +24,8 @@ use sysinfo::System;
 /// 3. Have compile-time dispatch for better performance
 pub enum BackendEnum {
     /// ONNX backend (does not support streaming)
-    Onnx(crate::backends::OnnxBackend),
+    #[cfg(not(feature = "disable-onnx"))]
+    Onnx(OnnxBackend),
     /// TranscribeCpp backend (supports streaming)
     TranscribeCpp(TranscribeCppBackend),
 }
@@ -42,6 +45,7 @@ impl SpeechBackend for BackendEnum {
         params: &crate::backends::TranscribeParams,
     ) -> std::io::Result<crate::backends::TranscribeResult> {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(backend) => backend.transcribe(audio, params),
             BackendEnum::TranscribeCpp(backend) => backend.transcribe(audio, params),
         }
@@ -49,6 +53,7 @@ impl SpeechBackend for BackendEnum {
 
     fn memory_usage(&self) -> u64 {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(backend) => backend.memory_usage(),
             BackendEnum::TranscribeCpp(backend) => backend.memory_usage(),
         }
@@ -56,6 +61,7 @@ impl SpeechBackend for BackendEnum {
 
     fn backend_type(&self) -> BackendType {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(_) => BackendType::Onnx,
             BackendEnum::TranscribeCpp(_) => BackendType::TranscribeCpp,
         }
@@ -63,6 +69,7 @@ impl SpeechBackend for BackendEnum {
 
     fn supports_streaming(&self) -> bool {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(_) => false,
             BackendEnum::TranscribeCpp(backend) => backend.supports_streaming(),
         }
@@ -79,6 +86,7 @@ impl BackendEnum {
         F: FnOnce(&mut transcribe_cpp::Stream) -> R,
     {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(_) => {
                 log::info!("[BackendEnum] ONNX backend does not support streaming");
                 None
@@ -99,6 +107,7 @@ impl BackendEnum {
     /// Returns `None` for ONNX backend.
     pub fn get_capabilities(&self) -> Option<&crate::backends::GgufCapabilities> {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(_) => None,
             BackendEnum::TranscribeCpp(backend) => Some(backend.get_capabilities()),
         }
@@ -110,6 +119,7 @@ impl BackendEnum {
     /// Returns `true` if session was recreated.
     pub fn add_duration_and_check_recreate(&self, duration_ms: u64) -> bool {
         match self {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendEnum::Onnx(_) => {
                 // ONNX backend does not have session recreation logic
                 false
@@ -254,6 +264,7 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
 
     // 验证文件/目录存在
     let exists = match backend {
+        #[cfg(not(feature = "disable-onnx"))]
         BackendType::Onnx => {
             let is_dir = model_path.is_dir();
             let has_model = model_path.join("model.int8.onnx").exists()
@@ -561,6 +572,7 @@ impl ModelManager {
 
         // 估算所需内存：文件大小 × 系数（考虑加载后内存膨胀）
         let memory_multiplier = match model_config.backend {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendType::Onnx => 1.5,          // ONNX Runtime 有额外开销
             BackendType::TranscribeCpp => 1.1, // GGUF 模型内存效率高
         };
@@ -626,10 +638,11 @@ impl ModelManager {
 
         // 根据后端类型创建对应的后端实例
         let backend: BackendEnum = match model_config.backend {
+            #[cfg(not(feature = "disable-onnx"))]
             BackendType::Onnx => {
                 info!("[ModelManager] 创建 ONNX 后端...");
                 let backend =
-                    crate::backends::OnnxBackend::load(Path::new(model_path)).map_err(|e| {
+                    OnnxBackend::load(Path::new(model_path)).map_err(|e| {
                         info!("[ModelManager] ONNX 后端加载失败: {}", e);
                         format!("Failed to load ONNX model: {}", e)
                     })?;
@@ -947,7 +960,7 @@ pub struct LoadedModelInfo {
     pub last_used_secs: u64,
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "disable-onnx")))]
 mod tests {
     use super::*;
     use crate::backends::TranscribeParams;
