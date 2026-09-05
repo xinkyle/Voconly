@@ -814,22 +814,31 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
         if let Ok(monitor) = float_window.primary_monitor() {
             if let Some(monitor) = monitor {
                 let monitor_size = monitor.size();
+                let scale_factor = monitor.scale_factor();
 
                 // 初始显示：药丸模式（仅显示状态栏）
-                let window_width = 520u32;
-                let window_height = 60u32; // 药丸高度：60 物理像素
+                // 使用逻辑像素，统一所有平台的视觉大小
+                let window_width_logical = 480.0; // 窗口宽度
+                let window_height_logical = 38.0; // 药丸高度：40 逻辑像素
+
+                // 转换为物理像素用于定位计算
+                let window_width_physical = (window_width_logical * scale_factor) as i32;
+                let window_height_physical = (window_height_logical * scale_factor) as i32;
 
                 // 计算窗口位置：底部居中，距任务栏固定间距
-                let x = (monitor_size.width as i32 - window_width as i32) / 2;
-                let y = monitor_size.height as i32 - window_height as i32 - 80;
+                let x = (monitor_size.width as i32 - window_width_physical) / 2;
+                let y = monitor_size.height as i32 - window_height_physical - 80;
 
-                // 设置窗口大小和位置
-                let _ = float_window.set_size(PhysicalSize::new(window_width, window_height));
+                // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
+                let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                    window_width_logical,
+                    window_height_logical,
+                )));
                 let _ = float_window.set_position(PhysicalPosition::new(x, y));
 
                 info!(
-                    "Float panel positioned at: x={}, y={}, height={} (pill mode)",
-                    x, y, window_height
+                    "Float panel positioned at: x={}, y={}, height={}px (logical), scale_factor={}",
+                    x, y, window_height_logical, scale_factor
                 );
             }
         }
@@ -918,7 +927,8 @@ async fn hide_float_panel(app: AppHandle, reason: Option<String>) -> Result<(), 
     if let Some(float_window) = app.get_webview_window("float-panel") {
         // 【关键修复】先将窗口大小设置为最小，避免隐藏后仍遮挡鼠标事件
         // 透明窗口即使隐藏后，其区域仍可能接收鼠标事件
-        let _ = float_window.set_size(PhysicalSize::new(1, 1));
+        // 使用逻辑像素，与显示时保持一致
+        let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1.0, 1.0)));
 
         float_window
             .hide()
@@ -965,32 +975,41 @@ async fn set_float_panel_height(
     if let Ok(monitor) = float_window.primary_monitor() {
         if let Some(monitor) = monitor {
             let monitor_size = monitor.size();
+            let scale_factor = monitor.scale_factor();
 
-            // 使用 PhysicalSize 设置物理像素尺寸
-            let window_width = 520u32;
+            // 使用逻辑像素设置窗口大小，统一所有平台的视觉高度
+            let window_width_logical = 480.0; // 窗口宽度
 
-            // 根据高度档位设置不同的展开高度
-            let target_height = if expanded {
+            // 根据高度档位设置不同的展开高度（逻辑像素）
+            // 压缩到原来的 2/3，所有平台呈现相同的视觉高度
+            let target_height_logical = if expanded {
                 match preview_height.as_deref() {
-                    Some("low") => 150u32,    // 低：约3行
-                    Some("medium") => 280u32, // 中：适中
-                    _ => 500u32,              // 高（默认）：500px
+                    Some("low") => 100.0,    // 低：约3行文字
+                    Some("medium") => 160.0, // 中：约5行文字
+                    _ => 280.0,              // 高（默认）：约10行文字
                 }
             } else {
-                60u32 // 药丸高度：60 物理像素
+                40.0 // 药丸高度：40 逻辑像素
             };
 
-            // 计算窗口位置：底部居中，距任务栏固定间距
-            let x = (monitor_size.width as i32 - window_width as i32) / 2;
-            let y = monitor_size.height as i32 - target_height as i32 - 80;
+            // 转换为物理像素用于定位计算
+            let window_width_physical = (window_width_logical * scale_factor) as i32;
+            let target_height_physical = (target_height_logical * scale_factor) as i32;
 
-            // 设置窗口大小和位置（物理像素）
-            let _ = float_window.set_size(PhysicalSize::new(window_width, target_height));
+            // 计算窗口位置：底部居中，距任务栏固定间距
+            let x = (monitor_size.width as i32 - window_width_physical) / 2;
+            let y = monitor_size.height as i32 - target_height_physical - 80;
+
+            // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
+            let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                window_width_logical,
+                target_height_logical,
+            )));
             let _ = float_window.set_position(PhysicalPosition::new(x, y));
 
             info!(
-                "Float panel height set to: {}px (expanded={}, preview_height={:?})",
-                target_height, expanded, preview_height
+                "Float panel height set to: {}px logical ({}px physical at scale_factor={}), expanded={}, preview_height={:?}",
+                target_height_logical, target_height_physical, scale_factor, expanded, preview_height
             );
         }
     }
@@ -2174,6 +2193,8 @@ fn main() {
             );
 
             // Create float panel window with same WebView data directory
+            // 窗口高度统一使用逻辑像素，让 Tauri 自动处理 DPI 缩放
+            // 药丸模式：60px，展开模式：最大 500px
             let float_window_start = Instant::now();
             let float_window = WebviewWindowBuilder::new(
                 app,
@@ -2181,7 +2202,7 @@ fn main() {
                 tauri::WebviewUrl::App("float.html".into()),
             )
             .title("Voconly 悬浮窗")
-            .inner_size(520.0, 160.0)
+            .inner_size(480.0, 40.0) // 药丸：480px 宽 × 40px 高
             .resizable(false)
             .decorations(false)
             .always_on_top(true)
