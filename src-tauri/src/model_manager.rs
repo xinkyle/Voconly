@@ -7,7 +7,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
-use crate::config::{AppConfig, DownloadSource, Model, ModelRef};
+use crate::config::{AppConfig, Model, ModelRef};
 use crate::presets::{scan_available_asr_models, get_base_model_id, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
 use crate::utils::extract_quant_suffix;
@@ -246,18 +246,6 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
 
     log::info!("[preset_to_model] ✓ 找到有效模型: {} -> {}", preset.id, model_path.display());
 
-    // 转换 download_urls
-    let download_urls: Vec<DownloadSource> = preset
-        .download_urls
-        .iter()
-        .map(|src| DownloadSource {
-            name: src.name.clone(),
-            url: src.url.clone(),
-            is_china_accessible: src.is_china_accessible,
-            priority: src.priority,
-        })
-        .collect();
-
     Some(Model {
         id: preset.id.clone(),
         name: preset.name.clone(),
@@ -265,7 +253,7 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
         size: preset.size.clone(),
         downloaded: true,
         path: Some(model_path.to_string_lossy().to_string()),
-        download_urls,
+        download_urls: preset.download_urls.clone(),
         languages: preset.languages.clone(),
         description: preset.description.clone(),
         gguf_config: None, // GGUF config not available from presets

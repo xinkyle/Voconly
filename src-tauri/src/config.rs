@@ -9,6 +9,7 @@ use crate::dictionary::UserDictionary;
 use crate::llm::{LlmConfig, LlmProfile, LlmProviderConfig, LlmProviderInstance, UserPromptPresets};
 use crate::model_manager::ModelManager;
 use crate::paths::{config_file_path, models_dir};
+use crate::presets::DownloadSourceInfo;
 use std::collections::HashMap;
 
 /// 当前配置版本
@@ -338,7 +339,7 @@ pub struct Model {
     pub path: Option<String>,
     /// 下载源列表
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub download_urls: Vec<DownloadSource>,
+    pub download_urls: Vec<DownloadSourceInfo>,
     /// 支持的语言
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub languages: Vec<String>,

@@ -87,6 +87,8 @@ objc = "0.2"
 cocoa = "0.26"
 # macOS 崩溃报告：信号处理
 libc = "0.2"
+# macOS 主线程调度：enigo 键盘模拟需要在主线程执行
+dispatch2 = "0.3"
 
 # Patch transcribe-cpp-sys to fix MSVC encoding issues.
 # Add /utf-8 flag to prevent character encoding errors on Windows MSVC.

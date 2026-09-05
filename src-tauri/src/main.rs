@@ -518,108 +518,128 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let is_terminal = is_terminal_window();
     info!("[simulate_input] Is terminal window: {}", is_terminal);
 
-    // 4. Create enigo instance for simulating keystrokes
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
-        error!("[simulate_input] FAILED to create enigo instance: {}", e);
-        format!("Failed to create enigo instance: {}", e)
-    })?;
-
+    // 4. Create enigo instance and simulate keystrokes
+    // On macOS, both Enigo::new() and key() must run on main thread
     #[cfg(target_os = "macos")]
     {
-        // macOS uses Cmd+V for paste (Meta key)
+        use dispatch2::DispatchQueue;
+        use std::sync::{Arc, Mutex};
+
         info!("[simulate_input] Using Cmd+V for macOS");
 
-        enigo
-            .key(Key::Meta, enigo::Direction::Press)
-            .map_err(|e| {
+        // exec_sync doesn't support return values, use Arc<Mutex> to pass errors
+        let error_msg = Arc::new(Mutex::new(None::<String>));
+        let error_msg_clone = error_msg.clone();
+
+        DispatchQueue::main().exec_sync(move || {
+            let mut enigo = match Enigo::new(&Settings::default()) {
+                Ok(e) => e,
+                Err(e) => {
+                    error!("[simulate_input] FAILED to create enigo instance: {}", e);
+                    *error_msg_clone.lock().unwrap() = Some(format!("Failed to create enigo instance: {}", e));
+                    return;
+                }
+            };
+
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Press) {
                 error!("[simulate_input] FAILED to press Meta: {}", e);
-                format!("Failed to press Meta: {}", e)
-            })?;
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to press Meta: {}", e));
+                return;
+            }
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        enigo
-            .key(Key::Unicode('v'), enigo::Direction::Click)
-            .map_err(|e| {
+            if let Err(e) = enigo.key(Key::Unicode('v'), enigo::Direction::Click) {
                 error!("[simulate_input] FAILED to click V: {}", e);
-                format!("Failed to click V: {}", e)
-            })?;
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to click V: {}", e));
+                return;
+            }
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        enigo
-            .key(Key::Meta, enigo::Direction::Release)
-            .map_err(|e| {
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Release) {
                 error!("[simulate_input] FAILED to release Meta: {}", e);
-                format!("Failed to release Meta: {}", e)
-            })?;
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to release Meta: {}", e));
+                return;
+            }
+        });
+
+        // Check if any error occurred
+        if let Some(err) = error_msg.lock().unwrap().take() {
+            return Err(err);
+        }
+        info!("[simulate_input] Paste operation completed");
     }
 
     #[cfg(target_os = "windows")]
-    if is_terminal {
-        // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
-        // Ctrl+V doesn't work in these environments
-        info!("[simulate_input] Using Shift+Insert for terminal");
+    {
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
+            error!("[simulate_input] FAILED to create enigo instance: {}", e);
+            format!("Failed to create enigo instance: {}", e)
+        })?;
 
-        enigo
-            .key(Key::Shift, enigo::Direction::Press)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to press Shift: {}", e);
-                format!("Failed to press Shift: {}", e)
-            })?;
+        if is_terminal {
+            // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
+            // Ctrl+V doesn't work in these environments
+            info!("[simulate_input] Using Shift+Insert for terminal");
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            enigo
+                .key(Key::Shift, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Shift: {}", e);
+                    format!("Failed to press Shift: {}", e)
+                })?;
 
-        enigo
-            .key(Key::Insert, enigo::Direction::Click)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to click Insert: {}", e);
-                format!("Failed to click Insert: {}", e)
-            })?;
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            enigo
+                .key(Key::Insert, enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click Insert: {}", e);
+                    format!("Failed to click Insert: {}", e)
+                })?;
 
-        enigo
-            .key(Key::Shift, enigo::Direction::Release)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to release Shift: {}", e);
-                format!("Failed to release Shift: {}", e)
-            })?;
-    } else {
-        // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
-        // This avoids the Insert key "overwrite mode" issue
-        info!("[simulate_input] Using Ctrl+V for regular application");
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        enigo
-            .key(Key::Control, enigo::Direction::Press)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to press Control: {}", e);
-                format!("Failed to press Control: {}", e)
-            })?;
+            enigo
+                .key(Key::Shift, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Shift: {}", e);
+                    format!("Failed to release Shift: {}", e)
+                })?;
+        } else {
+            // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
+            // This avoids the Insert key "overwrite mode" issue
+            info!("[simulate_input] Using Ctrl+V for regular application");
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            enigo
+                .key(Key::Control, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Control: {}", e);
+                    format!("Failed to press Control: {}", e)
+                })?;
 
-        enigo
-            .key(Key::Unicode('v'), enigo::Direction::Click)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to click V: {}", e);
-                format!("Failed to click V: {}", e)
-            })?;
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            enigo
+                .key(Key::Unicode('v'), enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click V: {}", e);
+                    format!("Failed to click V: {}", e)
+                })?;
 
-        enigo
-            .key(Key::Control, enigo::Direction::Release)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to release Control: {}", e);
-                format!("Failed to release Control: {}", e)
-            })?;
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Control, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Control: {}", e);
+                    format!("Failed to release Control: {}", e)
+                })?;
+        }
+
+        info!("[simulate_input] Paste operation completed");
     }
-
-    info!("[simulate_input] Paste operation completed");
-
-    // Drop enigo first
-    drop(enigo);
 
     // 4. Restore old clipboard content after a delay
     if let Some(old_text) = old_clipboard {
@@ -1225,6 +1245,7 @@ async fn is_autostart_enabled() -> Result<bool, String> {
             let result: Result<String, _> = key.get_value("Voconly");
             return Ok(result.is_ok());
         }
+        return Ok(false);
     }
 
     #[cfg(target_os = "macos")]
@@ -1236,6 +1257,7 @@ async fn is_autostart_enabled() -> Result<bool, String> {
         return Ok(plist_path.exists());
     }
 
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     Ok(false)
 }
 

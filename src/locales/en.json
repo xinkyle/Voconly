@@ -622,7 +622,8 @@
     "requesting": "Requesting...",
     "skip": "Skip",
     "deniedHint": "You previously denied microphone permission. Please enable it in system settings.",
-    "error": "Permission request failed. Please try again."
+    "error": "Permission request failed. Please try again.",
+    "openSettings": "Open System Settings"
   },
   "download": {
     "errorTitle": "Download Failed",

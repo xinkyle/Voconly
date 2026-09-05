@@ -154,6 +154,7 @@ function App() {
   // Permission modal state
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false); // 标记权限是否被拒绝
 
   // Download error dialog state
   const [showDownloadErrorDialog, setShowDownloadErrorDialog] = useState(false);
@@ -184,11 +185,13 @@ function App() {
         // First time - request permission directly (system will show its own dialog)
         const granted = await requestMicrophonePermission();
         if (!granted) {
-          // User denied - show our guidance modal
+          // User denied - show our guidance modal with "打开系统设置" button
+          setPermissionDenied(true);
           setShowPermissionModal(true);
         }
       } else if (state === 'denied') {
-        // Previously denied - show guidance modal
+        // Previously denied - show guidance modal with "打开系统设置" button
+        setPermissionDenied(true);
         setShowPermissionModal(true);
       }
       // 'granted' - nothing to do
@@ -1673,6 +1676,7 @@ function App() {
           log.info('Permission granted via modal');
           setShowPermissionModal(false);
         }}
+        initialDenied={permissionDenied}
       />
 
       {/* Download Error Dialog */}

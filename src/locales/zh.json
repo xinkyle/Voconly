@@ -622,7 +622,8 @@
     "requesting": "请求中...",
     "skip": "暂不授权",
     "deniedHint": "您之前拒绝了麦克风权限，请在系统设置中重新授权",
-    "error": "请求权限失败，请稍后重试"
+    "error": "请求权限失败，请稍后重试",
+    "openSettings": "打开系统设置"
   },
   "download": {
     "errorTitle": "模型下载失败",

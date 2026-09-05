@@ -7138,6 +7138,7 @@ dependencies = [
  "cocoa 0.26.1",
  "cpal",
  "dirs 5.0.1",
+ "dispatch2",
  "enigo",
  "env_filter",
  "ferrous-opencc",

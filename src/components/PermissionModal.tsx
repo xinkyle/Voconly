@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { requestMicrophonePermission } from '../services/audio';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { requestMicrophonePermission, checkMicrophonePermission } from '../services/audio';
 import { createLogger } from '../services/log';
 
 const log = createLogger('PermissionModal');
@@ -9,12 +10,25 @@ interface PermissionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGranted: () => void;
+  /** 是否初始就显示"打开系统设置"按钮（权限已被拒绝的情况） */
+  initialDenied?: boolean;
 }
 
-export default function PermissionModal({ isOpen, onClose, onGranted }: PermissionModalProps) {
+export default function PermissionModal({ isOpen, onClose, onGranted, initialDenied = false }: PermissionModalProps) {
   const { t } = useTranslation();
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDenied, setIsDenied] = useState(initialDenied);
+
+  // 当 modal 打开且 initialDenied 为 false 时，检查权限状态
+  useEffect(() => {
+    if (isOpen && !initialDenied) {
+      checkMicrophonePermission().then(state => {
+        log.info(`Permission state: ${state}`);
+        setIsDenied(state === 'denied');
+      });
+    }
+  }, [isOpen, initialDenied]);
 
   if (!isOpen) return null;
 
@@ -29,6 +43,8 @@ export default function PermissionModal({ isOpen, onClose, onGranted }: Permissi
         onGranted();
         onClose();
       } else {
+        // Permission still denied
+        setIsDenied(true);
         setError(t('permission.deniedHint'));
       }
     } catch (err) {
@@ -36,6 +52,22 @@ export default function PermissionModal({ isOpen, onClose, onGranted }: Permissi
       setError(t('permission.error'));
     } finally {
       setRequesting(false);
+    }
+  };
+
+  const handleOpenSystemSettings = async () => {
+    try {
+      // macOS: Open System Preferences > Security & Privacy > Privacy > Microphone
+      // Note: This URL scheme may not work in all macOS versions
+      log.info('Attempting to open system settings for microphone permission');
+      await openUrl('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
+      log.info('Successfully opened system settings');
+      // Close the modal after opening settings
+      onClose();
+    } catch (err) {
+      log.error(`Failed to open system settings: ${err}`);
+      // Show a more helpful error message
+      setError('无法打开系统设置，请手动打开：系统设置 > 隐私与安全性 > 麦克风');
     }
   };
 
@@ -69,28 +101,47 @@ export default function PermissionModal({ isOpen, onClose, onGranted }: Permissi
         )}
 
         {/* Buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-          >
-            {t('permission.skip')}
-          </button>
-          <button
-            onClick={handleRequestPermission}
-            disabled={requesting}
-            className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {requesting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {t('permission.requesting')}
-              </>
-            ) : (
-              t('permission.grant')
-            )}
-          </button>
-        </div>
+        {isDenied ? (
+          // Permission denied - show button to open system settings
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              {t('permission.skip')}
+            </button>
+            <button
+              onClick={handleOpenSystemSettings}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              {t('permission.openSettings')}
+            </button>
+          </div>
+        ) : (
+          // Permission not yet denied - show request button
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              {t('permission.skip')}
+            </button>
+            <button
+              onClick={handleRequestPermission}
+              disabled={requesting}
+              className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {requesting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {t('permission.requesting')}
+                </>
+              ) : (
+                t('permission.grant')
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
