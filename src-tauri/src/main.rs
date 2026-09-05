@@ -389,31 +389,32 @@ fn is_terminal_window() -> bool {
 fn is_terminal_window() -> bool {
     use cocoa::foundation::NSString;
     use objc::{class, msg_send, sel, sel_impl};
+    use objc::runtime::Object;
 
     unsafe {
         // Get NSWorkspace shared instance
-        let workspace: *mut std::ffi::c_void = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
         if workspace.is_null() {
             info!("[is_terminal_window] Failed to get NSWorkspace");
             return false;
         }
 
         // Get the frontmost application (NSRunningApplication)
-        let frontmost_app: *mut std::ffi::c_void = msg_send![workspace, frontmostApplication];
+        let frontmost_app: *mut Object = msg_send![workspace, frontmostApplication];
         if frontmost_app.is_null() {
             info!("[is_terminal_window] No frontmost application");
             return false;
         }
 
         // Get bundle identifier (NSString)
-        let bundle_id: *mut std::ffi::c_void = msg_send![frontmost_app, bundleIdentifier];
+        let bundle_id: *mut Object = msg_send![frontmost_app, bundleIdentifier];
         if bundle_id.is_null() {
             info!("[is_terminal_window] No bundle identifier");
             return false;
         }
 
         // Convert to Rust string
-        let bundle_str = NSString::UTF8String(bundle_id as *const std::ffi::c_void);
+        let bundle_str = NSString::UTF8String(bundle_id);
         if bundle_str.is_null() {
             return false;
         }
@@ -523,6 +524,38 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
         format!("Failed to create enigo instance: {}", e)
     })?;
 
+    #[cfg(target_os = "macos")]
+    {
+        // macOS uses Cmd+V for paste (Meta key)
+        info!("[simulate_input] Using Cmd+V for macOS");
+
+        enigo
+            .key(Key::Meta, enigo::Direction::Press)
+            .map_err(|e| {
+                error!("[simulate_input] FAILED to press Meta: {}", e);
+                format!("Failed to press Meta: {}", e)
+            })?;
+
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        enigo
+            .key(Key::Unicode('v'), enigo::Direction::Click)
+            .map_err(|e| {
+                error!("[simulate_input] FAILED to click V: {}", e);
+                format!("Failed to click V: {}", e)
+            })?;
+
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        enigo
+            .key(Key::Meta, enigo::Direction::Release)
+            .map_err(|e| {
+                error!("[simulate_input] FAILED to release Meta: {}", e);
+                format!("Failed to release Meta: {}", e)
+            })?;
+    }
+
+    #[cfg(target_os = "windows")]
     if is_terminal {
         // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
         // Ctrl+V doesn't work in these environments
@@ -2346,13 +2379,6 @@ fn main() {
                 );
 
                 // 1. 初始化 GPU 加速器
-                let onnx_gpu_start = Instant::now();
-                crate::backends::onnx::apply_ort_accelerator("cuda");
-                info!(
-                    "[AsyncInit] ONNX GPU 加速器初始化完成, 耗时: {}ms",
-                    onnx_gpu_start.elapsed().as_millis()
-                );
-
                 // Initialize transcribe-cpp backend (for GGUF ASR models like Qwen3-ASR)
                 // This loads Vulkan/Metal/CUDA backend modules before any model load
                 let transcribe_cpp_start = Instant::now();

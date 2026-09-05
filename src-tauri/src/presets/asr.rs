@@ -20,8 +20,6 @@
 //! - Parakeet TDT v3 (GGUF, European languages)
 //! - Parakeet Unified EN (GGUF, English optimized)
 //! - Whisper Large v3 Turbo (GGUF, 100+ languages)
-//! - SenseVoice Small (ONNX, Chinese/Cantonese optimized)
-//! - Parakeet V3 (ONNX, European languages)
 
 use super::ModelPreset;
 use crate::backends::BackendType;
@@ -65,8 +63,8 @@ mod tests {
     #[test]
     fn test_asr_presets_count() {
         let presets = get_asr_presets();
-        // Should have 8 ASR presets (6 GGUF + 2 ONNX)
-        assert_eq!(presets.len(), 8);
+        // Should have 6 ASR presets (all GGUF)
+        assert_eq!(presets.len(), 6);
     }
 
     #[test]
@@ -114,38 +112,18 @@ mod tests {
     }
 
     #[test]
-    fn test_onnx_presets() {
-        let onnx_presets = get_asr_presets_by_backend(BackendType::Onnx);
-        assert_eq!(onnx_presets.len(), 2);
-
-        // SenseVoice should support Chinese and Cantonese
-        let sensevoice = onnx_presets.iter().find(|p| p.id == "sensevoice-small");
-        assert!(sensevoice.is_some());
-        let sensevoice = sensevoice.unwrap();
-        assert!(sensevoice.languages.contains(&"zh".to_string()));
-        assert!(sensevoice.languages.contains(&"zh-yue".to_string()));
-
-        // Parakeet should support English and European languages
-        let parakeet = onnx_presets.iter().find(|p| p.id == "parakeet-v3");
-        assert!(parakeet.is_some());
-        let parakeet = parakeet.unwrap();
-        assert!(parakeet.languages.contains(&"en".to_string()));
-        assert!(parakeet.languages.contains(&"de".to_string()));
-    }
-
-    #[test]
     fn test_language_filtering() {
         let zh_presets = get_asr_presets_by_language("zh");
-        // Qwen3-ASR, Cohere, Nemotron, Whisper Turbo, SenseVoice support Chinese (5 GGUF + 1 ONNX)
-        assert_eq!(zh_presets.len(), 5);
+        // Qwen3-ASR, Cohere, Nemotron, Whisper Turbo support Chinese (4 GGUF)
+        assert_eq!(zh_presets.len(), 4);
 
         let en_presets = get_asr_presets_by_language("en");
-        // All 8 presets support English
-        assert_eq!(en_presets.len(), 8);
+        // All 6 presets support English
+        assert_eq!(en_presets.len(), 6);
 
         let de_presets = get_asr_presets_by_language("de");
-        // Qwen3-ASR, Cohere, Nemotron, Parakeet TDT, Whisper Turbo, Parakeet V3 (ONNX)
-        assert!(de_presets.len() >= 5);
+        // Qwen3-ASR, Cohere, Nemotron, Parakeet TDT, Whisper Turbo
+        assert!(de_presets.len() >= 4);
     }
 
     #[test]

@@ -327,7 +327,7 @@ pub struct DownloadSource {
 pub struct Model {
     pub id: String,
     pub name: String,
-    /// 后端类型 (onnx/transcribe_cpp)
+    /// 后端类型 (transcribe_cpp)
     #[serde(default)]
     pub backend: BackendType,
     /// 模型大小 (如 "39MB")
@@ -426,7 +426,7 @@ pub struct AppConfig {
     pub models: Vec<Model>,
 
     /// 用户对每个 ASR 模型的默认语言偏好
-    /// key: 模型 ID (如 "sensevoice-small", "qwen3-asr-0.6b-q4_0")
+    /// key: 模型 ID (如 "qwen3-asr-1.7b", "parakeet-tdt-1.1b")
     /// value: 语言代码 (如 "zh", "en", "auto")
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub model_language_prefs: HashMap<String, String>,
@@ -1051,7 +1051,7 @@ mod global_model_config_tests {
         // 创建带有 GlobalModelConfig 的 AppConfig
         let config = AppConfig {
             global_model_config: GlobalModelConfig {
-                asr_model: ModelRef::new("sensevoice-small".to_string()),
+                asr_model: ModelRef::new("qwen3-asr-1.7b".to_string()),
                 llm: GlobalLlmConfig {
                     provider_id: "openai".to_string(),
                     model: "gpt-4".to_string(),
@@ -1075,7 +1075,7 @@ mod global_model_config_tests {
         let deserialized: AppConfig = serde_json::from_str(&json).unwrap();
 
         // 验证
-        assert_eq!(deserialized.global_model_config.asr_model.model_id, "sensevoice-small");
+        assert_eq!(deserialized.global_model_config.asr_model.model_id, "qwen3-asr-1.7b");
         assert_eq!(deserialized.global_model_config.llm.provider_id, "openai");
     }
 
@@ -1089,7 +1089,7 @@ mod global_model_config_tests {
                     "name": "测试场景",
                     "shortcut": "1",
                     "model": {
-                        "modelId": "sensevoice-small"
+                        "modelId": "qwen3-asr-1.7b"
                     },
                     "enabled": true
                 }

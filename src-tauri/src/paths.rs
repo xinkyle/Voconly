@@ -35,7 +35,7 @@ pub fn user_data_dir() -> Result<PathBuf, String> {
 }
 
 /// 获取内置资源目录 (%LOCALAPPDATA%\Voconly\Application)
-/// 用于存放打包内置资源：dll、onnx 模型等
+/// 用于存放打包内置资源：dll 等文件
 pub fn bundle_resource_dir() -> Result<PathBuf, String> {
     application_dir()
 }

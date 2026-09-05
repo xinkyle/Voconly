@@ -255,35 +255,6 @@
           "priority": 1
         }
       ]
-    },
-    {
-      "id": "sensevoice-small",
-      "name": "SenseVoice Small",
-      "architecture": "sensevoice",
-      "backend": "Onnx",
-      "languages": ["zh", "zh-yue", "en", "ja", "ko"],
-      "capabilities": {
-        "streaming": false,
-        "translate": false,
-        "lang_detect": true
-      },
-      "speed_score": 95,
-      "accuracy_score": 86,
-      "description": "纯中文识别效果不错，中英混合识别一般，系统资源要求不高",
-      "download_urls": [
-        {
-          "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
-          "is_china_accessible": true,
-          "priority": 0
-        },
-        {
-          "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly-org/sensevoice-small/resolve/main/sensevoice-small.zip",
-          "is_china_accessible": false,
-          "priority": 2
-        }
-      ]
     }
   ]
 }

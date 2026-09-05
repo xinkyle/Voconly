@@ -3,7 +3,7 @@
 
 use crate::config::{load_config, AppServices};
 use crate::paths::{llm_models_dir, models_dir};
-use crate::presets::{get_asr_presets, get_model_backend, is_gguf_model, is_llm_model, is_onnx_model, scan_available_asr_models};
+use crate::presets::{get_asr_presets, get_model_backend, is_gguf_model, is_llm_model, scan_available_asr_models};
 use futures_util::StreamExt;
 use log;
 use serde::{Deserialize, Serialize};
@@ -242,9 +242,6 @@ pub fn get_model_path_from_preset(model_id: &str) -> Result<PathBuf, String> {
 }
 
 /// Get model file path by model ID and backend type
-/// For ONNX models (SenseVoice/Parakeet/Moonshine), returns directory path
-/// For Whisper models, returns file path
-/// For Python backend models (Qwen3-ASR), returns directory path
 /// For GGUF models (TranscribeCpp backend), returns file path
 ///
 /// 搜索顺序：
@@ -256,110 +253,49 @@ pub fn get_model_path(model_id: &str, backend: &str) -> Result<PathBuf, String> 
 
     // Use unified detection functions
     let is_gguf = is_gguf_model(model_id) || backend == "transcribe_cpp" || backend == "transcribecpp" || backend == "transcribe-cpp";
-    let is_onnx = is_onnx_model(model_id) || backend == "onnx";
 
-    log::debug!("[get_model_path] 判断模型类型: is_gguf={}, is_onnx={}", is_gguf, is_onnx);
+    log::debug!("[get_model_path] 判断模型类型: is_gguf={}", is_gguf);
 
-    if is_gguf {
-        // GGUF 文件直接使用文件名
-        let filename = if model_id.ends_with(".gguf") || model_id.ends_with(".bin") {
-            log::debug!("[get_model_path] 模型ID已包含扩展名: {}", model_id);
-            model_id.to_string()
-        } else {
-            // 先尝试 .gguf，如果不存在则尝试 .bin (GGML 格式)
-            let gguf_path = storage_dir.join(format!("{}.gguf", model_id));
-            let bin_path = storage_dir.join(format!("{}.bin", model_id));
-            log::debug!("[get_model_path] 尝试默认目录: gguf={}, bin={}", gguf_path.display(), bin_path.display());
-
-            if gguf_path.exists() {
-                log::debug!("[get_model_path] 默认目录找到.gguf文件");
-                format!("{}.gguf", model_id)
-            } else if bin_path.exists() {
-                log::debug!("[get_model_path] 默认目录找到.bin文件");
-                format!("{}.bin", model_id)
-            } else {
-                log::debug!("[get_model_path] 默认目录未找到文件，使用.gguf扩展名");
-                format!("{}.gguf", model_id)
-            }
-        };
-
-        // 先检查默认目录
-        let default_path = storage_dir.join(&filename);
-        log::debug!("[get_model_path] 检查默认路径: {}", default_path.display());
-        if default_path.exists() {
-            log::info!("[get_model_path] ✓ 在默认目录找到模型: {}", default_path.display());
-            return Ok(default_path);
-        }
-
-        // 再检查自定义目录
-        log::debug!("[get_model_path] 默认目录未找到，检查自定义目录...");
-        if let Some(custom_path) = find_in_custom_dirs(&filename, true) {
-            log::info!("[get_model_path] ✓ 在自定义目录找到模型: {}", custom_path.display());
-            return Ok(custom_path);
-        }
-
-        // 都没找到，返回默认路径（后续检查存在性时会失败）
-        log::warn!("[get_model_path] 未找到模型文件: {}, 返回默认路径（不存在）", filename);
-        Ok(default_path)
-    } else if is_onnx {
-        // ONNX models (SenseVoice/Parakeet/Moonshine) use directory structure
-        // transcribe-rs expects: directory/model.int8.onnx + tokens.txt
-
-        // Return directory path for ONNX models
-        // e.g., sensevoice-small/ or parakeet-unified-en-0.6b-F16/
-
-        // 先检查默认目录
-        let default_path = storage_dir.join(model_id);
-        log::debug!("[get_model_path] 检查ONNX默认目录: {}", default_path.display());
-        if default_path.exists() {
-            log::info!("[get_model_path] ✓ 在默认目录找到ONNX模型目录: {}", default_path.display());
-            return Ok(default_path);
-        }
-
-        // 再检查自定义目录（目录类型）
-        log::debug!("[get_model_path] 默认目录未找到，检查自定义目录...");
-        if let Some(custom_path) = find_in_custom_dirs(model_id, false) {
-            log::info!("[get_model_path] ✓ 在自定义目录找到ONNX模型目录: {}", custom_path.display());
-            return Ok(custom_path);
-        }
-
-        // 都没找到，返回默认路径
-        log::warn!("[get_model_path] 未找到ONNX模型目录: {}, 返回默认路径（不存在）", model_id);
-        Ok(default_path)
+    // GGUF 文件直接使用文件名
+    let filename = if model_id.ends_with(".gguf") || model_id.ends_with(".bin") {
+        log::debug!("[get_model_path] 模型ID已包含扩展名: {}", model_id);
+        model_id.to_string()
     } else {
-        // Fallback for unknown model types
-        let extension = match backend {
-            "transcribe_cpp" => "gguf",
-            _ => "gguf",
-        };
+        // 先尝试 .gguf，如果不存在则尝试 .bin (GGML 格式)
+        let gguf_path = storage_dir.join(format!("{}.gguf", model_id));
+        let bin_path = storage_dir.join(format!("{}.bin", model_id));
+        log::debug!("[get_model_path] 尝试默认目录: gguf={}, bin={}", gguf_path.display(), bin_path.display());
 
-        let filename = if model_id.contains('.') {
-            log::debug!("[get_model_path] 模型ID包含点号，直接使用: {}", model_id);
-            model_id.to_string()
+        if gguf_path.exists() {
+            log::debug!("[get_model_path] 默认目录找到.gguf文件");
+            format!("{}.gguf", model_id)
+        } else if bin_path.exists() {
+            log::debug!("[get_model_path] 默认目录找到.bin文件");
+            format!("{}.bin", model_id)
         } else {
-            format!("{}.{}", model_id, extension)
-        };
-
-        log::debug!("[get_model_path] GGUF文件名: {}", filename);
-
-        // 先检查默认目录
-        let default_path = storage_dir.join(&filename);
-        log::debug!("[get_model_path] 检查默认路径: {}", default_path.display());
-        if default_path.exists() {
-            log::info!("[get_model_path] ✓ 在默认目录找到GGUF文件: {}", default_path.display());
-            return Ok(default_path);
+            log::debug!("[get_model_path] 默认目录未找到文件，使用.gguf扩展名");
+            format!("{}.gguf", model_id)
         }
+    };
 
-        // 再检查自定义目录
-        log::debug!("[get_model_path] 默认目录未找到，检查自定义目录...");
-        if let Some(custom_path) = find_in_custom_dirs(&filename, true) {
-            log::info!("[get_model_path] ✓ 在自定义目录找到GGUF文件: {}", custom_path.display());
-            return Ok(custom_path);
-        }
-
-        log::warn!("[get_model_path] 未找到GGUF文件: {}, 返回默认路径（不存在）", filename);
-        Ok(default_path)
+    // 先检查默认目录
+    let default_path = storage_dir.join(&filename);
+    log::debug!("[get_model_path] 检查默认路径: {}", default_path.display());
+    if default_path.exists() {
+        log::info!("[get_model_path] ✓ 在默认目录找到模型: {}", default_path.display());
+        return Ok(default_path);
     }
+
+    // 再检查自定义目录
+    log::debug!("[get_model_path] 默认目录未找到，检查自定义目录...");
+    if let Some(custom_path) = find_in_custom_dirs(&filename, true) {
+        log::info!("[get_model_path] ✓ 在自定义目录找到模型: {}", custom_path.display());
+        return Ok(custom_path);
+    }
+
+    // 都没找到，返回默认路径（后续检查存在性时会失败）
+    log::warn!("[get_model_path] 未找到模型文件: {}, 返回默认路径（不存在）", filename);
+    Ok(default_path)
 }
 
 /// 在用户自定义目录中查找模型
@@ -405,7 +341,6 @@ fn find_in_custom_dirs(file_name: &str, is_file: bool) -> Option<PathBuf> {
 }
 
 /// Check if model file exists
-/// For ONNX models, checks if directory exists with model files
 /// For GGUF models (TranscribeCpp backend), checks if file exists
 pub fn model_exists(model_id: &str, backend: &str) -> bool {
     check_model_available(model_id, Some(backend))
@@ -415,7 +350,6 @@ pub fn model_exists(model_id: &str, backend: &str) -> bool {
 ///
 /// Uses the scanner as the single source of truth, following design principles:
 /// - GGUF models: uses scan_available_asr_models() (already selects highest precision version)
-/// - ONNX models: checks if directory exists (not using scanner, as scanner may miss newly downloaded)
 /// - LLM models: directly checks file
 ///
 /// # Performance optimization
@@ -431,14 +365,6 @@ pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
     let backend_type = backend
         .map(|b| b.to_string())
         .unwrap_or_else(|| get_model_backend_str(model_id));
-
-    // ONNX models: check directory existence (not using scanner, as scanner may miss newly downloaded)
-    if backend_type == "onnx" {
-        if let Ok(path) = get_model_path(model_id, &backend_type) {
-            return path.is_dir() && has_onnx_model_files(&path, model_id);
-        }
-        return false;
-    }
 
     // GGUF models: use scanner (already selected highest precision version, supports multi-quantization)
     // 需要处理带量化后缀的模型 ID，如 "parakeet-unified-en-0.6b-Q8_0"
@@ -470,21 +396,6 @@ pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
 fn get_model_backend_str(model_id: &str) -> String {
     match get_model_backend(model_id) {
         crate::backends::BackendType::TranscribeCpp => "transcribe_cpp".to_string(),
-        crate::backends::BackendType::Onnx => "onnx".to_string(),
-    }
-}
-
-/// Helper: Check if ONNX model directory contains necessary model files
-fn has_onnx_model_files(path: &Path, model_id: &str) -> bool {
-    if model_id.contains("moonshine") {
-        // Moonshine: encoder_model.onnx or encoder.ort
-        path.join("encoder_model.onnx").exists() || path.join("encoder.ort").exists()
-    } else if model_id.contains("parakeet") {
-        // Parakeet: encoder-model.int8.onnx
-        path.join("encoder-model.int8.onnx").exists()
-    } else {
-        // SenseVoice: model.int8.onnx
-        path.join("model.int8.onnx").exists()
     }
 }
 
@@ -804,8 +715,7 @@ async fn download_single_attempt(
     // Check if this is a zip file that needs extraction
     let is_zip = url.to_lowercase().ends_with(".zip");
     let final_path = if is_zip {
-        // For zip files, extract to the model directory (e.g., models/sensevoice-small/)
-        // model_path is already the target directory for ONNX models
+        // For zip files, extract to the model directory
         let extract_dir = model_path.clone();
 
         log::info!("Extracting zip file {:?} to {:?}", temp_path, extract_dir);
@@ -880,7 +790,6 @@ pub async fn download_model_with_source(
     // Use unified detection from preset table
     let backend = match get_model_backend(&model_id) {
         crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
-        crate::backends::BackendType::Onnx => "onnx",
     };
 
     if check_model_available(&model_id, Some(backend)) {
@@ -1072,7 +981,6 @@ pub async fn download_model_from_url(
     let backend_type = backend.unwrap_or_else(|| {
         match get_model_backend(&model_id) {
             crate::backends::BackendType::TranscribeCpp => "transcribe_cpp".to_string(),
-            crate::backends::BackendType::Onnx => "onnx".to_string(),
         }
     });
 
@@ -1157,10 +1065,8 @@ pub fn get_model_storage_path_cmd(
     let backend_type = backend.unwrap_or_else(|| {
         match get_model_backend(&model_id) {
             crate::backends::BackendType::TranscribeCpp => "transcribe_cpp".to_string(),
-            crate::backends::BackendType::Onnx => "onnx".to_string(),
         }
     });
-
     let path = get_model_path_from_preset(&model_id)?;
     Ok(path.to_string_lossy().to_string())
 }

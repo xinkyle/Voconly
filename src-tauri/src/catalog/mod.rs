@@ -20,7 +20,7 @@ pub struct CatalogModel {
     pub id: String,
     pub name: String,
     pub architecture: Option<String>,
-    pub backend: Option<String>, // Backend type: Onnx or TranscribeCpp
+    pub backend: Option<String>, // Backend type: TranscribeCpp
     pub languages: Vec<String>,
     pub capabilities: CatalogCapabilities,
     /// Speed score (0-100, higher = faster)
@@ -92,7 +92,6 @@ impl CatalogModel {
     /// Parse backend type from catalog model
     fn parse_backend(&self) -> BackendType {
         match self.backend.as_deref() {
-            Some("Onnx") => BackendType::Onnx,
             Some("TranscribeCpp") | None => BackendType::TranscribeCpp,
             _ => BackendType::TranscribeCpp,
         }
@@ -104,9 +103,6 @@ impl CatalogModel {
     /// - Uses `default_quant` to select the file variant
     /// - Sets `filename` and `quant` fields
     /// - Falls back to Q5_K_M if no default specified
-    ///
-    /// For ONNX models:
-    /// - Returns a preset without filename/quant fields
     pub fn to_preset(&self) -> ModelPreset {
         let backend = self.parse_backend();
 
@@ -203,7 +199,7 @@ impl CatalogModel {
             }
         }
 
-        // ONNX models or models without files
+        // Models without files
         ModelPreset::asr_preset(
             self.id.clone(),
             self.name.clone(),
@@ -379,12 +375,12 @@ mod tests {
 
         assert!(!presets.is_empty(), "should generate presets");
 
-        // 验证 sensevoice-small 有分数
-        let sensevoice = presets.iter().find(|p| p.id == "sensevoice-small");
-        assert!(sensevoice.is_some());
-        let sensevoice = sensevoice.unwrap();
-        assert!(sensevoice.accuracy_score.is_some());
-        assert!(sensevoice.speed_score.is_some());
+        // 验证模型有分数
+        let qwen = presets.iter().find(|p| p.id == "Qwen3-ASR-1.7B");
+        assert!(qwen.is_some());
+        let qwen = qwen.unwrap();
+        assert!(qwen.accuracy_score.is_some());
+        assert!(qwen.speed_score.is_some());
     }
 
     #[test]
