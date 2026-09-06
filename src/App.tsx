@@ -42,7 +42,7 @@ import PermissionModal from './components/PermissionModal';
 import AccessibilityBanner from './components/AccessibilityBanner';
 import AccessibilityModal from './components/AccessibilityModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
-import { checkAccessibilityPermission, requestAccessibilityPermission } from './services/permissions';
+import { checkAccessibilityPermission, requestAccessibilityPermission, requestInputMonitoringPermission } from './services/permissions';
 import type { RemoteVersionInfo } from './types/updater';
 import { eventManager } from './services/eventManager';
 
@@ -373,23 +373,38 @@ function App() {
   // Re-check permissions when window regains focus (user may have authorized in system settings)
   useEffect(() => {
     const handleFocus = async () => {
-      if (showAccessibilityBanner || showKeyhookBanner) {
-        log.info('Window focused, re-checking permissions');
+      if (showAccessibilityBanner) {
+        // 检查辅助功能权限（静默检查，不会触发弹窗）
+        log.info('Window focused, re-checking accessibility permission');
         const granted = await checkAccessibilityPermission();
         if (granted) {
           setShowAccessibilityBanner(false);
-          setShowKeyhookBanner(false);
-          // 权限恢复后重启键盘监听
+          // 辅助功能已授权，尝试重启键盘监听
           try {
             const { commands } = await import('@tauri-keyhook');
             const isListening = await commands.isListening();
             if (!isListening) {
-              log.info('Restarting keyhook listener after permission granted');
+              log.info('Restarting keyhook listener after accessibility permission granted');
               await commands.startListen();
             }
           } catch (err) {
             log.error(`Failed to restart keyhook: ${err}`);
           }
+        }
+      }
+      if (showKeyhookBanner) {
+        // keyhook 横幅显示时，尝试重启键盘监听
+        // 如果成功，keyhook 会发送 listen-started 事件，清除横幅
+        // 如果失败，keyhook 会发送 listen-failed 事件，保持横幅
+        try {
+          const { commands } = await import('@tauri-keyhook');
+          const isListening = await commands.isListening();
+          if (!isListening) {
+            log.info('Window focused, trying to restart keyhook');
+            await commands.startListen();
+          }
+        } catch (err) {
+          log.error(`Failed to restart keyhook: ${err}`);
         }
       }
     };
@@ -1827,7 +1842,16 @@ function App() {
         <AccessibilityBanner
           mode="keyhook"
           onAuthorize={async () => {
-            const granted = await requestAccessibilityPermission();
+            // 输入监控权限需要先有辅助功能权限
+            const axGranted = await checkAccessibilityPermission();
+            if (!axGranted) {
+              // 辅助功能未授权，显示辅助功能横幅
+              setShowKeyhookBanner(false);
+              setShowAccessibilityBanner(true);
+              return;
+            }
+            // 请求输入监控权限
+            const granted = await requestInputMonitoringPermission();
             if (granted) {
               setShowKeyhookBanner(false);
               // 重启键盘监听
