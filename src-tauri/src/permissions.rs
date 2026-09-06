@@ -57,26 +57,14 @@ pub fn reset_tcc_service(service: &str, identifier: &str) {
     }
 }
 
-/// 请求辅助功能权限（用户点击"去授权"时调用）：
-/// 1. 已授权 → 直接返回 true，不做任何事；
-/// 2. 未授权 → 清理失效的辅助功能条目，再以 prompt 模式触发系统注册。
-/// 返回调用时刻的授权状态（通常为 false，用户在系统设置里打开开关后，
-/// 由前端在窗口聚焦时重新检查确认）。
-///
-/// 注意：不再重置 ListenEvent，避免影响输入监控的授权状态。
+/// 请求辅助功能权限（用户点击"去授权"时调用）。
+/// 清理工作已在 check_accessibility_permission 中完成，这里只负责触发系统弹窗。
+/// 返回调用时刻的授权状态。
 #[cfg(target_os = "macos")]
-pub fn request_accessibility(identifier: &str) -> bool {
-    if ax_is_trusted(false) {
-        return true;
-    }
-
-    // 只重置辅助功能条目
-    reset_tcc_service("Accessibility", identifier);
-
-    // 直接调用 ax_is_trusted(true)，不需要 DispatchQueue::main()
-    // AXIsProcessTrustedWithOptions 本身是线程安全的
+pub fn request_accessibility(_identifier: &str) -> bool {
+    // 清理工作已在 check_accessibility_permission 中完成
+    // 直接触发系统弹窗，把当前应用注册到系统设置列表中
     ax_is_trusted(true);
-
     ax_is_trusted(false)
 }
 

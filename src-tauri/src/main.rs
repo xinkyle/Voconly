@@ -473,10 +473,22 @@ async fn get_registered_shortcuts(app: AppHandle) -> Result<Vec<String>, String>
     Ok(Vec::new())
 }
 
-/// 静默检查辅助功能权限（macOS 查询 AX 信任状态，不弹任何系统弹窗；Windows 恒为 true）
+/// 检查辅助功能权限，如果未授权则自动清理老版本的授权条目
+/// （macOS 查询 AX 信任状态，不弹任何系统弹窗；Windows 恒为 true）
+///
+/// 清理逻辑：如果当前未授权，说明列表中的记录（如果有）是无效的，
+/// 可以安全清理，让用户重新授权。
 #[tauri::command]
-fn check_accessibility_permission() -> bool {
-    permissions::ax_is_trusted(false)
+fn check_accessibility_permission(app: AppHandle) -> bool {
+    let identifier = app.config().identifier.clone();
+    if permissions::ax_is_trusted(false) {
+        return true;
+    }
+
+    // 未授权 → 清理老条目（包括用户拒绝的记录）
+    // 这不会影响用户的选择权，只是让列表更干净
+    permissions::reset_tcc_service("Accessibility", &identifier);
+    false
 }
 
 /// 请求辅助功能权限：清理失效的授权条目并触发系统重新注册（仅 macOS 有效），
@@ -2646,11 +2658,25 @@ fn main() {
             debug!("[STARTUP] ASR 模型闲置检测定时器已启动");
 
             Ok(())
-        })
-        .run(tauri::generate_context!());
+        });
 
-    if let Err(e) = result {
-        error!("Error running Tauri application: {:?}", e);
-        std::process::exit(1);
-    }
+    // 构建应用
+    let app = result
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    // 运行应用并处理 macOS Dock 图标点击重新打开窗口
+    app.run(|app, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+            // has_visible_windows 为 false 表示没有可见窗口，需要重新显示
+            if !has_visible_windows {
+                if let Some(main_window) = app.get_webview_window("main") {
+                    info!("[macOS] Reopening main window on Dock click");
+                    let _ = main_window.show();
+                    let _ = main_window.set_focus();
+                }
+            }
+        }
+    });
 }
