@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # Voconly - Build Release for macOS
-# Build the release version of Voconly for macOS only
+# Build and sign the release version of Voconly for macOS
 #
 # Usage:
-#   ./build-release-mac.sh [OPTIONS]
+#   ./build-release-mac.sh --version <version> [OPTIONS]
 #
 # Options:
+#   --version <version>     Version number (required, e.g., 1.0.0)
 #   --key <key>             Tauri signing private key (for updater artifacts)
 #   -h, --help              Show this help message
 #
@@ -22,40 +23,37 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# ============================================
-# Check if running on macOS
-# ============================================
-
-if [[ "$OSTYPE" != "darwin"* ]]; then
-    echo ""
-    echo -e "${RED}[ERROR] This script is designed for macOS only${NC}"
-    echo -e "${YELLOW}Current OS: $OSTYPE${NC}"
-    echo -e "${YELLOW}For Windows builds, use build-release-win.ps1${NC}"
-    echo ""
-    exit 1
-fi
+# Default values
+VERSION=""
+TAURI_SIGNING_KEY_ARG=""
 
 # ============================================
 # Parse command line arguments
 # ============================================
 
-TAURI_SIGNING_KEY_ARG=""
-
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --version)
+            VERSION="$2"
+            shift 2
+            ;;
         --key)
             TAURI_SIGNING_KEY_ARG="$2"
             shift 2
             ;;
         -h|--help)
-            echo "Usage: ./build-release-mac.sh [OPTIONS]"
+            echo "Usage: ./build-release-mac.sh --version <version> [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --key <key>            Tauri signing private key (for updater artifacts)"
-            echo "  -h, --help             Show this help message"
+            echo "  --version <version>   Version number (required, e.g., 1.0.0)"
+            echo "  --key <key>           Tauri signing private key (for updater artifacts)"
+            echo "  -h, --help            Show this help message"
             echo ""
             echo "Environment variables (fallback):"
             echo "  TAURI_SIGNING_PRIVATE_KEY  Tauri signing private key"
+            echo ""
+            echo "Example:"
+            echo "  ./build-release-mac.sh --version 1.0.0 --key \"your-private-key\""
             exit 0
             ;;
         *)
@@ -65,6 +63,29 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# ============================================
+# Validate required parameters
+# ============================================
+
+if [[ -z "$VERSION" ]]; then
+    echo -e "${RED}[ERROR] Version is required${NC}"
+    echo "Use: ./build-release-mac.sh --version <version>"
+    exit 1
+fi
+
+# ============================================
+# Check if running on macOS
+# ============================================
+
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    echo ""
+    echo -e "${RED}[ERROR] This script is designed for macOS only${NC}"
+    echo -e "${YELLOW}Current OS: $OSTYPE${NC}"
+    echo -e "${YELLOW}For Windows builds, use scripts/build-release-local.ps1${NC}"
+    echo ""
+    exit 1
+fi
 
 # ============================================
 # Set signing key
@@ -77,7 +98,7 @@ elif [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
     echo -e "${GREEN}[INFO] Using signing key from environment variable${NC}"
 else
     echo -e "${YELLOW}[WARN] No signing key provided (updater artifacts will not be signed)${NC}"
-    echo -e "${YELLOW}       Use --signing-key or set TAURI_SIGNING_PRIVATE_KEY${NC}"
+    echo -e "${YELLOW}       Use --key or set TAURI_SIGNING_PRIVATE_KEY${NC}"
 fi
 
 echo ""
@@ -87,10 +108,27 @@ echo -e "${CYAN}========================================${NC}"
 echo ""
 
 # ============================================
-# Pre-flight checks
+# [1/5] Update version in Cargo.toml
 # ============================================
 
-echo -e "${YELLOW}[1/5] Checking prerequisites...${NC}"
+echo -e "${YELLOW}[1/5] Updating version to $VERSION...${NC}"
+echo ""
+
+CARGO_PATH="src-tauri/Cargo.toml"
+
+# Replace version in [package] section (only the first occurrence after [package])
+# Match: [package] followed by any content, then version = "..."
+sed -i.bak 's/^\(version = "\)[^"]*\(".*\)$/\1'"$VERSION"'\2/' "$CARGO_PATH"
+rm -f "${CARGO_PATH}.bak"
+
+echo -e "  ${GREEN}[OK] Updated Cargo.toml version to $VERSION${NC}"
+echo ""
+
+# ============================================
+# [2/5] Pre-flight checks
+# ============================================
+
+echo -e "${YELLOW}[2/5] Checking prerequisites...${NC}"
 echo ""
 
 # Check Xcode Command Line Tools
@@ -139,13 +177,22 @@ else
     echo -e "  ${GREEN}[OK] Rust: $RUST_VERSION${NC}"
 fi
 
+# Check patches directory
+if [ ! -d "patches" ]; then
+    echo -e "  ${RED}[ERROR] patches directory not found${NC}"
+    echo -e "  ${YELLOW}This directory is required for macOS build${NC}"
+    exit 1
+else
+    echo -e "  ${GREEN}[OK] patches directory exists${NC}"
+fi
+
 echo ""
 
 # ============================================
-# Install npm dependencies
+# [3/5] Install dependencies
 # ============================================
 
-echo -e "${YELLOW}[2/5] Checking npm dependencies...${NC}"
+echo -e "${YELLOW}[3/5] Checking dependencies...${NC}"
 echo ""
 
 if [ ! -d "node_modules" ]; then
@@ -164,25 +211,7 @@ fi
 echo ""
 
 # ============================================
-# Check Rust dependencies
-# ============================================
-
-echo -e "${YELLOW}[3/5] Checking Rust dependencies...${NC}"
-echo ""
-
-# Check if patches directory exists
-if [ ! -d "patches" ]; then
-    echo -e "  ${RED}[ERROR] patches directory not found${NC}"
-    echo -e "  ${YELLOW}This directory is required for macOS build${NC}"
-    exit 1
-else
-    echo -e "  ${GREEN}[OK] patches directory exists${NC}"
-fi
-
-echo ""
-
-# ============================================
-# Build
+# [4/5] Build
 # ============================================
 
 echo -e "${YELLOW}[4/5] Building release version...${NC}"
@@ -222,31 +251,51 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 
 # ============================================
-# Show output location
+# [5/5] Locate output files
 # ============================================
 
 echo -e "${YELLOW}[5/5] Locating output files...${NC}"
 echo ""
 
-if [ -d "src-tauri/target/release/bundle" ]; then
-    echo -e "${GREEN}[INFO] Output location: src-tauri/target/release/bundle/${NC}"
+OUTPUT_DIR="src-tauri/target/release/bundle"
+
+if [ -d "$OUTPUT_DIR" ]; then
+    echo -e "${GREEN}[INFO] Output location: $OUTPUT_DIR/${NC}"
     echo ""
 
     # List the bundle contents
     echo -e "${YELLOW}Generated files:${NC}"
-    if [ -d "src-tauri/target/release/bundle/dmg" ]; then
-        DMG_FILE=$(ls src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
+
+    # DMG file
+    if [ -d "$OUTPUT_DIR/dmg" ]; then
+        DMG_FILE=$(ls $OUTPUT_DIR/dmg/*.dmg 2>/dev/null | head -1)
         if [ -n "$DMG_FILE" ]; then
             DMG_SIZE=$(du -h "$DMG_FILE" | cut -f1)
             echo -e "  ${GREEN}DMG: $DMG_FILE ($DMG_SIZE)${NC}"
         fi
     fi
-    if [ -d "src-tauri/target/release/bundle/macos" ]; then
-        APP_FILE=$(ls src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1)
+
+    # App bundle
+    if [ -d "$OUTPUT_DIR/macos" ]; then
+        APP_FILE=$(ls $OUTPUT_DIR/macos/*.app 2>/dev/null | head -1)
         if [ -n "$APP_FILE" ]; then
             APP_SIZE=$(du -sh "$APP_FILE" | cut -f1)
             echo -e "  ${GREEN}App: $APP_FILE ($APP_SIZE)${NC}"
         fi
+    fi
+
+    # Updater artifacts (if signed)
+    if [ -f "$OUTPUT_DIR/Voconly.app.tar.gz" ]; then
+        TAR_SIZE=$(du -h "$OUTPUT_DIR/Voconly.app.tar.gz" | cut -f1)
+        echo -e "  ${GREEN}Updater: $OUTPUT_DIR/Voconly.app.tar.gz ($TAR_SIZE)${NC}"
+    fi
+    if [ -f "$OUTPUT_DIR/Voconly.app.tar.gz.sig" ]; then
+        echo -e "  ${GREEN}Signature: $OUTPUT_DIR/Voconly.app.tar.gz.sig${NC}"
+    fi
+
+    # Check if latest.json was generated
+    if [ -f "$OUTPUT_DIR/../../latest.json" ]; then
+        echo -e "  ${GREEN}Update manifest: src-tauri/target/release/latest.json${NC}"
     fi
 else
     echo -e "${RED}[ERROR] Bundle directory not found${NC}"
@@ -255,6 +304,10 @@ fi
 
 echo ""
 echo -e "${CYAN}Next steps:${NC}"
-echo -e "  ${YELLOW}1. Double-click the .dmg file to install${NC}"
-echo -e "  ${YELLOW}2. Or copy the .app file to Applications folder${NC}"
+echo -e "  ${YELLOW}1. Test the .dmg file by installing${NC}"
+echo -e "  ${YELLOW}2. Upload files to GitHub Releases${NC}"
+echo -e "  ${YELLOW}   - DMG: src-tauri/target/release/bundle/dmg/Voconly_${VERSION}_aarch64.dmg${NC}"
+if [ -f "$OUTPUT_DIR/../../latest.json" ]; then
+    echo -e "  ${YELLOW}   - Update manifest: src-tauri/target/release/latest.json${NC}"
+fi
 echo ""

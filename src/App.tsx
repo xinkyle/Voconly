@@ -39,7 +39,10 @@ import { countWords, getSceneNameFromPromptType } from './utils/i18n';
 import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
+import AccessibilityBanner from './components/AccessibilityBanner';
+import AccessibilityModal from './components/AccessibilityModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
+import { checkAccessibilityPermission, requestAccessibilityPermission } from './services/permissions';
 import type { RemoteVersionInfo } from './types/updater';
 import { eventManager } from './services/eventManager';
 
@@ -156,6 +159,12 @@ function App() {
   const [permissionChecked, setPermissionChecked] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false); // 标记权限是否被拒绝
 
+  // Accessibility permission state (macOS only, other platforms always granted)
+  const [showAccessibilityBanner, setShowAccessibilityBanner] = useState(false);
+  const [showAccessibilityModal, setShowAccessibilityModal] = useState(false);
+  const [accessibilityChecked, setAccessibilityChecked] = useState(false);
+  const [showKeyhookBanner, setShowKeyhookBanner] = useState(false);
+
   // Download error dialog state
   const [showDownloadErrorDialog, setShowDownloadErrorDialog] = useState(false);
   const [downloadErrorInfo, setDownloadErrorInfo] = useState<{ modelId: string; modelName: string; error: string } | null>(null);
@@ -200,6 +209,30 @@ function App() {
       log.error(`Permission check failed: ${error}`);
     }
   }, [permissionChecked]);
+
+  // Check accessibility permission (macOS only)
+  const checkAccessibility = useCallback(async () => {
+    if (accessibilityChecked) return;
+
+    try {
+      const granted = await checkAccessibilityPermission();
+      log.info(`Accessibility permission: ${granted}`);
+
+      if (!granted) {
+        // 未授权 → 显示引导弹窗（首次）或横幅（后续）
+        setShowAccessibilityModal(!showAccessibilityBanner);
+        setShowAccessibilityBanner(true);
+      } else {
+        // 已授权 → 清除所有引导 UI
+        setShowAccessibilityBanner(false);
+        setShowAccessibilityModal(false);
+      }
+      setAccessibilityChecked(true);
+    } catch (error) {
+      log.error(`Accessibility check failed: ${error}`);
+      setAccessibilityChecked(true); // 失败时也标记已检查，避免反复尝试
+    }
+  }, [accessibilityChecked, showAccessibilityBanner]);
 
   // Check permission when config is loaded and tutorial is already completed
   useEffect(() => {
@@ -298,6 +331,71 @@ function App() {
       unlistenRef.current?.();
     };
   }, []);
+
+  // Listen for accessibility permission denied (paste failed on macOS)
+  useEffect(() => {
+    const handleAccessibilityDenied = () => {
+      log.info('Accessibility permission denied during paste');
+      setShowAccessibilityBanner(true);
+      showToast({ type: 'warning', title: t('accessibility.pasteFailedToast') });
+    };
+    window.addEventListener('voconly:accessibility-denied', handleAccessibilityDenied);
+    return () => window.removeEventListener('voconly:accessibility-denied', handleAccessibilityDenied);
+  }, [showToast, t]);
+
+  // Listen for keyhook listen state (keyboard monitoring permission on macOS)
+  useEffect(() => {
+    const unlistenStarted = { current: null as (() => void) | null };
+    const unlistenFailed = { current: null as (() => void) | null };
+    let mounted = true;
+
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (!mounted) return;
+
+      listen<void>('keyhook:listen-started', () => {
+        log.info('Keyhook started, clearing keyhook banner');
+        setShowKeyhookBanner(false);
+      }).then(fn => { if (mounted) unlistenStarted.current = fn; });
+
+      listen<void>('keyhook:listen-failed', () => {
+        log.info('Keyhook failed, showing keyhook banner');
+        setShowKeyhookBanner(true);
+      }).then(fn => { if (mounted) unlistenFailed.current = fn; });
+    });
+
+    return () => {
+      mounted = false;
+      unlistenStarted.current?.();
+      unlistenFailed.current?.();
+    };
+  }, []);
+
+  // Re-check permissions when window regains focus (user may have authorized in system settings)
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (showAccessibilityBanner || showKeyhookBanner) {
+        log.info('Window focused, re-checking permissions');
+        const granted = await checkAccessibilityPermission();
+        if (granted) {
+          setShowAccessibilityBanner(false);
+          setShowKeyhookBanner(false);
+          // 权限恢复后重启键盘监听
+          try {
+            const { commands } = await import('@tauri-keyhook');
+            const isListening = await commands.isListening();
+            if (!isListening) {
+              log.info('Restarting keyhook listener after permission granted');
+              await commands.startListen();
+            }
+          } catch (err) {
+            log.error(`Failed to restart keyhook: ${err}`);
+          }
+        }
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [showAccessibilityBanner, showKeyhookBanner]);
 
   // Listen for recording cancelled event from float panel
   useEffect(() => {
@@ -1603,6 +1701,8 @@ function App() {
                     // 引导完成后检查麦克风权限
                     // 注意：toast 提示由 useEffect 统一处理，这里不重复显示
                     checkMicPermission();
+                    // 引导完成后检查辅助功能权限（macOS）
+                    checkAccessibility();
                   }
                 }}
               />
@@ -1705,6 +1805,55 @@ function App() {
         availableMemory={memoryError.availableMemory}
         onClose={() => {
           setMemoryError(prev => ({ ...prev, visible: false }));
+        }}
+      />
+
+      {/* Accessibility Permission Banner (macOS only) */}
+      {showAccessibilityBanner && !showAccessibilityModal && (
+        <AccessibilityBanner
+          mode="accessibility"
+          onAuthorize={async () => {
+            const granted = await requestAccessibilityPermission();
+            if (granted) {
+              setShowAccessibilityBanner(false);
+            }
+          }}
+          onDismiss={() => setShowAccessibilityBanner(false)}
+        />
+      )}
+
+      {/* Keyhook Permission Banner (macOS Input Monitoring) */}
+      {showKeyhookBanner && (
+        <AccessibilityBanner
+          mode="keyhook"
+          onAuthorize={async () => {
+            const granted = await requestAccessibilityPermission();
+            if (granted) {
+              setShowKeyhookBanner(false);
+              // 重启键盘监听
+              try {
+                const { commands } = await import('@tauri-keyhook');
+                await commands.startListen();
+                log.info('Keyhook restarted after permission granted');
+              } catch (err) {
+                log.error(`Failed to restart keyhook: ${err}`);
+              }
+            }
+          }}
+          onDismiss={() => setShowKeyhookBanner(false)}
+        />
+      )}
+
+      {/* Accessibility Permission Modal (first-time onboarding) */}
+      <AccessibilityModal
+        isOpen={showAccessibilityModal}
+        onSkip={() => setShowAccessibilityModal(false)}
+        onAuthorize={async () => {
+          const granted = await requestAccessibilityPermission();
+          if (granted) {
+            setShowAccessibilityModal(false);
+            setShowAccessibilityBanner(false);
+          }
         }}
       />
     </div>

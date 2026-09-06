@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Voconly 需要访问麦克风进行语音输入</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Voconly 需要辅助功能权限来响应全局快捷键并把识别文字自动粘贴到光标位置</string>
+</dict>
+</plist>

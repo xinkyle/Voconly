@@ -43,25 +43,42 @@ pub fn bundle_resource_dir() -> Result<PathBuf, String> {
 /// 获取内置资源文件路径（带多路径搜索）
 /// 搜索顺序：
 /// 1. 开发模式：项目源目录 src-tauri/resources/...
-/// 2. 安装模式：Application/resources/...
-/// 3. Portable：exe 同级目录
+/// 2. macOS bundle: .app/Contents/Resources/resources/...
+/// 3. 安装模式：Application/resources/...
+/// 4. Portable：exe 同级目录
 /// 例如: "resources/models/silero_vad.onnx"
 pub fn resolve_resource_path(relative_path: &str) -> Result<PathBuf, String> {
     use std::env;
 
-    let candidates = [
-        // 1. Development: relative to cwd (src-tauri/)
-        PathBuf::from(relative_path),
-        // 2. Installed: Application directory
-        application_dir()
-            .map(|d| d.join(relative_path))
-            .unwrap_or_default(),
-        // 3. Portable: next to executable
-        env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(|p| p.join(relative_path)))
-            .unwrap_or_default(),
-    ];
+    // Build candidate paths
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1. Development: relative to cwd (src-tauri/)
+    candidates.push(PathBuf::from(relative_path));
+
+    // 2. macOS bundle: .app/Contents/Resources/resources/...
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(exe) = env::current_exe() {
+            // exe is at Contents/MacOS/Voconly
+            // Resources are at Contents/Resources/
+            if let Some(contents_dir) = exe.parent().and_then(|p| p.parent()) {
+                candidates.push(contents_dir.join("Resources").join(relative_path));
+            }
+        }
+    }
+
+    // 3. Installed: Application directory
+    if let Ok(app_dir) = application_dir() {
+        candidates.push(app_dir.join(relative_path));
+    }
+
+    // 4. Portable: next to executable
+    if let Ok(exe) = env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            candidates.push(exe_dir.join(relative_path));
+        }
+    }
 
     for candidate in &candidates {
         if candidate.exists() {

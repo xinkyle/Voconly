@@ -30,6 +30,9 @@
     "resources": {
       "resources/models/*": "resources/models/"
     },
+    "macOS": {
+      "entitlements": "./entitlements.plist"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",

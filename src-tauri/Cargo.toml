@@ -89,6 +89,8 @@ cocoa = "0.26"
 libc = "0.2"
 # macOS 主线程调度：enigo 键盘模拟需要在主线程执行
 dispatch2 = "0.3"
+# macOS 辅助功能权限检查（AXIsProcessTrustedWithOptions）
+core-foundation = "0.10"
 
 # Patch transcribe-cpp-sys to fix MSVC encoding issues.
 # Add /utf-8 flag to prevent character encoding errors on Windows MSVC.

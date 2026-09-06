@@ -60,6 +60,19 @@ pub(crate) fn emit_key_event(app: &tauri::AppHandle, payload: KeyEventPayload) {
     }
 }
 
+/// 通知前端全局键盘监听的状态变化（tap 创建成功 / 失败），
+/// 前端据此显示或清除权限引导提示
+pub(crate) fn emit_listen_state(app: &tauri::AppHandle, started: bool) {
+    let event = if started {
+        "keyhook:listen-started"
+    } else {
+        "keyhook:listen-failed"
+    };
+    if let Err(e) = app.emit(event, ()) {
+        tracing::error!("Failed to emit {}: {}", event, e);
+    }
+}
+
 /// 开始监听键盘事件
 #[tauri::command]
 fn start_listen(app: tauri::AppHandle) {

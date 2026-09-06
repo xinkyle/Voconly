@@ -40,6 +40,13 @@ export async function typeTextSafe(text: string): Promise<{ success: boolean; er
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('ACCESSIBILITY_DENIED')) {
+      // macOS 辅助功能权限未授予：模拟粘贴失败，但后端已先把文字写入剪贴板。
+      // 通知全局监听器（App.tsx）展示权限引导，用户可手动 ⌘V 粘贴，文字不丢失
+      log.error('Accessibility permission denied, text kept in clipboard');
+      window.dispatchEvent(new CustomEvent('voconly:accessibility-denied'));
+      return { success: false, error: 'ACCESSIBILITY_DENIED' };
+    }
     log.error(`Keyboard simulation failed: ${errorMessage}`);
     return { success: false, error: errorMessage };
   }

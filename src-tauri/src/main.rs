@@ -47,6 +47,7 @@ mod log_settings;
 mod model_manager;
 mod paths;
 mod performance;
+mod permissions;
 mod presets;
 mod updater;
 mod utils; // Crash report module for enhanced crash tracking
@@ -472,6 +473,19 @@ async fn get_registered_shortcuts(app: AppHandle) -> Result<Vec<String>, String>
     Ok(Vec::new())
 }
 
+/// 静默检查辅助功能权限（macOS 查询 AX 信任状态，不弹任何系统弹窗；Windows 恒为 true）
+#[tauri::command]
+fn check_accessibility_permission() -> bool {
+    permissions::ax_is_trusted(false)
+}
+
+/// 请求辅助功能权限：清理失效的授权条目并触发系统重新注册（仅 macOS 有效），
+/// 用户在系统设置里拨动开关即可，无需手动删除旧条目
+#[tauri::command]
+fn request_accessibility_permission(app: AppHandle) -> bool {
+    permissions::request_accessibility(&app.config().identifier)
+}
+
 #[tauri::command]
 async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let start_time = std::time::Instant::now();
@@ -532,8 +546,19 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
         let error_msg_clone = error_msg.clone();
 
         DispatchQueue::main().exec_sync(move || {
-            let mut enigo = match Enigo::new(&Settings::default()) {
+            // 关闭 enigo 内置的系统授权弹窗：无权限时不再每次转录都弹系统窗，
+            // 而是返回结构化错误，由前端做一次性引导（文字已写入剪贴板，可手动 ⌘V）
+            let settings = Settings {
+                open_prompt_to_get_permissions: false,
+                ..Settings::default()
+            };
+            let mut enigo = match Enigo::new(&settings) {
                 Ok(e) => e,
+                Err(enigo::NewConError::NoPermission) => {
+                    error!("[simulate_input] macOS accessibility permission denied; text kept in clipboard");
+                    *error_msg_clone.lock().unwrap() = Some("ACCESSIBILITY_DENIED".to_string());
+                    return;
+                }
                 Err(e) => {
                     error!("[simulate_input] FAILED to create enigo instance: {}", e);
                     *error_msg_clone.lock().unwrap() = Some(format!("Failed to create enigo instance: {}", e));
@@ -2044,6 +2069,8 @@ fn main() {
             unregister_all_shortcuts,
             get_registered_shortcuts,
             simulate_input,
+            check_accessibility_permission,
+            request_accessibility_permission,
             load_config,
             save_config,
             get_model_storage_path,
@@ -2373,6 +2400,16 @@ fn main() {
                                         info!("[Quit] ModelManager 已清理");
                                     }
                                 }
+                            }
+
+                            // 【macOS Metal 修复】等待 GPU 操作完成
+                            // Metal 的 ResidencySet 需要等待所有 GPU 操作完成才能正确销毁
+                            // 否则在退出时会触发断言错误：GGML_ASSERT([rsets->data count] == 0)
+                            #[cfg(target_os = "macos")]
+                            {
+                                info!("[Quit] 等待 Metal 资源同步...");
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                info!("[Quit] Metal 资源同步完成");
                             }
 
                             info!("[Quit] 所有资源清理完成，退出应用");
