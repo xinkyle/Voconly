@@ -2213,9 +2213,9 @@ fn main() {
                 .resizable(true)
                 .fullscreen(false)
                 .decorations(false)
-                .shadow(true) // Enable window shadow to control border appearance
+                .shadow(false) // 禁用系统阴影，使用 CSS 控制边框和阴影
                 .always_on_top(false)
-                .transparent(false)
+                .transparent(true) // 透明窗口，让 CSS 控制外观，确保跨平台一致
                 .skip_taskbar(false)
                 .visible(false) // Initially hidden, show after page loads
                 .center()
@@ -2227,10 +2227,9 @@ fn main() {
                 .build()
                 .expect("Failed to create main window");
 
-            // Set main window background color to match HTML background (#F5F5F7)
-            // This ensures the window shows correct color immediately when shown
+            // 透明窗口：背景色完全透明，由 HTML/CSS 控制外观
             let _ = main_window
-                .set_background_color(Some(tauri::window::Color(0xF5, 0xF5, 0xF7, 0xFF)));
+                .set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
 
             debug!(
                 "[STARTUP] 主窗口创建完成 (初始隐藏, 页面加载后显示), 耗时: {}ms",

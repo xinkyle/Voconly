@@ -24,9 +24,9 @@
   }
 
   body {
-    @apply bg-neutral-100 text-gray-900 antialiased;
-    /* 渐变背景增加深度 */
-    background: linear-gradient(180deg, #F5F5F7 0%, #FAFAFA 50%, #F5F5F7 100%);
+    @apply text-gray-900 antialiased;
+    /* 透明背景，让 App.tsx 中的容器背景色生效 */
+    background: transparent;
   }
 
   /* Hide scrollbar for all elements */
