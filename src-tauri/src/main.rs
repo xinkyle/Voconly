@@ -2213,6 +2213,7 @@ fn main() {
                 .resizable(true)
                 .fullscreen(false)
                 .decorations(false)
+                .shadow(true) // Enable window shadow to control border appearance
                 .always_on_top(false)
                 .transparent(false)
                 .skip_taskbar(false)
