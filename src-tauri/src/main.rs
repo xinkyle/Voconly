@@ -819,7 +819,7 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
                 // 初始显示：药丸模式（仅显示状态栏）
                 // 使用逻辑像素，统一所有平台的视觉大小
                 let window_width_logical = 480.0; // 窗口宽度
-                let window_height_logical = 38.0; // 药丸高度：40 逻辑像素
+                let window_height_logical = 40.0; // 药丸高度：40 逻辑像素（与 set_float_panel_height 保持一致）
 
                 // 转换为物理像素用于定位计算
                 let window_width_physical = (window_width_logical * scale_factor) as i32;

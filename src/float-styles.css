@@ -327,6 +327,18 @@ body {
   padding: 0;
 }
 
+/* SVG icons in buttons - explicit sizing to avoid Tailwind dependency */
+.cancel-button svg,
+.collapse-toggle-button svg {
+  width: 12px;  /* w-3 equivalent */
+  height: 12px; /* h-3 equivalent */
+}
+
+.confirm-button svg {
+  width: 16px;  /* w-4 equivalent */
+  height: 16px; /* h-4 equivalent */
+}
+
 .cancel-button:hover {
   background: rgba(255, 59, 48, 0.3);
   color: rgba(255, 255, 255, 0.9);
