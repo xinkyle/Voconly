@@ -1,7 +1,17 @@
 #!/bin/bash
 
 # Voconly - Build Release for macOS
-# Build the release version of Voconly
+# Build the release version of Voconly for macOS only
+#
+# Usage:
+#   ./build-release-mac.sh [OPTIONS]
+#
+# Options:
+#   --key <key>             Tauri signing private key (for updater artifacts)
+#   -h, --help              Show this help message
+#
+# Environment variables (fallback):
+#   TAURI_SIGNING_PRIVATE_KEY  Tauri signing private key
 
 set -e
 
@@ -11,6 +21,64 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# ============================================
+# Check if running on macOS
+# ============================================
+
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    echo ""
+    echo -e "${RED}[ERROR] This script is designed for macOS only${NC}"
+    echo -e "${YELLOW}Current OS: $OSTYPE${NC}"
+    echo -e "${YELLOW}For Windows builds, use build-release-win.ps1${NC}"
+    echo ""
+    exit 1
+fi
+
+# ============================================
+# Parse command line arguments
+# ============================================
+
+TAURI_SIGNING_KEY_ARG=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --key)
+            TAURI_SIGNING_KEY_ARG="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: ./build-release-mac.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --key <key>            Tauri signing private key (for updater artifacts)"
+            echo "  -h, --help             Show this help message"
+            echo ""
+            echo "Environment variables (fallback):"
+            echo "  TAURI_SIGNING_PRIVATE_KEY  Tauri signing private key"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}[ERROR] Unknown option: $1${NC}"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# ============================================
+# Set signing key
+# ============================================
+
+if [ -n "$TAURI_SIGNING_KEY_ARG" ]; then
+    export TAURI_SIGNING_PRIVATE_KEY="$TAURI_SIGNING_KEY_ARG"
+    echo -e "${GREEN}[INFO] Using signing key from command line argument${NC}"
+elif [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+    echo -e "${GREEN}[INFO] Using signing key from environment variable${NC}"
+else
+    echo -e "${YELLOW}[WARN] No signing key provided (updater artifacts will not be signed)${NC}"
+    echo -e "${YELLOW}       Use --signing-key or set TAURI_SIGNING_PRIVATE_KEY${NC}"
+fi
 
 echo ""
 echo -e "${CYAN}========================================${NC}"
@@ -26,16 +94,14 @@ echo -e "${YELLOW}[1/5] Checking prerequisites...${NC}"
 echo ""
 
 # Check Xcode Command Line Tools
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    if ! xcode-select -p &>/dev/null; then
-        echo -e "  ${RED}[ERROR] Xcode Command Line Tools not installed${NC}"
-        echo -e "  ${YELLOW}Installing Xcode Command Line Tools...${NC}"
-        xcode-select --install 2>/dev/null || true
-        echo -e "  ${YELLOW}Please complete the installation and run this script again${NC}"
-        exit 1
-    else
-        echo -e "  ${GREEN}[OK] Xcode Command Line Tools installed${NC}"
-    fi
+if ! xcode-select -p &>/dev/null; then
+    echo -e "  ${RED}[ERROR] Xcode Command Line Tools not installed${NC}"
+    echo -e "  ${YELLOW}Installing Xcode Command Line Tools...${NC}"
+    xcode-select --install 2>/dev/null || true
+    echo -e "  ${YELLOW}Please complete the installation and run this script again${NC}"
+    exit 1
+else
+    echo -e "  ${GREEN}[OK] Xcode Command Line Tools installed${NC}"
 fi
 
 # Check Node.js
