@@ -803,6 +803,27 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
 
     info!("[show_float_panel] Event emitted to float-panel window");
 
+    // 【优化】首次显示时预初始化音频捕获（减少首次录音延迟）
+    // 如果 audio_capture 未初始化，异步调用预初始化
+    let app_state = app.state::<AppState>();
+    let needs_preinit = {
+        let capture_guard = app_state.audio_capture.lock().map_err(|e| e.to_string())?;
+        capture_guard.is_none()
+    };
+
+    if needs_preinit {
+        info!("[show_float_panel] 首次显示浮动面板，异步预初始化音频捕获...");
+        let app_for_preinit = app.clone();
+        // 异步执行，不阻塞窗口显示
+        tokio::spawn(async move {
+            if let Err(e) = crate::preinit_audio_capture(app_for_preinit).await {
+                warn!("[show_float_panel] 预初始化音频捕获失败: {}", e);
+            } else {
+                info!("[show_float_panel] 预初始化音频捕获完成");
+            }
+        });
+    }
+
     // Check if the panel is already shown using our tracked state
     let already_shown = app
         .try_state::<AppState>()
@@ -1283,10 +1304,12 @@ async fn is_autostart_enabled() -> Result<bool, String> {
 /// Start VAD-based recording
 #[tauri::command]
 async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), String> {
-    info!("Starting VAD recording... (scene: {})", scene_id);
+    let start_time = std::time::Instant::now();
+    info!("[TIMING] [Main] start_vad_recording 命令入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
 
     // Get VAD model path from Application directory
     let vad_model_path = resolve_resource_path("resources/models/silero_vad_v6.2.1_16k.onnx")?;
+    info!("[TIMING] [Main] 获取 VAD 模型路径后 - elapsed: {}ms", start_time.elapsed().as_millis());
     info!("VAD model path: {:?}", vad_model_path);
 
     // 从配置读取分段转录开关
@@ -1299,7 +1322,9 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     let state = app.state::<AppState>();
 
     // Get or create audio capture
+    let get_capture_start = std::time::Instant::now();
     let mut capture_guard = state.audio_capture.lock().map_err(|e| e.to_string())?;
+    info!("[TIMING] [Main] 获取/创建 AudioCapture 前 - elapsed: {}ms", start_time.elapsed().as_millis());
 
     let capture = match capture_guard.as_mut() {
         Some(c) => c,
@@ -1311,11 +1336,15 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
             capture_guard.as_mut().unwrap()
         }
     };
+    info!("[TIMING] [Main] 获取/创建 AudioCapture 后 - elapsed: {}ms", start_time.elapsed().as_millis());
 
     // Open microphone if not already open
+    let open_start = std::time::Instant::now();
+    info!("[TIMING] [Main] 调用 capture.open() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
     capture
         .open()
         .map_err(|e| format!("Failed to open microphone: {}", e))?;
+    info!("[TIMING] [Main] 调用 capture.open() 后 - elapsed: {}ms (open耗时: {}ms)", start_time.elapsed().as_millis(), open_start.elapsed().as_millis());
 
     // Apply streaming mode setting
     if streaming_enabled {
@@ -1325,9 +1354,12 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     }
 
     // Start recording
+    let record_start = std::time::Instant::now();
+    info!("[TIMING] [Main] 调用 capture.start() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
     capture
         .start(&scene_id)
         .map_err(|e| format!("Failed to start recording: {}", e))?;
+    info!("[TIMING] [Main] 调用 capture.start() 后 - elapsed: {}ms (start耗时: {}ms)", start_time.elapsed().as_millis(), record_start.elapsed().as_millis());
 
     // Set is_recording flag to true
     {
@@ -1335,8 +1367,16 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
         *is_recording_guard = true;
     }
 
+    // 发送录音开始事件，让前端立即显示波浪动画
+    if let Err(e) = app.emit("recording-started", ()) {
+        warn!("[TIMING] Failed to emit recording-started event: {}", e);
+    } else {
+        info!("[TIMING] Emitted recording-started event");
+    }
+
     info!(
-        "VAD recording started successfully (streaming: {})",
+        "[TIMING] [Main] VAD recording started successfully (总耗时: {}ms, streaming: {})",
+        start_time.elapsed().as_millis(),
         streaming_enabled
     );
     Ok(())
@@ -1371,8 +1411,7 @@ async fn set_streaming_mode(app: AppHandle, enabled: bool) -> Result<(), String>
 /// This loads the VAD model so that subsequent recordings can start faster
 /// Note: We do NOT open the microphone stream here, to avoid showing the
 /// microphone-in-use indicator in the system tray on startup
-#[tauri::command]
-async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
+fn preinit_audio_capture_internal(app: AppHandle) -> Result<(), String> {
     info!("Pre-initializing audio capture (loading VAD model only)...");
 
     // Get VAD model path from Application directory
@@ -1398,6 +1437,11 @@ async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
 
     info!("Audio capture pre-initialized successfully (VAD model loaded)");
     Ok(())
+}
+
+#[tauri::command]
+async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
+    preinit_audio_capture_internal(app)
 }
 
 /// Stop VAD-based recording
@@ -2420,6 +2464,18 @@ fn main() {
                     "[AsyncInit] WebView 渲染等待完成, 耗时: {}ms",
                     async_init_start.elapsed().as_millis()
                 );
+
+                // 0. 预初始化音频捕获（加载 VAD 模型，减少首次录音延迟）
+                let preinit_audio_start = Instant::now();
+                info!("[AsyncInit] 预初始化音频捕获（VAD 模型）...");
+                if let Err(e) = preinit_audio_capture_internal(app_for_preload.clone()) {
+                    warn!("[AsyncInit] 预初始化音频捕获失败: {}", e);
+                } else {
+                    info!(
+                        "[AsyncInit] 预初始化音频捕获完成, 耗时: {}ms",
+                        preinit_audio_start.elapsed().as_millis()
+                    );
+                }
 
                 // 1. 初始化 GPU 加速器
                 // Initialize transcribe-cpp backend (for GGUF ASR models like Qwen3-ASR)

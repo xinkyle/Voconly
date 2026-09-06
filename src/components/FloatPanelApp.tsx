@@ -563,6 +563,7 @@ export default function FloatPanelApp() {
 
     unlistenPromises.push(
       listen<VadStatus>('vad-status', (event) => {
+        console.log(`[TIMING] [FloatPanel] 收到 vad-status 事件 - at: ${Date.now()}ms, isVoice: ${event.payload.isVoice}`);
         log.debug(`Received vad-status: ${JSON.stringify(event.payload)}`);
         setVoiceDetected(event.payload.isVoice);
       }).catch((e) => {

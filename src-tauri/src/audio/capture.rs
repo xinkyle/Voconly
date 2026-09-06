@@ -229,18 +229,25 @@ impl AudioCapture {
     /// * `app_handle` - Tauri app handle for emitting events
     /// * `vad_model_path` - Path to the Silero VAD model file
     pub fn new(app_handle: AppHandle, vad_model_path: &str) -> Result<Self> {
+        let start_time = std::time::Instant::now();
+        log::info!("[TIMING] [Capture] AudioCapture::new() 入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+
         // Initialize Silero VAD with hysteresis mechanism
         // threshold=0.5: enter speech state when prob > 0.5
         // neg_threshold=0.35: exit speech state when prob < 0.35
         // Hysteresis band (0.35-0.5): state unchanged, prevents flickering
+        let vad_start = std::time::Instant::now();
         let silero = SileroVad::new(vad_model_path, 0.5, 0.35)
             .map_err(|e| anyhow::anyhow!("Failed to create SileroVad: {}", e))?;
+        log::info!("[TIMING] [Capture] SileroVad::new() 完成 - elapsed: {}ms (vad初始化耗时: {}ms)", start_time.elapsed().as_millis(), vad_start.elapsed().as_millis());
 
         // Wrap with SmoothedVad for temporal smoothing
-        // Prefill: 3 frames (96ms) - capture speech onset, reduce previous sentence tail inclusion
+        // Prefill: 8 frames (256ms) - capture speech onset, prevent word swallowing
         // Hangover: 10 frames (320ms) - tolerate natural pauses, but segment earlier to avoid hard threshold
         // Onset: 2 frames (64ms) - require consecutive voice frames
-        let smoothed_vad = SmoothedVad::new(Box::new(silero), 3, 10, 2);
+        let smoothed_vad = SmoothedVad::new(Box::new(silero), 8, 10, 2);
+
+        log::info!("[TIMING] [Capture] AudioCapture::new() 完成 - elapsed: {}ms", start_time.elapsed().as_millis());
 
         Ok(AudioCapture {
             device: None,
@@ -253,7 +260,11 @@ impl AudioCapture {
 
     /// Open the microphone and start the worker thread
     pub fn open(&mut self) -> Result<()> {
+        let start_time = std::time::Instant::now();
+        log::info!("[TIMING] [Capture] AudioCapture::open() 入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+
         if self.worker_handle.is_some() {
+            log::info!("[TIMING] [Capture] open() 已打开，跳过 - elapsed: 0ms");
             return Ok(()); // Already open
         }
 
@@ -265,6 +276,7 @@ impl AudioCapture {
         let device = host
             .default_input_device()
             .ok_or_else(|| anyhow::anyhow!("No input device found"))?;
+        log::info!("[TIMING] [Capture] 获取默认音频设备 - elapsed: {}ms", start_time.elapsed().as_millis());
 
         let thread_device = device.clone();
         let vad = self.vad.clone();
@@ -344,6 +356,7 @@ impl AudioCapture {
                 self.device = Some(device);
                 self.cmd_tx = Some(cmd_tx);
                 self.worker_handle = Some(worker);
+                log::info!("[TIMING] [Capture] AudioCapture::open() 完成 - elapsed: {}ms", start_time.elapsed().as_millis());
                 Ok(())
             }
             Ok(Err(error_message)) => {
@@ -361,9 +374,13 @@ impl AudioCapture {
 
     /// Start recording with scene_id
     pub fn start(&self, scene_id: &str) -> Result<()> {
+        let start_time = std::time::Instant::now();
+        log::info!("[TIMING] [Capture] AudioCapture::start() 入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+
         if let Some(tx) = &self.cmd_tx {
             tx.send(Cmd::Start(scene_id.to_string()))?;
         }
+        log::info!("[TIMING] [Capture] AudioCapture::start() 完成 - elapsed: {}ms", start_time.elapsed().as_millis());
         Ok(())
     }
 
@@ -875,6 +892,7 @@ fn run_consumer(
                     // 检测从 speech 到 silence 的转变
                     if !is_voice && last_vad_status {
                         last_vad_status = false;
+                        log::info!("[TIMING] [Capture] 发送 vad-status=false 事件 - at: {}ms", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
                         log::info!("[VAD] Speech ended, sending vad-status=false to float-panel");
                         let _ = app_handle.emit_to("float-panel", "vad-status", VadStatus { is_voice: false });
                     }
@@ -882,6 +900,7 @@ fn run_consumer(
                     // 处理 voice=true（用户说话）
                     if is_voice && !last_vad_status {
                         last_vad_status = true;
+                        log::info!("[TIMING] [Capture] 发送 vad-status=true 事件 - at: {}ms", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
                         log::info!("[VAD] Voice detected, sending vad-status=true to float-panel");
                         let _ = app_handle.emit_to("float-panel", "vad-status", VadStatus { is_voice: true });
                     }
