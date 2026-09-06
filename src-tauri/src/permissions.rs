@@ -9,6 +9,9 @@
 //!   用户在系统设置里只需要拨动一次开关，无需手动删除再重新添加。
 //!
 //! 注意：两个权限是独立的，需要分别授权！
+//!
+//! 输入监控权限的检查由 keyhook 插件处理（通过尝试创建 CGEventTap），
+//! 本模块只负责辅助功能权限和重置输入监控条目。
 
 /// 静默检查当前进程是否被信任为辅助功能（Accessibility）客户端。
 /// `prompt` 为 true 时，未授权会弹出系统引导窗，并把当前二进制注册进
@@ -34,33 +37,6 @@ pub fn ax_is_trusted(prompt: bool) -> bool {
     };
     let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
     unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
-}
-
-/// 检查输入监控权限：尝试创建一个临时的 CGEventTap，成功则说明有权限。
-/// 注意：这个检查可能会触发系统授权弹窗，所以只在用户主动点击"授权"时调用。
-#[cfg(target_os = "macos")]
-pub fn check_input_monitoring() -> bool {
-    use core_graphics::event::{
-        CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
-    };
-
-    // 尝试创建一个临时的 listen-only tap
-    let result = CGEventTap::new(
-        CGEventTapLocation::HID,
-        CGEventTapPlacement::HeadInsertEventTap,
-        CGEventTapOptions::ListenOnly,
-        vec![CGEventType::KeyDown],
-        |_proxy, _type, event| Some(event.to_owned()),
-    );
-
-    match result {
-        Ok(tap) => {
-            // 有权限，立即销毁 tap
-            drop(tap);
-            true
-        }
-        Err(_) => false,
-    }
 }
 
 /// 通过官方 tccutil 清理指定服务的授权条目（无需管理员权限）。
@@ -104,28 +80,18 @@ pub fn request_accessibility(identifier: &str) -> bool {
     ax_is_trusted(false)
 }
 
-/// 请求输入监控权限（用户点击"去授权"时调用）：
-/// 1. 清理失效的输入监控条目
-/// 2. 尝试创建 tap 触发系统授权引导
-/// 返回调用时刻的授权状态。
+/// 重置输入监控权限条目（用户点击 keyhook 横幅"去授权"时调用）。
+/// 重置后需要调用 keyhook 的 startListen 来触发授权引导。
+/// 注意：调用此函数前应先确认辅助功能权限已授权。
 #[cfg(target_os = "macos")]
-pub fn request_input_monitoring(identifier: &str) -> bool {
-    // 先检查辅助功能权限，如果没有则提示用户先授权辅助功能
+pub fn reset_input_monitoring(identifier: &str) {
+    // 先检查辅助功能权限
     if !ax_is_trusted(false) {
-        log::warn!("[Permissions] Accessibility not granted, cannot request input monitoring");
-        return false;
+        log::warn!("[Permissions] Accessibility not granted, cannot reset input monitoring");
+        return;
     }
 
-    // 检查是否已有输入监控权限
-    if check_input_monitoring() {
-        return true;
-    }
-
-    // 重置输入监控条目
     reset_tcc_service("ListenEvent", identifier);
-
-    // 再次尝试创建 tap，这会触发系统授权弹窗
-    check_input_monitoring()
 }
 
 /// 非 macOS 平台没有 TCC 权限体系，恒为已授权
@@ -140,17 +106,9 @@ pub fn request_accessibility(_identifier: &str) -> bool {
     true
 }
 
-/// 非 macOS 平台恒为已授权
+/// 非 macOS 平台无需重置
 #[cfg(not(target_os = "macos"))]
-pub fn check_input_monitoring() -> bool {
-    true
-}
-
-/// 非 macOS 平台无需授权动作
-#[cfg(not(target_os = "macos"))]
-pub fn request_input_monitoring(_identifier: &str) -> bool {
-    true
-}
+pub fn reset_input_monitoring(_identifier: &str) {}
 
 /// 非 macOS 平台无需重置
 #[cfg(not(target_os = "macos"))]

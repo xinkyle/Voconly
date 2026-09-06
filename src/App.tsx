@@ -42,7 +42,7 @@ import PermissionModal from './components/PermissionModal';
 import AccessibilityBanner from './components/AccessibilityBanner';
 import AccessibilityModal from './components/AccessibilityModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
-import { checkAccessibilityPermission, requestAccessibilityPermission, requestInputMonitoringPermission } from './services/permissions';
+import { checkAccessibilityPermission, requestAccessibilityPermission, resetInputMonitoringPermission } from './services/permissions';
 import type { RemoteVersionInfo } from './types/updater';
 import { eventManager } from './services/eventManager';
 
@@ -1850,18 +1850,14 @@ function App() {
               setShowAccessibilityBanner(true);
               return;
             }
-            // 请求输入监控权限
-            const granted = await requestInputMonitoringPermission();
-            if (granted) {
-              setShowKeyhookBanner(false);
-              // 重启键盘监听
-              try {
-                const { commands } = await import('@tauri-keyhook');
-                await commands.startListen();
-                log.info('Keyhook restarted after permission granted');
-              } catch (err) {
-                log.error(`Failed to restart keyhook: ${err}`);
-              }
+            // 重置输入监控条目，然后重启键盘监听触发授权引导
+            await resetInputMonitoringPermission();
+            try {
+              const { commands } = await import('@tauri-keyhook');
+              await commands.startListen();
+              log.info('Keyhook restarted after resetting input monitoring');
+            } catch (err) {
+              log.error(`Failed to restart keyhook: ${err}`);
             }
           }}
           onDismiss={() => setShowKeyhookBanner(false)}

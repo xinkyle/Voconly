@@ -486,21 +486,12 @@ fn request_accessibility_permission(app: AppHandle) -> bool {
     permissions::request_accessibility(&app.config().identifier)
 }
 
-/// 检查输入监控权限（仅 macOS 有效；Windows 恒为 true）
-/// 注意：此命令可能会触发系统授权弹窗，只在用户主动点击"授权"时调用
+/// 重置输入监控权限条目（仅 macOS 有效）。
+/// 重置后需要调用 keyhook 的 startListen 来触发授权引导。
+/// 注意：调用此函数前应先确认辅助功能权限已授权。
 #[tauri::command]
-fn check_input_monitoring_permission() -> bool {
-    // 输入监控权限检查需要先有辅助功能权限
-    if !permissions::ax_is_trusted(false) {
-        return false;
-    }
-    permissions::check_input_monitoring()
-}
-
-/// 请求输入监控权限：清理失效条目并尝试创建 tap 触发授权（仅 macOS 有效）
-#[tauri::command]
-fn request_input_monitoring_permission(app: AppHandle) -> bool {
-    permissions::request_input_monitoring(&app.config().identifier)
+fn reset_input_monitoring_permission(app: AppHandle) {
+    permissions::reset_input_monitoring(&app.config().identifier);
 }
 
 #[tauri::command]
@@ -2088,8 +2079,7 @@ fn main() {
             simulate_input,
             check_accessibility_permission,
             request_accessibility_permission,
-            check_input_monitoring_permission,
-            request_input_monitoring_permission,
+            reset_input_monitoring_permission,
             load_config,
             save_config,
             get_model_storage_path,

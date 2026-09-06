@@ -35,28 +35,14 @@ export async function requestAccessibilityPermission(): Promise<boolean> {
 }
 
 /**
- * 检查输入监控权限（macOS 全局快捷键需要此权限）
- * 注意：此函数可能会触发系统授权弹窗，只在用户主动点击时调用
- * @returns true 表示已授权
+ * 重置输入监控权限条目。
+ * 重置后需要调用 keyhook 的 startListen 来触发授权引导。
+ * 注意：调用此函数前应先确认辅助功能权限已授权。
  */
-export async function checkInputMonitoringPermission(): Promise<boolean> {
+export async function resetInputMonitoringPermission(): Promise<void> {
   try {
-    return await invoke<boolean>('check_input_monitoring_permission');
+    await invoke('reset_input_monitoring_permission');
   } catch (error) {
-    log.error(`checkInputMonitoringPermission failed: ${error}`);
-    return true;
-  }
-}
-
-/**
- * 请求输入监控权限：清理失效条目并尝试创建 tap 触发授权
- * 返回调用时刻的授权状态。
- */
-export async function requestInputMonitoringPermission(): Promise<boolean> {
-  try {
-    return await invoke<boolean>('request_input_monitoring_permission');
-  } catch (error) {
-    log.error(`requestInputMonitoringPermission failed: ${error}`);
-    return false;
+    log.error(`resetInputMonitoringPermission failed: ${error}`);
   }
 }

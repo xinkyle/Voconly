@@ -638,8 +638,16 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     // 添加事件监听
     window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+
+    // DOM 键盘事件监听仅用于 Windows WebView2 的补充方案
+    // Mac 上 CGEventTap 正常工作，不需要 DOM 事件补充，否则会导致重复触发
+    if (!isMacRef.current) {
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+      log.debug('[useShortcut] Windows 平台：启用 DOM 键盘事件补充监听');
+    } else {
+      log.debug('[useShortcut] Mac 平台：仅使用 keyhook 监听，跳过 DOM 事件');
+    }
 
     return () => {
       // 清理 keyhook 监听
@@ -663,8 +671,11 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 清理焦点监听
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      // 仅在 Windows 上清理 DOM 键盘事件监听
+      if (!isMacRef.current) {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+      }
     };
   }, [initializeKeyhook, clearKeyPressedState, checkShortcutMatch]);
 
