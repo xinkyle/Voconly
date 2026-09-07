@@ -2082,8 +2082,8 @@ fn main() {
                         .filter(move |metadata| console_filter_clone.enabled(metadata)),
                     // 通道 2: 文件输出
                     Target::new(TargetKind::Folder {
-                        path: app_data_dir.join("logs"),
-                        file_name: Some("talk-free".into()),
+                        path: paths::logs_dir().expect("Failed to get logs directory"),
+                        file_name: Some("voconly".into()),
                     })
                     .filter(|metadata| {
                         let file_level =
