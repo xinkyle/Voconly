@@ -170,7 +170,7 @@ body {
 
 /* 低 - 仅显示约2行（约50px） */
 .preview-text.height-low {
-  max-height: 50px;
+  max-height: 42px;
 }
 
 .preview-text::-webkit-scrollbar {
