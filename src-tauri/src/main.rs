@@ -1,6 +1,6 @@
 // Windows: 隐藏 CMD 控制台窗口
 // macOS/Linux: 不需要此属性
- //#![cfg_attr(windows, windows_subsystem = "windows")]
+#![cfg_attr(windows, windows_subsystem = "windows")]
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -2534,14 +2534,14 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 use tauri::Listener;
 
-                let unlisten = app_for_listener.listen("app-ready", move |_event| {
+                let _unlisten = app_for_listener.listen("app-ready", move |_event| {
                     info!("[AsyncInit] 收到前端 app-ready 事件");
                     let _ = ready_tx_clone.send(());
                 });
 
-                // 最多等待 10 秒，超时后自动移除监听器
+                // 最多等待 10 秒，超时后监听器会自动失效（进程生命周期内）
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                drop(unlisten);
+                // 监听器 ID 已忽略，无需显式移除
             });
 
             // 后台初始化线程
