@@ -85,7 +85,7 @@ body {
 /* 高度填满窗口，由 Rust 控制窗口高度（60px 或 300px） */
 .float-panel-wrapper {
   --pill-width-ratio: 1; /* 宽度比例变量，可通过 .compact 类调整为 0.6 */
-  --base-pill-width: min(260px, 90vw); /* 药丸宽度 260px */
+  --base-pill-width: min(220px, 90vw); /* 药丸宽度 220px */
 
   background: #16161a;
   border-radius: 16px;
@@ -96,8 +96,8 @@ body {
 
   /* DPI 感知尺寸：基于视口百分比，同时限制范围 */
   width: calc(var(--base-pill-width) * var(--pill-width-ratio));
-  min-width: min(200px, 80vw); /* 最小宽度保护 */
-  max-width: min(260px, 95vw); /* 最大宽度限制 */
+  min-width: min(180px, 80vw); /* 最小宽度保护 */
+  max-width: min(220px, 95vw); /* 最大宽度限制 */
 
   /* 高度填满窗口，由 Rust 动态控制 */
   height: 100%;
@@ -121,8 +121,8 @@ body {
 /* 状态栏固定在底部，预览区从上方"生长出来"，避免窗口变大时状态栏滑动 */
 .float-panel-wrapper.expanded-mode {
   justify-content: flex-end; /* 状态栏在底部，预览区在上方 */
-  --base-pill-width: min(260px, 90vw); /* 展开模式与药丸同宽 */
-  max-width: min(260px, 95vw); /* 展开模式下最大宽度 */
+  --base-pill-width: min(220px, 90vw); /* 展开模式与药丸同宽 */
+  max-width: min(240px, 95vw); /* 展开模式下最大宽度 */
 }
 
 /* 预览区域 - 融合在药丸上方 */
@@ -163,14 +163,14 @@ body {
   max-height: none;
 }
 
-/* 中 - 适中显示，限制最大高度约120px（约5行） */
+/* 中 - 适中显示，限制最大高度约100px（约5行） */
 .preview-text.height-medium {
-  max-height: 120px;
+  max-height: 100px;
 }
 
-/* 低 - 仅显示约3行（约60px） */
+/* 低 - 仅显示约2行（约50px） */
 .preview-text.height-low {
-  max-height: 60px;
+  max-height: 50px;
 }
 
 .preview-text::-webkit-scrollbar {
@@ -220,7 +220,7 @@ body {
 /* 状态区域 - 原药丸内容 */
 .status-area {
   flex-shrink: 0;
-  padding: 8px 16px;
+  padding: 6px 14px; /* 压缩 padding，保持紧凑 */
   min-height: 36px;
   display: flex;
   align-items: center;
@@ -231,10 +231,9 @@ body {
 }
 
 /* 融合状态时调整圆角和间距 */
-/* 增加上下 padding 1px，让文字在分割线和底部之间更居中 */
 .status-area.fused {
   border-radius: 0;
-  padding: 9px 15px; /* 上下各10px，比默认8px多2px */
+  padding: 7px 14px; /* 略微增加，让文字更居中 */
 }
 
 /* 独立状态区域（无预览时）- 保持原药丸样式 */
@@ -270,7 +269,8 @@ body {
   height: 100%;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
   border-radius: 0;
-  transition: transform 0.05s ease-out;
+  /* 【修复 macOS 进度条抖动】移除 transition，RAF 已提供流畅动画 */
+  transition: none;
   z-index: 2;
 }
 
@@ -326,6 +326,18 @@ body {
   transition: all 0.15s ease;
   flex-shrink: 0;
   padding: 0;
+}
+
+/* SVG icons in buttons - explicit sizing to avoid Tailwind dependency */
+.cancel-button svg,
+.collapse-toggle-button svg {
+  width: 12px;  /* w-3 equivalent */
+  height: 12px; /* h-3 equivalent */
+}
+
+.confirm-button svg {
+  width: 16px;  /* w-4 equivalent */
+  height: 16px; /* h-4 equivalent */
 }
 
 .cancel-button:hover {
@@ -429,6 +441,18 @@ body {
   background: #8e8e93;
 }
 
+/* 【新设计】绿灯 - 系统就绪，可以正常使用 */
+.status-dot.ready {
+  background: #34c759;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* 【新设计】红灯 - 系统未就绪，麦克风正在初始化 */
+.status-dot.unavailable {
+  background: #ff3b30;
+  animation: pulse 1s ease-in-out infinite;
+}
+
 .status-text {
   color: #ffffff;
   font-size: 12px;
@@ -436,6 +460,16 @@ body {
   letter-spacing: -0.1px;
   white-space: nowrap;
   line-height: 1;
+}
+
+/* 【新设计】灰色文字 - 系统未就绪 */
+.status-text.unavailable {
+  color: rgba(128, 128, 128, 0.5);
+}
+
+/* 【新设计】白色文字 - 系统就绪 */
+.status-text.ready {
+  color: #ffffff;
 }
 
 /* Progress info - percentage and time */
@@ -479,6 +513,13 @@ body {
 .wave-bar.active {
   background: rgba(255, 255, 255, 0.9);
   animation: waveScaleAnimation 0.5s ease-in-out infinite;
+}
+
+/* 【新设计】灰色波浪条 - 系统不可用 */
+.wave-bar.unavailable {
+  background: rgba(128, 128, 128, 0.6);
+  /* 不播放动画，保持静态 */
+  animation: none;
 }
 
 .wave-bar:nth-child(1) {

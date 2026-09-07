@@ -517,8 +517,15 @@ export default {
  * @param sceneId - The scene ID for transcription configuration
  */
 export async function startVadRecording(sceneId?: string): Promise<boolean> {
+  const startTime = performance.now();
+  console.log(`[TIMING] [Audio] startVadRecording() 入口 - at: ${Date.now()}ms (from start: 0ms)`);
+
   try {
+    console.log(`[TIMING] [Audio] invoke('start_vad_recording') 调用前 - elapsed: ${performance.now() - startTime}ms`);
+    const invokeStart = performance.now();
     await invoke('start_vad_recording', { sceneId });
+    const invokeEnd = performance.now();
+    console.log(`[TIMING] [Audio] invoke('start_vad_recording') 调用后 - elapsed: ${performance.now() - startTime}ms (invoke耗时: ${invokeEnd - invokeStart}ms)`);
     return true;
   } catch (error) {
     log.error(`Failed to start VAD recording: ${error}`);

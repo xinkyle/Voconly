@@ -5,7 +5,6 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BackendType {
     TranscribeCpp, // GGUF 模型（GPU 加速）
-    Onnx,          // ONNX 模型（CPU only）
 }
 
 impl Default for BackendType {
@@ -26,7 +25,6 @@ impl std::fmt::Display for BackendType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BackendType::TranscribeCpp => write!(f, "transcribe_cpp"),
-            BackendType::Onnx => write!(f, "onnx"),
         }
     }
 }
@@ -37,7 +35,6 @@ impl std::str::FromStr for BackendType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "transcribe_cpp" | "transcribecpp" | "transcribe-cpp" => Ok(BackendType::TranscribeCpp),
-            "onnx" => Ok(BackendType::Onnx),
             _ => Err(format!("Unknown backend type: {}", s)),
         }
     }
@@ -152,20 +149,9 @@ pub trait StreamingBackend: Send {
         F: FnOnce(&mut transcribe_cpp::Stream) -> R;
 }
 
-/// ONNX模型类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum OnnxModelType {
-    #[default]
-    SenseVoice,
-    Parakeet,
-    Moonshine,
-    Whisper,
-    Unknown,
-}
-
-/// ONNX 后端实现
-pub mod onnx;
-pub use onnx::OnnxBackend;
+/// TranscribeCpp backend implementation (GGUF ASR models)
+pub mod transcribe_cpp;
+pub use transcribe_cpp::{init_transcribe_cpp_backend, TranscribeCppBackend};
 
 /// GGUF metadata parser
 pub mod gguf_meta;
@@ -176,7 +162,3 @@ pub use gguf_capabilities::{
     get_architecture_capabilities, probe_gguf_capabilities, Compatibility, GgufCapabilities,
     KNOWN_ARCHES,
 };
-
-/// TranscribeCpp backend implementation (GGUF ASR models)
-pub mod transcribe_cpp;
-pub use transcribe_cpp::{init_transcribe_cpp_backend, TranscribeCppBackend};

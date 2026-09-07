@@ -290,13 +290,15 @@
     "noCustomDirs": "暂无导入的目录",
     "asrMoreModelsInfo": "更多模型的量化版本可从以下平台下载：",
     "asrQuantizationPriority": "当模型提供多个量化版本时，系统将自动使用最高精度版本（F16 > Q8 > Q6 > Q5 > Q4），暂不支持手动选择量化版本。",
-    "asrDownloadHint": "下载后将模型文件放入默认 models 目录，或通过「导入外部模型」按钮添加模型文件夹即可使用。"
+    "asrDownloadHint": "下载后将模型文件放入默认 models 目录，或通过「导入外部模型」按钮添加模型文件夹即可使用。",
+    "modelFileNotFound": "模型文件不存在",
+    "modelFileNotFoundDesc": "该模型文件已被移除，请重新下载"
   },
   "dialog": {
     "modelNotDownloaded": "模型未下载",
-    "modelNotDownloadedDesc": "当前场景使用的模型「{{name}}」尚未下载，是否立即下载？",
+    "modelNotDownloadedDesc": "当前场景使用的模型「{{name}}」尚未下载，是否前往下载？",
     "cancel": "取消",
-    "download": "下载"
+    "goToDownload": "前往下载"
   },
   "toast": {
     "sceneDisabled": "场景已禁用",
@@ -541,7 +543,9 @@
     "switchTo": "切换",
     "selectPrompt": "选择提示词",
     "moveUp": "上移，首页将展示前两个场景",
-    "hint": "首页仅展示列表前两位的场景。点击「上移」按钮调整位置，即可将其显示在首页。其他场景虽不在首页展示，但仍可通过快捷键正常使用。"
+    "hint": "首页仅展示列表前两位的场景。点击「上移」按钮调整位置，即可将其显示在首页。其他场景虽不在首页展示，但仍可通过快捷键正常使用。",
+    "precisionTipTitle": "选择建议",
+    "precisionTipDesc": "根据电脑配置选择合适精度。精度越高效果越好，但需要更多内存。低配电脑推荐低精度，高配可选高精度获得更佳效果。"
   },
   "keyboard": {
     "left": "左",
@@ -590,7 +594,8 @@
       "idle": "空闲",
       "loadingModel": "加载模型中",
       "llmError": "LLM异常，已输出原文",
-      "llmSkippedTooLong": "文本过长，跳过LLM处理"
+      "llmSkippedTooLong": "文本过长，跳过LLM处理",
+      "initializing": "准备中..."
     },
     "confirmError": "确认",
     "collapsePreview": "折叠预览",
@@ -622,13 +627,33 @@
     "requesting": "请求中...",
     "skip": "暂不授权",
     "deniedHint": "您之前拒绝了麦克风权限，请在系统设置中重新授权",
-    "error": "请求权限失败，请稍后重试"
+    "error": "请求权限失败，请稍后重试",
+    "openSettings": "打开系统设置"
+  },
+  "accessibility": {
+    "modalTitle": "需要辅助功能权限",
+    "modalDescription": "把识别文字自动粘贴到光标位置需要该权限。",
+    "modalHint": "授权后，录音完成的文字会自动粘贴到光标位置。",
+    "skip": "暂不授权",
+    "authorize": "去授权",
+    "authorizeHint": "请在「辅助功能」列表中打开 Voconly 的开关",
+    "bannerText": "需要辅助功能权限，自动粘贴暂不可用",
+    "keyhookBannerTitle": "需要输入监控权限",
+    "keyhookBannerText": "全局快捷键暂不可用，请在「输入监控」中允许 Voconly",
+    "keyhookAuthorizeHint": "请在「输入监控」列表中打开 Voconly 的开关",
+    "dismiss": "暂不提醒",
+    "pasteFailedToast": "未获辅助功能权限：文字已复制到剪贴板，可手动 ⌘V 粘贴"
   },
   "download": {
     "errorTitle": "模型下载失败",
     "errorDesc": "{{name}} 下载出现问题，您可以重试或选择其他已下载的模型。",
     "retry": "重试下载",
-    "selectOther": "选择其他模型"
+    "selectOther": "选择其他模型",
+    "quantDownloadComplete": "{{model}} {{quant}} 下载完成",
+    "switchQuantHint": "是否切换到此精度版本？",
+    "switchNow": "立即切换",
+    "switchSuccess": "模型已切换",
+    "switchFailed": "模型切换失败"
   },
   "about": {
     "title": "关于",

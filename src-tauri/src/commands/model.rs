@@ -328,10 +328,6 @@ fn build_model_list_from_presets(
             // 扫描结果中没有路径，尝试在默认目录中查找
             // （兼容旧版本的预设，如硬编码的预设模型）
             let model_path = match model.backend {
-                Some(crate::backends::BackendType::Onnx) => {
-                    // ONNX 模型是目录
-                    storage_dir.join(&model.id)
-                }
                 Some(crate::backends::BackendType::TranscribeCpp) => {
                     // GGUF/GGML 模型是文件，需要尝试扩展名
                     let gguf_path = storage_dir.join(format!("{}.gguf", model.id));
@@ -342,8 +338,8 @@ fn build_model_list_from_presets(
                     }
                 }
                 None => {
-                    // 未知后端，尝试目录
-                    storage_dir.join(&model.id)
+                    // 未知后端，尝试 gguf 扩展名
+                    storage_dir.join(format!("{}.gguf", model.id))
                 }
             };
 

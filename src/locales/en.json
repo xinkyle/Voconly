@@ -290,13 +290,15 @@
     "noCustomDirs": "No imported directories",
     "asrMoreModelsInfo": "More quantized models available from:",
     "asrQuantizationPriority": "When multiple quantization versions are available, the system automatically uses the highest precision version (F16 > Q8 > Q6 > Q5 > Q4). Manual selection of quantization version is not supported at this time.",
-    "asrDownloadHint": "Download model files to the default models directory, or use 'Import External Models' to add model folders."
+    "asrDownloadHint": "Download model files to the default models directory, or use 'Import External Models' to add model folders.",
+    "modelFileNotFound": "Model file not found",
+    "modelFileNotFoundDesc": "The model file has been removed, please re-download"
   },
   "dialog": {
     "modelNotDownloaded": "Model not downloaded",
-    "modelNotDownloadedDesc": "The model \"{{name}}\" used by this scene has not been downloaded. Download now?",
+    "modelNotDownloadedDesc": "The model \"{{name}}\" is not downloaded. Go to download?",
     "cancel": "Cancel",
-    "download": "Download"
+    "goToDownload": "Go to Download"
   },
   "toast": {
     "sceneDisabled": "Scene disabled",
@@ -541,7 +543,9 @@
     "switchTo": "Switch",
     "selectPrompt": "Select Prompt",
     "moveUp": "Move up, homepage shows first two scenes",
-    "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage."
+    "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage.",
+    "precisionTipTitle": "Selection Tip",
+    "precisionTipDesc": "Choose precision based on your PC specs. Higher precision = better results but more memory. Low-spec: choose low precision; High-spec: choose high precision for best results."
   },
   "keyboard": {
     "left": "Left",
@@ -590,7 +594,8 @@
       "idle": "Idle",
       "loadingModel": "Loading Model",
       "llmError": "LLM error, original text output",
-      "llmSkippedTooLong": "Text too long, LLM skipped"
+      "llmSkippedTooLong": "Text too long, LLM skipped",
+      "initializing": "Initializing..."
     },
     "confirmError": "Confirm",
     "collapsePreview": "Collapse preview",
@@ -622,13 +627,19 @@
     "requesting": "Requesting...",
     "skip": "Skip",
     "deniedHint": "You previously denied microphone permission. Please enable it in system settings.",
-    "error": "Permission request failed. Please try again."
+    "error": "Permission request failed. Please try again.",
+    "openSettings": "Open System Settings"
   },
   "download": {
     "errorTitle": "Download Failed",
     "errorDesc": "{{name}} download failed. You can retry or select another downloaded model.",
     "retry": "Retry Download",
-    "selectOther": "Select Other Model"
+    "selectOther": "Select Other Model",
+    "quantDownloadComplete": "{{model}} {{quant}} download complete",
+    "switchQuantHint": "Switch to this quantization version?",
+    "switchNow": "Switch Now",
+    "switchSuccess": "Model switched",
+    "switchFailed": "Failed to switch model"
   },
   "about": {
     "title": "About",

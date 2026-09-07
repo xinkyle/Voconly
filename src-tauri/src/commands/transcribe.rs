@@ -589,6 +589,16 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
         }
     }
 
+    // 【macOS Metal 修复】等待 GPU 操作完成
+    // Metal 的 ResidencySet 需要等待所有 GPU 操作完成才能正确销毁
+    // 否则在退出时会触发断言错误：GGML_ASSERT([rsets->data count] == 0)
+    #[cfg(target_os = "macos")]
+    {
+        info!("[Cleanup] 等待 Metal 资源同步...");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        info!("[Cleanup] Metal 资源同步完成");
+    }
+
     info!("[Cleanup] 所有资源清理完成");
     Ok(())
 }

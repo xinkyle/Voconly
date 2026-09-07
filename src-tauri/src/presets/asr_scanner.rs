@@ -1,8 +1,7 @@
 //! ASR Model Scanner
 //!
 //! Scans the model storage directory for available ASR models.
-//! Supports two backend types:
-//! - ONNX: directories containing `.onnx` or `.ort` files
+//! Supports:
 //! - TranscribeCpp: `.gguf` and `.bin` files (GGUF/GGML format for Whisper, Qwen3-ASR, etc.)
 //!
 //! 支持多目录扫描：
@@ -271,17 +270,8 @@ fn scan_single_directory_recursive(
 
         // Check for directories
         if path.is_dir() {
-            // Check for ONNX model directory (contains .onnx files)
-            if is_onnx_model_directory(&path) {
-                if let Some(preset) = scan_onnx_model(&path, &presets) {
-                    models.push(preset);
-                }
-            }
-
             // Recursively scan subdirectories if not at max depth
-            // ONNX 模型目录不递归进入（已经是模型目录）
-            // 但普通目录需要递归查找 GGUF 文件
-            if current_depth < max_depth && !is_onnx_model_directory(&path) {
+            if current_depth < max_depth {
                 let sub_models =
                     scan_single_directory_recursive(&path, current_depth + 1, max_depth);
                 models.extend(sub_models);
@@ -292,28 +282,7 @@ fn scan_single_directory_recursive(
     models
 }
 
-/// Check if a directory contains ONNX model files
-fn is_onnx_model_directory(path: &Path) -> bool {
-    if !path.is_dir() {
-        return false;
-    }
-
-    // Look for .onnx or .ort files
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let entry_path = entry.path();
-            if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
-                if ext == "onnx" || ext == "ort" {
-                    return true;
-                }
-            }
-        }
-    }
-
-    false
-}
-
-/// Get model ID from path (filename or directory name without extension)
+/// Get model ID from path (filename without extension)
 fn get_model_id_from_path(path: &Path) -> String {
     path.file_name()
         .and_then(|n| n.to_str())
@@ -340,81 +309,6 @@ fn get_size_mb(path: &Path) -> Option<u64> {
         Some(total / (1024 * 1024))
     } else {
         None
-    }
-}
-
-/// Scan an ONNX model directory and create a preset
-fn scan_onnx_model(path: &Path, presets: &[ModelPreset]) -> Option<ModelPreset> {
-    let id = get_model_id_from_path(path);
-
-    // Try to match against preset:
-    // 1. First try exact ID match (case-insensitive)
-    // 2. If no exact match, try base name match (for quantization variants)
-    let (preset, matched_by_base_name) = presets
-        .iter()
-        .find(|p| p.id.to_lowercase() == id.to_lowercase() && p.backend == Some(BackendType::Onnx))
-        .map(|p| (Some(p), false))
-        .unwrap_or_else(|| {
-            // Try base name match (case-insensitive)
-            let base_id = get_base_model_id(&id);
-            presets
-                .iter()
-                .find(|p| {
-                    p.backend == Some(BackendType::Onnx) && get_base_model_id(&p.id) == base_id
-                })
-                .map(|p| (Some(p), true))
-                .unwrap_or((None, false))
-        });
-
-    let size_mb = get_size_mb(path);
-
-    // 记录扫描到的实际路径
-    let model_path = path.to_string_lossy().to_string();
-
-    if let Some(p) = preset {
-        // 使用实际文件的 ID，继承预设的语言列表
-        let display_name = if matched_by_base_name {
-            id.clone()
-        } else {
-            p.name.clone()
-        };
-
-        Some(ModelPreset::asr_preset_with_path(
-            id.clone(), // 使用文件 ID，避免去重冲突
-            display_name,
-            size_mb
-                .map(|s| format!("{}MB", s))
-                .unwrap_or_else(|| p.size.clone()),
-            BackendType::Onnx,
-            p.download_urls.clone(),
-            p.languages.clone(),
-            p.description.clone(),
-            p.supports_auto_detect,
-            p.supports_streaming,
-            p.supports_translation,
-            p.accuracy_score, // 继承预设的评分
-            p.speed_score,    // 继承预设的评分
-            Some(model_path),
-        ))
-    } else {
-        // Generate default preset for unknown ONNX model
-        Some(ModelPreset::asr_preset_with_path(
-            id.clone(),
-            id.clone(),
-            size_mb
-                .map(|s| format!("{}MB", s))
-                .unwrap_or_else(|| "未知大小".to_string()),
-            BackendType::Onnx,
-            Vec::new(),
-            vec!["zh".to_string(), "en".to_string()], // Default languages
-            Some("用户自定义 ONNX 模型".to_string()),
-            None, // Unknown supports_auto_detect
-            None, // Unknown supports_streaming
-            None, // Unknown supports_translation
-            None, // Unknown accuracy_score
-            None, // Unknown speed_score
-            Some(model_path),
-        ))
     }
 }
 
@@ -615,16 +509,6 @@ mod tests {
     use std::path::PathBuf;
     use tempfile::TempDir;
 
-    /// Create a test ONNX model directory
-    fn create_test_onnx_dir(dir: &Path, name: &str) -> PathBuf {
-        let model_dir = dir.join(name);
-        fs::create_dir_all(&model_dir).unwrap();
-        // Create a dummy .onnx file
-        let onnx_path = model_dir.join("model.int8.onnx");
-        fs::File::create(&onnx_path).unwrap();
-        model_dir
-    }
-
     /// Create a test GGUF file
     fn create_test_gguf_file(dir: &Path, name: &str, size_bytes: u64) -> PathBuf {
         let path = dir.join(name);
@@ -642,62 +526,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let models = scan_available_asr_models_from_path(temp_dir.path());
         assert!(models.is_empty());
-    }
-
-    #[test]
-    fn test_scan_known_onnx_model() {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a sensevoice-small directory (matching preset)
-        create_test_onnx_dir(temp_dir.path(), "sensevoice-small");
-
-        let models = scan_available_asr_models_from_path(temp_dir.path());
-
-        assert_eq!(models.len(), 1);
-        let model = &models[0];
-        assert_eq!(model.id, "sensevoice-small");
-        assert_eq!(model.backend, Some(BackendType::Onnx));
-        // Should have preset languages (zh, zh-yue, en, ja, ko)
-        assert!(model.languages.contains(&"zh".to_string()));
-        assert!(model.languages.contains(&"zh-yue".to_string()));
-    }
-
-    #[test]
-    fn test_scan_unknown_onnx_model() {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create an unknown ONNX model directory
-        create_test_onnx_dir(temp_dir.path(), "custom-onnx-model");
-
-        let models = scan_available_asr_models_from_path(temp_dir.path());
-
-        assert_eq!(models.len(), 1);
-        let model = &models[0];
-        assert_eq!(model.id, "custom-onnx-model");
-        assert_eq!(model.backend, Some(BackendType::Onnx));
-        assert!(model.description.as_ref().unwrap().contains("用户自定义"));
-    }
-
-    #[test]
-    fn test_is_onnx_model_directory() {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a directory with .onnx file
-        let onnx_dir = temp_dir.path().join("onnx-model");
-        fs::create_dir_all(&onnx_dir).unwrap();
-        fs::File::create(onnx_dir.join("model.onnx")).unwrap();
-        assert!(is_onnx_model_directory(&onnx_dir));
-
-        // Create a directory with .ort file (ONNX Runtime format)
-        let ort_dir = temp_dir.path().join("ort-model");
-        fs::create_dir_all(&ort_dir).unwrap();
-        fs::File::create(ort_dir.join("encoder.ort")).unwrap();
-        assert!(is_onnx_model_directory(&ort_dir));
-
-        // Create a directory without ONNX files
-        let empty_dir = temp_dir.path().join("empty-dir");
-        fs::create_dir_all(&empty_dir).unwrap();
-        assert!(!is_onnx_model_directory(&empty_dir));
     }
 
     /// Helper function for tests to scan from a specific path

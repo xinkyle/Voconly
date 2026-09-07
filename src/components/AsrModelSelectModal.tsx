@@ -130,6 +130,11 @@ function AsrModelSelectModal({
             layout="single"
           />
         </div>
+        {/* 精度选择提示 */}
+        <div className="flex-shrink-0 pt-3 mt-3 border-t border-gray-100">
+          <h5 className="text-xs font-medium text-gray-700 mb-1">{t('sceneList.precisionTipTitle')}</h5>
+          <p className="text-xs text-gray-500 leading-relaxed">{t('sceneList.precisionTipDesc')}</p>
+        </div>
       </div>
     </div>
   );

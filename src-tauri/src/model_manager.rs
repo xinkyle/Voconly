@@ -4,10 +4,12 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use tauri::Emitter;
+
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
-use crate::config::{AppConfig, DownloadSource, Model, ModelRef};
+use crate::config::{AppConfig, Model, ModelRef};
 use crate::presets::{scan_available_asr_models, get_base_model_id, ModelPreset};
 use crate::utils::downloader::{get_model_path, get_model_storage_dir};
 use crate::utils::extract_quant_suffix;
@@ -21,8 +23,6 @@ use sysinfo::System;
 /// 2. Call `StreamingBackend::with_stream()` on TranscribeCpp backend
 /// 3. Have compile-time dispatch for better performance
 pub enum BackendEnum {
-    /// ONNX backend (does not support streaming)
-    Onnx(crate::backends::OnnxBackend),
     /// TranscribeCpp backend (supports streaming)
     TranscribeCpp(TranscribeCppBackend),
 }
@@ -42,28 +42,24 @@ impl SpeechBackend for BackendEnum {
         params: &crate::backends::TranscribeParams,
     ) -> std::io::Result<crate::backends::TranscribeResult> {
         match self {
-            BackendEnum::Onnx(backend) => backend.transcribe(audio, params),
             BackendEnum::TranscribeCpp(backend) => backend.transcribe(audio, params),
         }
     }
 
     fn memory_usage(&self) -> u64 {
         match self {
-            BackendEnum::Onnx(backend) => backend.memory_usage(),
             BackendEnum::TranscribeCpp(backend) => backend.memory_usage(),
         }
     }
 
     fn backend_type(&self) -> BackendType {
         match self {
-            BackendEnum::Onnx(_) => BackendType::Onnx,
             BackendEnum::TranscribeCpp(_) => BackendType::TranscribeCpp,
         }
     }
 
     fn supports_streaming(&self) -> bool {
         match self {
-            BackendEnum::Onnx(_) => false,
             BackendEnum::TranscribeCpp(backend) => backend.supports_streaming(),
         }
     }
@@ -72,17 +68,12 @@ impl SpeechBackend for BackendEnum {
 impl BackendEnum {
     /// Execute a streaming operation on the backend
     ///
-    /// Returns `None` if the backend does not support streaming (ONNX)
-    /// or if streaming fails.
+    /// Returns `None` if streaming fails.
     pub fn with_stream<F, R>(&self, f: F) -> Option<R>
     where
         F: FnOnce(&mut transcribe_cpp::Stream) -> R,
     {
         match self {
-            BackendEnum::Onnx(_) => {
-                log::info!("[BackendEnum] ONNX backend does not support streaming");
-                None
-            }
             BackendEnum::TranscribeCpp(backend) => {
                 log::info!("[BackendEnum] Calling with_stream on TranscribeCpp backend");
                 let result = StreamingBackend::with_stream(backend, f);
@@ -94,12 +85,9 @@ impl BackendEnum {
         }
     }
 
-    /// Get runtime capabilities (only available for TranscribeCpp backend)
-    ///
-    /// Returns `None` for ONNX backend.
+    /// Get runtime capabilities
     pub fn get_capabilities(&self) -> Option<&crate::backends::GgufCapabilities> {
         match self {
-            BackendEnum::Onnx(_) => None,
             BackendEnum::TranscribeCpp(backend) => Some(backend.get_capabilities()),
         }
     }
@@ -110,10 +98,6 @@ impl BackendEnum {
     /// Returns `true` if session was recreated.
     pub fn add_duration_and_check_recreate(&self, duration_ms: u64) -> bool {
         match self {
-            BackendEnum::Onnx(_) => {
-                // ONNX backend does not have session recreation logic
-                false
-            }
             BackendEnum::TranscribeCpp(backend) => {
                 backend.add_duration_and_check_recreate(duration_ms)
             }
@@ -123,14 +107,9 @@ impl BackendEnum {
     /// Recreate session to clear accumulated state
     ///
     /// This is useful to call after a recording session ends to ensure
-    /// fresh state for the next recording. Only TranscribeCpp backend
-    /// supports this; ONNX is a no-op.
+    /// fresh state for the next recording.
     pub fn recreate_session(&self) -> bool {
         match self {
-            BackendEnum::Onnx(_) => {
-                // ONNX backend does not have session recreation
-                true
-            }
             BackendEnum::TranscribeCpp(backend) => {
                 backend.recreate_session().is_ok()
             }
@@ -244,25 +223,16 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
             log::debug!("[preset_to_model] 使用 quant_paths[{}]: {}", quant, path.display());
             path
         } else {
-            log::warn!("[preset_to_model] 量化版本 {} 不在 quant_paths 中，尝试其他方式", quant);
-            // 回退到其他查找方式
-            find_model_path_fallback(preset, &backend_str)?
+            // 指定精度的模型文件不存在，直接返回 None，不进行 fallback
+            log::warn!("[preset_to_model] 指定精度的模型文件不存在: {} ({})", preset.id, quant);
+            return None;
         }
     } else {
         find_model_path_fallback(preset, &backend_str)?
     };
 
-    // 验证文件/目录存在
+    // 验证文件存在
     let exists = match backend {
-        BackendType::Onnx => {
-            let is_dir = model_path.is_dir();
-            let has_model = model_path.join("model.int8.onnx").exists()
-                || model_path.join("encoder-model.int8.onnx").exists()
-                || model_path.join("encoder_model.onnx").exists()
-                || model_path.join("encoder.ort").exists();
-            log::debug!("[preset_to_model] ONNX验证: path={}, is_dir={}, has_model={}", model_path.display(), is_dir, has_model);
-            is_dir && has_model
-        }
         BackendType::TranscribeCpp => {
             let is_file = model_path.is_file();
             let file_exists = model_path.exists();
@@ -278,18 +248,6 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
 
     log::info!("[preset_to_model] ✓ 找到有效模型: {} -> {}", preset.id, model_path.display());
 
-    // 转换 download_urls
-    let download_urls: Vec<DownloadSource> = preset
-        .download_urls
-        .iter()
-        .map(|src| DownloadSource {
-            name: src.name.clone(),
-            url: src.url.clone(),
-            is_china_accessible: src.is_china_accessible,
-            priority: src.priority,
-        })
-        .collect();
-
     Some(Model {
         id: preset.id.clone(),
         name: preset.name.clone(),
@@ -297,7 +255,7 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
         size: preset.size.clone(),
         downloaded: true,
         path: Some(model_path.to_string_lossy().to_string()),
-        download_urls,
+        download_urls: preset.download_urls.clone(),
         languages: preset.languages.clone(),
         description: preset.description.clone(),
         gguf_config: None, // GGUF config not available from presets
@@ -393,14 +351,14 @@ impl ModelManager {
     /// 获取场景对应的模型文件路径
     ///
     /// 用于模型能力检测（如 probe_gguf_capabilities）。
-    /// 仅返回 GGUF 模型的路径（ONNX 模型不支持流式转录）。
+    /// 仅返回 GGUF 模型的路径。
     pub fn get_model_path_for_scene(&self, scene_id: &str) -> Option<std::path::PathBuf> {
         // 获取模型配置
         let model_id = self.get_model_id_for_scene(scene_id).ok()?;
         let model_config = self.get_model_config(&model_id).ok()?;
 
         // 只返回 TranscribeCpp (GGUF) 模型的路径
-        // ONNX 模型不支持流式转录，所以返回 None
+        // 返回模型路径
         if model_config.backend != BackendType::TranscribeCpp {
             return None;
         }
@@ -561,7 +519,6 @@ impl ModelManager {
 
         // 估算所需内存：文件大小 × 系数（考虑加载后内存膨胀）
         let memory_multiplier = match model_config.backend {
-            BackendType::Onnx => 1.5,          // ONNX Runtime 有额外开销
             BackendType::TranscribeCpp => 1.1, // GGUF 模型内存效率高
         };
         let required_mb = (file_size_mb as f64 * memory_multiplier) as u64;
@@ -626,16 +583,6 @@ impl ModelManager {
 
         // 根据后端类型创建对应的后端实例
         let backend: BackendEnum = match model_config.backend {
-            BackendType::Onnx => {
-                info!("[ModelManager] 创建 ONNX 后端...");
-                let backend =
-                    crate::backends::OnnxBackend::load(Path::new(model_path)).map_err(|e| {
-                        info!("[ModelManager] ONNX 后端加载失败: {}", e);
-                        format!("Failed to load ONNX model: {}", e)
-                    })?;
-                info!("[ModelManager] ONNX 后端创建成功");
-                BackendEnum::Onnx(backend)
-            }
             BackendType::TranscribeCpp => {
                 info!("[ModelManager] 创建 TranscribeCpp 后端...");
 
@@ -845,7 +792,12 @@ impl ModelManager {
     ///
     /// 使用 GlobalModelConfig.asr_model 作为全局 ASR 模型。
     /// 所有场景共用同一个 ASR 模型。
-    pub fn preload_always_models(&mut self) {
+    ///
+    /// 参数:
+    /// - app_handle: Tauri AppHandle，用于发送加载事件给前端
+    ///
+    /// 返回: Ok(model_id) 成功加载的模型 ID，Err(error) 加载失败的错误信息
+    pub fn preload_always_models(&mut self, app_handle: Option<tauri::AppHandle>) -> Result<String, String> {
         info!("[ModelManager] 开始预加载全局 ASR 模型...");
 
         // 获取全局 ASR 模型
@@ -853,27 +805,44 @@ impl ModelManager {
             Ok(id) => {
                 if id.is_empty() {
                     info!("[ModelManager] 全局 ASR 模型未配置，跳过预加载");
-                    return;
+                    return Ok(String::new()); // 返回空字符串表示无配置
                 }
                 id
             }
             Err(e) => {
                 info!("[ModelManager] 获取全局 ASR 模型失败: {}", e);
-                return;
+                return Err(e);
             }
         };
 
         info!("[ModelManager] 预加载全局 ASR 模型: {}", model_id);
 
-        match self.load_model(&model_id, false) {
-            Ok(_) => info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id),
-            Err(e) => warn!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e),
+        // 发送加载开始事件
+        if let Some(ref handle) = app_handle {
+            let _ = handle.emit("asr-model-loading", &serde_json::json!({ "modelId": &model_id }));
         }
 
-        info!(
-            "[ModelManager] 预加载完成，当前已加载模型数: {}",
-            self.loaded_models.len()
-        );
+        match self.load_model(&model_id, false) {
+            Ok(_) => {
+                info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id);
+                // 发送加载成功事件
+                if let Some(ref handle) = app_handle {
+                    let _ = handle.emit("asr-model-loaded", &serde_json::json!({ "modelId": &model_id }));
+                }
+                Ok(model_id)
+            }
+            Err(e) => {
+                warn!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e);
+                // 发送加载失败事件
+                if let Some(ref handle) = app_handle {
+                    let _ = handle.emit("asr-model-load-failed", &serde_json::json!({
+                        "modelId": model_id,
+                        "error": &e
+                    }));
+                }
+                Err(e)
+            }
+        }
     }
 
     /// 获取已加载模型列表
@@ -945,427 +914,4 @@ pub struct LoadedModelInfo {
     pub size_mb: u64,
     pub loaded_at_secs: u64,
     pub last_used_secs: u64,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::backends::TranscribeParams;
-    use crate::config::Scene;
-    use std::path::PathBuf;
-
-    /// 获取测试模型路径（ONNX 目录）
-    fn get_test_model_path() -> Option<PathBuf> {
-        let models_dir = crate::paths::models_dir().ok()?;
-        // ONNX 模型使用目录结构
-        let model_path = models_dir.join("sensevoice-small");
-        if model_path.exists() && model_path.is_dir() {
-            Some(model_path)
-        } else {
-            None
-        }
-    }
-
-    /// 创建测试配置（使用 sensevoice-small）
-    fn create_test_config(model_path: &str) -> AppConfig {
-        AppConfig {
-            models: vec![Model {
-                id: "sensevoice-small".to_string(),
-                name: "SenseVoice Small".to_string(),
-                backend: BackendType::Onnx,
-                size: "229MB".to_string(),
-                downloaded: true,
-                path: Some(model_path.to_string()),
-                download_urls: vec![],
-                languages: vec!["zh".to_string(), "en".to_string()],
-                description: Some("Test model".to_string()),
-                gguf_config: None,
-                supports_auto_detect: true,
-                default_language: "auto".to_string(),
-            }],
-            scenes: vec![Scene {
-                id: "1".to_string(),
-                name: "轻度润色".to_string(),
-                shortcut: "1".to_string(),
-                model: ModelRef::new("sensevoice-small".to_string()),
-                model_id: None,
-                enabled: true,
-                load_strategy: LoadStrategy::Always,
-                auto_type: true,
-                prompt_type: "lightPolish".to_string(),
-                custom_prompt: None,
-            }],
-            auto_start: Some(false),
-            default_microphone: None,
-            check_updates: Some(true),
-            show_shortcut_hint: Some(true),
-            max_history_records: Some(100),
-            max_recording_duration: Some(180),
-            ..Default::default()
-        }
-    }
-
-    /// 测试1: 模型加载
-    #[test]
-    fn test_model_loading() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        let config = create_test_config(model_path.to_string_lossy().as_ref());
-        let config = Arc::new(Mutex::new(config));
-        let mut manager = ModelManager::new(config);
-
-        // 加载模型
-        let result = manager.load_model("sensevoice-small", false);
-        assert!(result.is_ok(), "Failed to load model: {:?}", result.err());
-
-        // 验证模型已加载
-        assert!(
-            manager.is_loaded("sensevoice-small"),
-            "Model should be loaded"
-        );
-        assert_eq!(manager.loaded_count(), 1, "Should have 1 loaded model");
-
-        // 验证模型信息
-        let loaded_info = manager.get_loaded_models();
-        assert_eq!(loaded_info.len(), 1);
-        assert_eq!(loaded_info[0].model_id, "sensevoice-small");
-        assert_eq!(loaded_info[0].backend_type, "onnx");
-
-        println!("✓ Model loading test passed");
-    }
-
-    /// 测试2: 语音转录（创建简单测试音频）
-    #[test]
-    fn test_transcription() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        let config = create_test_config(model_path.to_string_lossy().as_ref());
-        let config = Arc::new(Mutex::new(config));
-        let mut manager = ModelManager::new(config);
-
-        // 加载模型
-        let loaded_model = manager
-            .load_model("sensevoice-small", false)
-            .expect("Failed to load model");
-
-        // 创建简单的静音测试音频（1秒，16kHz采样率）
-        // ONNX backend 期望 16kHz 采样率的 f32 数组
-        let audio: Vec<f32> = vec![0.0; 16000];
-
-        // 测试转录
-        let params = TranscribeParams {
-            language: "zh".to_string(),
-            translate: false,
-            initial_prompt: None,
-            with_timestamps: false,
-        };
-        let result = loaded_model.backend.transcribe(&audio, &params);
-
-        assert!(result.is_ok(), "Transcription failed: {:?}", result.err());
-        let transcribe_result = result.unwrap();
-
-        // 注意：ASR 模型可能会对静音音频产生幻觉文本，这是正常行为
-        // 只要转录成功且有文本输出就认为测试通过
-        println!("Transcription result: '{}'", transcribe_result.text);
-        assert!(
-            !transcribe_result.text.is_empty() || transcribe_result.text.is_empty(),
-            "Transcription should complete without error"
-        );
-
-        println!("✓ Transcription test passed");
-    }
-
-    /// 测试3: 测试常驻策略
-    #[test]
-    fn test_always_strategy() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        let config = create_test_config(model_path.to_string_lossy().as_ref());
-        let config = Arc::new(Mutex::new(config));
-        let mut manager = ModelManager::new(config);
-
-        // 预加载常驻模型
-        manager.preload_always_models();
-
-        // 验证场景1（Always策略）的模型已加载
-        assert!(
-            manager.is_loaded("sensevoice-small"),
-            "Always model should be preloaded"
-        );
-
-        // 尝试清理空闲模型
-        manager.cleanup_idle_models();
-
-        // 常驻模型不应该被清理
-        assert!(
-            manager.is_loaded("sensevoice-small"),
-            "Always model should not be cleaned up"
-        );
-
-        println!("✓ Always strategy test passed");
-    }
-
-    /// 测试4: 测试按需加载策略
-    #[test]
-    fn test_lazy_strategy() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        // 创建一个带有 Lazy 策略的场景配置
-        let config = AppConfig {
-            models: vec![Model {
-                id: "sensevoice-small".to_string(),
-                name: "SenseVoice Small".to_string(),
-                backend: BackendType::Onnx,
-                size: "229MB".to_string(),
-                downloaded: true,
-                path: Some(model_path.to_string_lossy().to_string()),
-                download_urls: vec![],
-                languages: vec!["zh".to_string()],
-                description: None,
-                gguf_config: None,
-                supports_auto_detect: true,
-                default_language: "auto".to_string(),
-            }],
-            scenes: vec![Scene {
-                id: "1".to_string(),
-                name: "测试场景".to_string(),
-                shortcut: "1".to_string(),
-                model: ModelRef::new("sensevoice-small".to_string()),
-                model_id: None,
-                enabled: true,
-                load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
-                auto_type: true,
-                prompt_type: "lightPolish".to_string(),
-                custom_prompt: None,
-            }],
-            auto_start: Some(false),
-            default_microphone: None,
-            check_updates: Some(true),
-            show_shortcut_hint: Some(true),
-            max_history_records: Some(100),
-            max_recording_duration: Some(180),
-            ..Default::default()
-        };
-        let config = Arc::new(Mutex::new(config));
-        let mut manager = ModelManager::new(config);
-
-        // 验证初始状态没有模型加载
-        assert_eq!(
-            manager.loaded_count(),
-            0,
-            "No models should be loaded initially"
-        );
-
-        // 使用场景1（Lazy策略）加载模型
-        let result = manager.get_or_load_model("1");
-        assert!(
-            result.is_ok(),
-            "Failed to get or load model: {:?}",
-            result.err()
-        );
-
-        // 验证模型已加载
-        assert!(
-            manager.is_loaded("sensevoice-small"),
-            "Model should be loaded after get_or_load_model"
-        );
-
-        // 获取模型的加载策略
-        let strategy = manager.get_model_load_strategy("sensevoice-small");
-        match strategy {
-            LoadStrategy::Lazy { idle_timeout } => {
-                assert_eq!(idle_timeout, 300, "Idle timeout should be 300 seconds");
-            }
-            _ => panic!("Expected Lazy strategy"),
-        }
-
-        // 测试卸载模型
-        let unloaded = manager.unload_model("sensevoice-small");
-        assert!(unloaded, "Model should be unloaded");
-        assert!(
-            !manager.is_loaded("sensevoice-small"),
-            "Model should not be loaded after unload"
-        );
-
-        println!("✓ Lazy strategy test passed");
-    }
-
-    /// 测试5: get_or_load_model 返回已加载的模型（不重复加载）
-    #[test]
-    fn test_get_or_load_model_no_duplicate() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        let config = create_test_config(model_path.to_string_lossy().as_ref());
-        let config = Arc::new(Mutex::new(config));
-        let mut manager = ModelManager::new(config);
-
-        // 第一次加载
-        let _ = manager
-            .load_model("sensevoice-small", false)
-            .expect("Failed to load model");
-        let initial_count = manager.loaded_count();
-        assert_eq!(initial_count, 1, "Should have 1 model loaded");
-
-        // 再次通过 get_or_load_model 获取（场景1映射到 sensevoice-small）
-        let result = manager.get_or_load_model("1");
-        assert!(result.is_ok(), "Failed to get model: {:?}", result.err());
-
-        // 不应该重复加载
-        assert_eq!(
-            manager.loaded_count(),
-            initial_count,
-            "Should not load duplicate model"
-        );
-
-        println!("✓ No duplicate loading test passed");
-    }
-
-    /// 测试6: get_model_config 从 config.models 获取预设模型（向后兼容）
-    #[test]
-    fn test_get_model_config_from_config_models() {
-        let model_path = match get_test_model_path() {
-            Some(path) => path,
-            None => {
-                eprintln!("Skipping test: No ONNX model file found");
-                return;
-            }
-        };
-
-        let config = create_test_config(model_path.to_string_lossy().as_ref());
-        let config = Arc::new(Mutex::new(config));
-        let manager = ModelManager::new(config);
-
-        // 获取预设中的模型配置（sensevoice-small 在 config.models 中）
-        let result = manager.get_model_config("sensevoice-small");
-        assert!(
-            result.is_ok(),
-            "Should find model in config.models: {:?}",
-            result.err()
-        );
-
-        let model = result.unwrap();
-        assert_eq!(model.id, "sensevoice-small");
-        assert_eq!(model.backend, BackendType::Onnx);
-        assert!(model.path.is_some());
-
-        println!("✓ get_model_config from config.models test passed");
-    }
-
-    /// 测试7: get_model_config 对不存在模型返回错误
-    #[test]
-    fn test_get_model_config_not_found() {
-        let config = AppConfig::default();
-        let config = Arc::new(Mutex::new(config));
-        let manager = ModelManager::new(config);
-
-        // 尝试获取不存在的模型
-        let result = manager.get_model_config("nonexistent-model");
-        assert!(result.is_err(), "Should return error for nonexistent model");
-        let error = result.unwrap_err();
-        assert!(error.contains("Model not found"));
-
-        println!("✓ get_model_config not found test passed");
-    }
-
-    /// 测试8: get_model_config 优先从扫描结果获取模型
-    #[test]
-    fn test_get_model_config_prefers_scanned_models() {
-        use std::fs;
-        use tempfile::TempDir;
-
-        // 创建临时模型目录
-        let temp_dir = TempDir::new().unwrap();
-        let storage_dir = temp_dir.path().join("Voconly").join("models");
-        fs::create_dir_all(&storage_dir).unwrap();
-
-        // 创建一个不在 config.models 中的自定义 ONNX 模型目录
-        // 目录结构包含 model.int8.onnx
-        let custom_dir = storage_dir.join("custom-model");
-        fs::create_dir_all(&custom_dir).unwrap();
-        fs::write(
-            custom_dir.join("model.int8.onnx"),
-            "mock custom model content",
-        )
-        .unwrap();
-
-        // 创建一个空的配置（没有 custom 模型）
-        let config = AppConfig {
-            models: vec![Model {
-                id: "sensevoice-small".to_string(),
-                name: "SenseVoice Small".to_string(),
-                backend: BackendType::Onnx,
-                size: "229MB".to_string(),
-                downloaded: false,
-                path: None,
-                download_urls: vec![],
-                languages: vec!["zh".to_string()],
-                description: None,
-                gguf_config: None,
-                supports_auto_detect: true,
-                default_language: "auto".to_string(),
-            }],
-            scenes: vec![],
-            ..Default::default()
-        };
-        let config = Arc::new(Mutex::new(config));
-        let manager = ModelManager::new(config);
-
-        // 注意：由于 scan_available_asr_models() 使用真实的系统存储目录，
-        // 这个测试无法直接测试自定义模型的加载。
-        // 这里我们验证测试逻辑的结构正确性。
-
-        println!("✓ get_model_config prefers scanned models structure test passed");
-    }
-
-    /// 测试9: 扫描结果中找到的模型应可通过 get_model_config 加载
-    #[test]
-    fn test_scan_and_get_model_config_integration() {
-        // 这个测试验证 scan_available_asr_models() 和 get_model_config() 的集成
-        let scanned = scan_available_asr_models();
-
-        // 如果有扫描到的模型，验证它们可以转换为 Model
-        for preset in scanned {
-            if let Some(model) = preset_to_model(&preset, None) {
-                assert_eq!(model.id, preset.id);
-                assert!(model.downloaded);
-                assert!(model.path.is_some());
-                println!(
-                    "Scanned model {} can be converted to Model with path {:?}",
-                    model.id, model.path
-                );
-            }
-        }
-
-        println!("✓ scan and get_model_config integration test passed");
-    }
 }

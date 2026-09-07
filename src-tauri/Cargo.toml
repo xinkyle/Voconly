@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
+tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-log = "2"
@@ -62,7 +62,6 @@ default = []
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
-transcribe-rs = { version = "0.3.2", features = ["onnx", "ort-cuda"] }
 # 启用 Vulkan GPU 加速 (跨平台，支持 NVIDIA/AMD/Intel GPU)
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_SystemInformation", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
 raw-window-handle = "0.6"
@@ -81,19 +80,21 @@ tauri-plugin-single-instance = "2"
 tempfile = "3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# macOS 上 Metal 加速由 transcribe-rs 自动处理
+# transcribe-cpp Metal 加速用于 GGUF 模型
 transcribe-cpp = { version = "0.1.3", default-features = false, features = ["metal"] }
+# macOS 终端检测：获取当前活动应用程序
+objc = "0.2"
+cocoa = "0.26"
+# macOS 崩溃报告：信号处理
 libc = "0.2"
+# macOS 主线程调度：enigo 键盘模拟需要在主线程执行
+dispatch2 = "0.3"
+# macOS 辅助功能权限检查（AXIsProcessTrustedWithOptions）
+core-foundation = "0.10"
 
-# Patch transcribe-rs to fix Whisper context leakage issue
-# See: patches/transcribe-rs-0.3.2/src/whisper_cpp/mod.rs
-# The patch creates a fresh WhisperState for each transcription to prevent
-# KV cache and prompt_past1 contamination between calls.
-#
 # Patch transcribe-cpp-sys to fix MSVC encoding issues.
 # Add /utf-8 flag to prevent character encoding errors on Windows MSVC.
 [patch.crates-io]
-transcribe-rs = { path = "../patches/transcribe-rs-0.3.2" }
 transcribe-cpp-sys = { path = "../patches/transcribe-cpp-sys-0.1.3" }
 
 # Linux: transcribe-cpp Vulkan GPU 加速 + dynamic-backends

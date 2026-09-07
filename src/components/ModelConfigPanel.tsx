@@ -16,9 +16,10 @@ import {
 import { createLogger } from '../services/log';
 import type { DownloadProgress } from '../services/downloader';
 import { subscribeToDownloadComplete } from '../services/downloader';
+import { checkModelExists, invalidateAsrModelsCache } from '../services/downloader';
 import { useToast } from './ui/Toast';
 import { Info } from 'lucide-react';
-import AsrModelList from './AsrModelList';
+import AsrModelList, { getDefaultQuant } from './AsrModelList';
 import { getFullModelId } from '../types';
 
 const log = createLogger('ModelConfigPanel');
@@ -30,6 +31,10 @@ interface ModelConfigPanelProps {
   onConfigUpdate?: () => void; // 通知父组件重新加载配置
   modelQuantPrefs?: Record<string, string>;
   onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
+  /** Pending download model ID - if set, auto-trigger download after loading model list */
+  pendingDownloadModelId?: string | null;
+  /** Callback when pending download is handled */
+  onPendingDownloadHandled?: () => void;
 }
 
 // Icons
@@ -46,6 +51,8 @@ export default function ModelConfigPanel({
   onConfigUpdate,
   modelQuantPrefs,
   onQuantPrefChange,
+  pendingDownloadModelId,
+  onPendingDownloadHandled,
 }: ModelConfigPanelProps) {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
@@ -101,6 +108,82 @@ export default function ModelConfigPanel({
     };
   }, []);
 
+  // Handle pending download - auto-trigger download after model list is loaded
+  useEffect(() => {
+    if (!pendingDownloadModelId || loading || asrModels.length === 0 || !onDownload) return;
+
+    const triggerPendingDownload = async () => {
+      try {
+        // 提取基础 ID，解决匹配问题
+        const { baseId } = parseModelId(pendingDownloadModelId);
+        log.info(`Looking for model with baseId: ${baseId} (from ${pendingDownloadModelId})`);
+
+        // 使用基础 ID 查找模型
+        const model = asrModels.find(m => m.preset.id === baseId);
+
+        if (!model) {
+          log.warn(`Model not found in list: ${baseId}`);
+          showToast({
+            type: 'error',
+            title: `未找到模型: ${baseId}`,
+          });
+          return;
+        }
+
+        if (model.downloaded && model.preset.downloadUrls?.length > 0) {
+          log.info(`Model already downloaded: ${baseId}`);
+          showToast({
+            type: 'info',
+            title: `模型已下载: ${model.preset.name}`,
+          });
+          return;
+        }
+
+        if (!model.downloaded && model.preset.downloadUrls?.length > 0) {
+          // Get the default quantization (respect user preference)
+          const defaultQuantInfo = getDefaultQuant(model, modelQuantPrefs);
+          const quant = defaultQuantInfo?.quant || model.quantVariants?.[0]?.quant;
+
+          // Build Model object for onDownload
+          const modelForDownload: Model = {
+            id: quant ? `${model.preset.id}-${quant}` : model.preset.id,
+            name: model.preset.name,
+            backend: model.preset.backend || 'Whisper',
+            size: model.preset.size,
+            downloaded: false,
+            downloadUrls: model.preset.downloadUrls.map(source => ({
+              name: source.name,
+              url: source.url,
+              isChinaAccessible: source.isChinaAccessible,
+              priority: source.priority,
+            })),
+            languages: model.preset.languages,
+            description: model.preset.description,
+            modelType: 'asr',
+            supportsAutoDetect: model.preset.supportsAutoDetect,
+            supportsStreaming: model.preset.supportsStreaming,
+            accuracyScore: model.preset.accuracyScore,
+            speedScore: model.preset.speedScore,
+          };
+
+          log.info(`Auto-triggering download for pending model: ${modelForDownload.id}`);
+          onDownload(modelForDownload);
+        }
+      } catch (err) {
+        log.error(`Failed to trigger pending download for model ${pendingDownloadModelId}: ${err}`);
+        showToast({
+          type: 'error',
+          title: '触发下载失败',
+        });
+      } finally {
+        // Clear the pending state
+        onPendingDownloadHandled?.();
+      }
+    };
+
+    triggerPendingDownload();
+  }, [pendingDownloadModelId, loading, asrModels, onDownload, onPendingDownloadHandled, modelQuantPrefs, showToast]);
+
   // Handlers
   // Handle ASR model selection
   const handleAsrModelSelect = useCallback(async (modelId: string) => {
@@ -108,6 +191,26 @@ export default function ModelConfigPanel({
       return;
     }
 
+    // 先检查模型文件是否存在
+    const modelExists = await checkModelExists(modelId);
+
+    if (!modelExists) {
+      // 模型文件不存在，更新缓存
+      await invalidateAsrModelsCache();
+
+      // 提示用户
+      showToast({
+        type: 'warning',
+        title: t('modelConfig.modelFileNotFound'),
+        description: t('modelConfig.modelFileNotFoundDesc'),
+      });
+
+      // 重新加载模型列表，更新界面状态
+      onConfigUpdate?.();
+      return;
+    }
+
+    // 模型存在，保存配置
     const { baseId, quant } = parseModelId(modelId);
     const newConfig: GlobalModelConfig = {
       asrModel: {

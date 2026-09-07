@@ -7,7 +7,7 @@ import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyb
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
-import { subscribeToDownloadComplete } from '../services/downloader';
+import { subscribeToDownloadComplete, invalidateAsrModelsCache } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
 import { getProviderList, getLlmPromptPresets } from '../services/llm';
 import { listen } from '@tauri-apps/api/event';
@@ -148,7 +148,7 @@ export default function HomePanelV2({
 
   // 快捷键监听状态
   const [listeningSceneId, setListeningSceneId] = useState<string | null>(null);
-  const listeningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listeningSceneIdRef = useRef(listeningSceneId);
   const localScenesRef = useRef(localScenes);
   const tryRegisterShortcutRef = useRef(tryRegisterShortcut);
@@ -300,40 +300,18 @@ export default function HomePanelV2({
         return;
       }
 
-      // 初始设为加载中，后端可能在预加载
-      setAsrLoading(true);
-      setAsrModelLoaded(false);
-
+      // 先检查模型状态，不要预设"加载中"
+      // 这样可以保留之前已知的卸载状态（灰点）
       try {
         // 检查模型是否已加载
         const loaded = await isModelLoaded(modelId);
         if (mounted) {
-          setAsrLoading(!loaded);
+          setAsrLoading(false); // 检查完成后，加载状态应该是 false（不是在加载中）
           setAsrModelLoaded(loaded);
           if (loaded) {
             log.debug(`ASR model ${modelId} is already loaded`);
           } else {
-            log.debug(`ASR model ${modelId} is not loaded yet`);
-            // 如果未加载，等待一段时间后再次检查（后端可能正在预加载）
-            setTimeout(async () => {
-              if (!mounted) return;
-              try {
-                const reloaded = await isModelLoaded(modelId);
-                if (mounted) {
-                  setAsrLoading(!reloaded);
-                  setAsrModelLoaded(reloaded);
-                  if (reloaded) {
-                    log.debug(`ASR model ${modelId} loaded after retry`);
-                  }
-                }
-              } catch (e) {
-                log.warn(`Failed to recheck model load status: ${e}`);
-                if (mounted) {
-                  setAsrLoading(false);
-                  setAsrModelLoaded(false);
-                }
-              }
-            }, 2000);
+            log.debug(`ASR model ${modelId} is not loaded`);
           }
         }
       } catch (err) {
@@ -561,10 +539,15 @@ export default function HomePanelV2({
       } else {
         log.warn(`ASR model switch failed: ${result.error}`);
         setAsrModelLoaded(false); // 标记模型未加载
+
+        // 更新模型缓存
+        await invalidateAsrModelsCache();
+
+        // 显示提示：模型文件不存在
         showToast({
           type: 'warning',
-          title: t('common.saved'),
-          description: result.error || '模型加载失败，但配置已保存',
+          title: t('modelConfig.modelFileNotFound'),
+          description: t('modelConfig.modelFileNotFoundDesc'),
         });
       }
 

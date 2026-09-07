@@ -1,11 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback } from 'react';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastMessage {
   id: string;
   type: 'success' | 'info' | 'warning' | 'error';
   title: string;
   description?: string;
+  /** Optional action button */
+  action?: ToastAction;
 }
 
 interface ToastContextType {
@@ -117,6 +124,22 @@ function ToastContainer({
               }`}>
                 {toast.description}
               </p>
+            )}
+            {toast.action && (
+              <button
+                onClick={() => {
+                  toast.action!.onClick();
+                  onDismiss(toast.id);
+                }}
+                className={`mt-2 text-xs font-medium px-2 py-1 rounded-md transition-colors ${
+                  toast.type === 'success' ? 'text-gray-700 bg-gray-200 hover:bg-gray-300' :
+                  toast.type === 'info' ? 'text-gray-700 bg-gray-200 hover:bg-gray-300' :
+                  toast.type === 'warning' ? 'text-amber-700 bg-amber-100 hover:bg-amber-200' :
+                  'text-red-700 bg-red-100 hover:bg-red-200'
+                }`}
+              >
+                {toast.action.label}
+              </button>
             )}
           </div>
 

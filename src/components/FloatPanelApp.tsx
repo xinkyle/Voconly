@@ -65,11 +65,11 @@ function getStatusConfig(status: RecorderStatus, t: (key: string) => string, ski
 }
 
 // Simple waveform component - inline
-function Waveform({ isActive }: { isActive: boolean }) {
+function Waveform({ isActive, isUnavailable }: { isActive: boolean; isUnavailable?: boolean }) {
   return (
     <div className="waveform-container">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className={`wave-bar ${isActive ? 'active' : ''}`} />
+        <div key={i} className={`wave-bar ${isActive ? 'active' : ''} ${isUnavailable ? 'unavailable' : ''}`} />
       ))}
     </div>
   );
@@ -78,10 +78,14 @@ function Waveform({ isActive }: { isActive: boolean }) {
 /**
  * 计算进度 - 时间驱动，95%后减速，最大100%
  */
-function calculateProgress(elapsed: number, estimatedTime: number): number {
+function calculateProgress(elapsed: number, estimatedTime: number, debugId?: string): number {
+  const id = debugId || 'calc';
+
   if (estimatedTime <= 0) {
     // 没有预估时间，缓慢增长到95%
-    return Math.min(95, elapsed / 100);
+    const result = Math.min(95, elapsed / 100);
+    console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms (no estimate) → ${result.toFixed(4)}%`);
+    return result;
   }
 
   const ratio = elapsed / estimatedTime;
@@ -90,7 +94,9 @@ function calculateProgress(elapsed: number, estimatedTime: number): number {
   // 95%之后减速前进（1%速度），避免"卡住"的感觉
   if (baseProgress >= 95) {
     // 最大限制为100%，防止进度无限增长
-    return Math.min(100, 95 + (baseProgress - 95) * 0.01);
+    const result = Math.min(100, 95 + (baseProgress - 95) * 0.01);
+    console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, base=${baseProgress.toFixed(4)}% (>=95%, SLOWDOWN) → ${result.toFixed(4)}%`);
+    return result;
   }
 
   return baseProgress;
@@ -158,6 +164,9 @@ export default function FloatPanelApp() {
   const [voiceDetected, setVoiceDetected] = useState(false);
   const [isCacheReady, setIsCacheReady] = useState(false);
   const prevVoiceDetectedRef = useRef(false); // 追踪上一次的语音检测状态
+
+  // 【新设计】麦克风初始化状态：true 表示正在初始化，显示红灯 + 灰色波浪
+  const [isMicrophoneInitializing, setIsMicrophoneInitializing] = useState(false);
 
   // 预览窗口折叠状态（用户偏好，存储在 localStorage）
   // 默认展开（false = 不折叠，true = 折叠）
@@ -496,6 +505,11 @@ export default function FloatPanelApp() {
             setIsAwaitingTranscribe(false);
             prevVoiceDetectedRef.current = false;
             setVoiceDetected(false);
+            // 【修复】新录音开始时，假设麦克风正在初始化，显示"未准备好"状态
+            // 避免"准备好 → 未准备好 → 准备好"的闪烁
+            // 当收到 recording-started 事件后，会切换为"准备好"
+            setIsMicrophoneInitializing(true);
+            log.debug('[MicInit] 新录音开始，设置 isMicrophoneInitializing=true（假设麦克风正在初始化）');
             // 【Session ID 模式】结束当前会话，旧动画自动过期
             sessionRef.current = null;
             estimatedTimeRef.current = 0;
@@ -553,6 +567,8 @@ export default function FloatPanelApp() {
           isAudioBufferedRef.current = false;
           prevVoiceDetectedRef.current = false;
           setVoiceDetected(false);
+          // 【新设计】重置麦克风初始化状态
+          setIsMicrophoneInitializing(false);
           log.debug('[HIDE-EVENT] 状态已完全重置');
         }, 100);
       }).catch((e) => {
@@ -563,10 +579,33 @@ export default function FloatPanelApp() {
 
     unlistenPromises.push(
       listen<VadStatus>('vad-status', (event) => {
+        console.log(`[TIMING] [FloatPanel] 收到 vad-status 事件 - at: ${Date.now()}ms, isVoice: ${event.payload.isVoice}`);
         log.debug(`Received vad-status: ${JSON.stringify(event.payload)}`);
         setVoiceDetected(event.payload.isVoice);
       }).catch((e) => {
         log.error(`Failed to listen vad-status: ${e}`);
+        return () => {};
+      })
+    );
+
+    // 【新设计】监听麦克风初始化事件：显示红灯 + 灰色波浪
+    unlistenPromises.push(
+      listen<void>('microphone-initializing', () => {
+        log.debug('[Microphone] Received microphone-initializing event, showing red light');
+        setIsMicrophoneInitializing(true);
+      }).catch((e) => {
+        log.error(`Failed to listen microphone-initializing: ${e}`);
+        return () => {};
+      })
+    );
+
+    // 【新设计】监听录音开始事件：切换为绿灯 + 白色波浪
+    unlistenPromises.push(
+      listen<void>('recording-started', () => {
+        log.debug('[Microphone] Received recording-started event, switching to green light');
+        setIsMicrophoneInitializing(false);
+      }).catch((e) => {
+        log.error(`Failed to listen recording-started: ${e}`);
         return () => {};
       })
     );
@@ -1043,17 +1082,33 @@ export default function FloatPanelApp() {
       log.debug(`[ESTIMATE] Final estimated time: ${newEstimatedTime}ms (${totalTime}s)`);
 
       // 【Session ID 模式】如果会话存在，直接更新会话的预估时间
-      // 旧动画会继续使用旧的 startTime，但新的预估时间会影响进度计算
+      // 【修复】确保进度只增不减，避免预估时间变化导致进度回退
       if (sessionRef.current) {
         const currentProgress = progressRef.current;
         const oldEstimated = sessionRef.current.estimated;
+        const sessionId = sessionRef.current.id;
+
+        console.log(`[PROGRESS-ESTIMATE][Session ${sessionId}] 预估时间更新: ${oldEstimated}ms → ${newEstimatedTime}ms, 当前进度=${currentProgress.toFixed(4)}%`);
+
         if (currentProgress > 0) {
           // 调整虚拟 startTime，保持当前进度不变
           // 公式：startTime = now - (progress% × newEstimated)
           const virtualElapsed = (currentProgress / 100) * newEstimatedTime;
-          const oldStartTime = sessionRef.current.startTime;
-          sessionRef.current.startTime = Date.now() - virtualElapsed;
-          log.debug(`[ESTIMATE-Session] Updating session ${sessionRef.current.id}: oldEstimated=${oldEstimated}ms, newEstimated=${newEstimatedTime}ms, progress=${currentProgress.toFixed(1)}%, adjusted startTime from ${oldStartTime} to ${sessionRef.current.startTime}`);
+          const newStartTime = Date.now() - virtualElapsed;
+
+          // 验证：新进度必须 >= 当前进度，防止回退
+          const newElapsed = Date.now() - newStartTime;
+          const newProgress = calculateProgress(newElapsed, newEstimatedTime, `session-${sessionId}-adjust`);
+
+          if (newProgress >= currentProgress) {
+            const oldStartTime = sessionRef.current.startTime;
+            sessionRef.current.startTime = newStartTime;
+            console.log(`[PROGRESS-ESTIMATE][Session ${sessionId}] ✅ startTime 调整: ${oldStartTime} → ${newStartTime}, 验证进度: ${newProgress.toFixed(4)}% >= ${currentProgress.toFixed(4)}%`);
+          } else {
+            // 不调整 startTime，保持原有的进度增长
+            // 新的预估时间只会影响后续的进度增长速度
+            console.log(`[PROGRESS-ESTIMATE][Session ${sessionId}] ⚠️ 跳过 startTime 调整 (防止回退): 当前=${currentProgress.toFixed(4)}%, 新计算=${newProgress.toFixed(4)}%`);
+          }
         }
         sessionRef.current.estimated = newEstimatedTime;
       }
@@ -1135,7 +1190,7 @@ export default function FloatPanelApp() {
         }
 
         const elapsed = now - currentSession.startTime;
-        const baseProgress = calculateProgress(elapsed, currentSession.estimated);
+        const baseProgress = calculateProgress(elapsed, currentSession.estimated, `session-${session.id}`);
 
         // 进度只增不减
         if (baseProgress > progressRef.current) {
@@ -1149,12 +1204,13 @@ export default function FloatPanelApp() {
 
         // 每500ms打印一次进度
         if (Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
-          log.debug(`[RAF] Session ${session.id}: elapsed=${elapsed}ms, progress=${baseProgress.toFixed(2)}%, estimated=${currentSession.estimated}ms`);
+          console.log(`[PROGRESS-RAF][Session ${session.id}] elapsed=${elapsed}ms, progress=${baseProgress.toFixed(4)}%, estimated=${currentSession.estimated}ms`);
         }
 
         requestAnimationFrame(animate);
       };
 
+      console.log(`[PROGRESS-START][Session ${session.id}] 启动进度动画, estimated=${session.estimated}ms`);
       requestAnimationFrame(animate);
 
     } else if (shouldTrack && hasSession) {
@@ -1316,15 +1372,20 @@ export default function FloatPanelApp() {
   // 是否有预览内容（用于决定是否显示折叠按钮）
   const hasPreviewContent = previewVisible && previewText;
 
-  // 状态圆点样式：
-  // - 分段转录开启 + 录音中 + 说话中：绿点（正在实时转录）
-  // - 分段转录开启 + 录音中 + 静音：红点（等待说话）
-  // - 分段转录关闭 + 录音中：红点（等待结束后转录）
-  // - 其他状态：按原状态
-  const actualDotClass: string =
-    segmentTranscribeEnabledRef.current && state.status === 'recording'
-      ? (voiceDetected ? 'transcribing' : 'recording')  // 绿点/红点
-      : statusConfig.dotClass;
+  // 【新设计】状态圆点样式：
+  // - 红灯：麦克风正在初始化，系统未就绪
+  // - 绿灯：系统就绪，可以正常使用（录音中、转录中）
+  const actualDotClass: string = isMicrophoneInitializing ? 'unavailable' : 'ready';
+
+  // 波浪动画颜色：
+  // - 灰色：麦克风正在初始化（系统未就绪）
+  // - 白色：系统就绪，可以正常使用
+  const isWaveformUnavailable = isMicrophoneInitializing;
+
+  // 【新设计】状态文字颜色：
+  // - 灰色：麦克风正在初始化（系统未就绪）
+  // - 白色：系统就绪，可以正常使用
+  const statusTextClass = isMicrophoneInitializing ? 'unavailable' : 'ready';
 
   // 如果显示 LLM 错误状态，渲染错误状态 UI
   if (llmError.visible) {
@@ -1437,10 +1498,10 @@ export default function FloatPanelApp() {
               )}
 
               <span className={`status-dot ${actualDotClass}`} />
-              <span className="status-text">{statusConfig.text}</span>
+              <span className={`status-text ${statusTextClass}`}>{statusConfig.text}</span>
             </div>
 
-            {showWaveform && <Waveform isActive={waveformActive} />}
+            {showWaveform && <Waveform isActive={waveformActive} isUnavailable={isWaveformUnavailable} />}
           </div>
         </div>
         )}

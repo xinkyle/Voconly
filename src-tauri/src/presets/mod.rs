@@ -61,7 +61,7 @@ pub enum ModelType {
 /// - `model_type`: ASR or LLM type
 ///
 /// # ASR-specific Fields (None for LLM models)
-/// - `backend`: Backend type (Onnx/TranscribeCpp)
+/// - `backend`: Backend type (TranscribeCpp)
 /// - `languages`: Supported language codes
 /// - `supports_auto_detect`: Whether the model supports automatic language detection
 ///
@@ -89,7 +89,7 @@ pub struct ModelPreset {
     pub model_type: ModelType,
 
     // ASR-specific fields (None for LLM models)
-    /// Backend type for ASR models (Onnx/TranscribeCpp)
+    /// Backend type for ASR models (TranscribeCpp)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backend: Option<BackendType>,
     /// Supported language codes (ASR only)
@@ -416,7 +416,7 @@ pub fn is_llm_model(model_id: &str) -> bool {
 /// 1. Exact match in ASR presets (case-insensitive)
 /// 2. Base name match in ASR presets (removing quantization suffix, case-insensitive)
 /// 3. LLM models default to TranscribeCpp (GGUF format)
-/// 4. Unknown models: detect from file extension (.onnx → Onnx, others → TranscribeCpp)
+/// 4. Unknown models: default to TranscribeCpp
 pub fn get_model_backend(model_id: &str) -> BackendType {
     // Check ASR presets - exact match (case-insensitive)
     let model_id_lower = model_id.to_lowercase();
@@ -448,12 +448,8 @@ pub fn get_model_backend(model_id: &str) -> BackendType {
         return BackendType::TranscribeCpp;
     }
 
-    // Unknown model: detect from file extension
-    if model_id.contains(".onnx") {
-        BackendType::Onnx
-    } else {
-        BackendType::TranscribeCpp
-    }
+    // Unknown model: default to TranscribeCpp
+    BackendType::TranscribeCpp
 }
 
 /// Check if a model is an ASR model (exact match)
@@ -468,9 +464,9 @@ pub fn is_gguf_model(model_id: &str) -> bool {
 }
 
 /// Check if a model is ONNX format (exact match first)
-pub fn is_onnx_model(model_id: &str) -> bool {
-    let backend = get_model_backend(model_id);
-    backend == BackendType::Onnx
+/// Note: ONNX backend is no longer supported. This function always returns false.
+pub fn is_onnx_model(_model_id: &str) -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -480,31 +476,31 @@ mod tests {
     #[test]
     fn test_asr_preset_creation() {
         let preset = ModelPreset::asr_preset(
-            "sensevoice-small".to_string(),
-            "SenseVoice Small".to_string(),
-            "229MB".to_string(),
-            BackendType::Onnx,
+            "qwen3-asr-1.7b".to_string(),
+            "Qwen3-ASR 1.7B".to_string(),
+            "1.7GB".to_string(),
+            BackendType::TranscribeCpp,
             vec![
                 DownloadSourceInfo {
-                    name: "ModelScope".to_string(),
-                    url: "https://modelscope.cn/models/savagexy23/sensevoice/resolve/main/sensevoice-small.zip".to_string(),
+                    name: "HuggingFace".to_string(),
+                    url: "https://huggingface.co/test/qwen3-asr".to_string(),
                     is_china_accessible: true,
                     priority: 0,
                 },
             ],
             vec!["zh".to_string(), "en".to_string()],
-            Some("Chinese/Cantonese optimized".to_string()),
+            Some("Chinese SOTA ASR model".to_string()),
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming
             Some(false), // supports_translation
-            Some(0.90),  // accuracy_score
-            Some(0.85),  // speed_score
+            Some(0.95),  // accuracy_score
+            Some(0.90),  // speed_score
         );
 
         assert!(preset.is_asr());
         assert!(!preset.is_llm());
-        assert_eq!(preset.id, "sensevoice-small");
-        assert_eq!(preset.backend, Some(BackendType::Onnx));
+        assert_eq!(preset.id, "qwen3-asr-1.7b");
+        assert_eq!(preset.backend, Some(BackendType::TranscribeCpp));
         assert!(preset.languages.contains(&"zh".to_string()));
         assert!(preset.n_gpu_layers.is_none());
         assert_eq!(preset.supports_auto_detect, Some(true));
@@ -544,13 +540,13 @@ mod tests {
     #[test]
     fn test_asr_preset_serialization() {
         let preset = ModelPreset::asr_preset(
-            "sensevoice-small".to_string(),
-            "SenseVoice Small".to_string(),
-            "229MB".to_string(),
-            BackendType::Onnx,
+            "qwen3-asr-1.7b".to_string(),
+            "Qwen3-ASR 1.7B".to_string(),
+            "1.7GB".to_string(),
+            BackendType::TranscribeCpp,
             vec![DownloadSourceInfo {
-                name: "ModelScope".to_string(),
-                url: "https://modelscope.cn/test".to_string(),
+                name: "HuggingFace".to_string(),
+                url: "https://huggingface.co/test/qwen3-asr".to_string(),
                 is_china_accessible: true,
                 priority: 0,
             }],
@@ -559,15 +555,15 @@ mod tests {
             Some(true),  // supports_auto_detect
             Some(false), // supports_streaming
             Some(false), // supports_translation
-            Some(0.90),  // accuracy_score
-            Some(0.85),  // speed_score
+            Some(0.95),  // accuracy_score
+            Some(0.90),  // speed_score
         );
 
         // Serialize to JSON
         let json = serde_json::to_string(&preset).expect("Serialization failed");
 
         // Should contain ASR-specific fields but not LLM-specific fields
-        assert!(json.contains("\"backend\":\"Onnx\""));
+        assert!(json.contains("\"backend\":\"TranscribeCpp\""));
         assert!(json.contains("\"languages\""));
         // Note: field names are in camelCase due to serde(rename_all = "camelCase")
         assert!(json.contains("\"supportsAutoDetect\":true"));
@@ -612,28 +608,28 @@ mod tests {
     #[test]
     fn test_asr_preset_deserialization() {
         let json = r#"{
-            "id": "sensevoice-small",
-            "name": "SenseVoice Small",
-            "size": "229MB",
-            "description": "Chinese optimized",
+            "id": "qwen3-asr-1.7b",
+            "name": "Qwen3-ASR 1.7B",
+            "size": "1.7GB",
+            "description": "Chinese SOTA ASR",
             "download_urls": [
                 {
-                    "name": "ModelScope",
-                    "url": "https://modelscope.cn/test",
+                    "name": "HuggingFace",
+                    "url": "https://huggingface.co/test",
                     "is_china_accessible": true,
                     "priority": 0
                 }
             ],
             "model_type": "asr",
-            "backend": "Onnx",
+            "backend": "TranscribeCpp",
             "languages": ["zh", "en"]
         }"#;
 
         let preset: ModelPreset = serde_json::from_str(json).expect("Deserialization failed");
 
         assert!(preset.is_asr());
-        assert_eq!(preset.id, "sensevoice-small");
-        assert_eq!(preset.backend, Some(BackendType::Onnx));
+        assert_eq!(preset.id, "qwen3-asr-1.7b");
+        assert_eq!(preset.backend, Some(BackendType::TranscribeCpp));
         assert_eq!(preset.languages, vec!["zh".to_string(), "en".to_string()]);
         assert!(preset.n_gpu_layers.is_none());
     }
@@ -668,10 +664,10 @@ mod tests {
         // Test that ASR presets without model_type field still deserialize correctly
         // (default is ASR)
         let json = r#"{
-            "id": "sensevoice-small",
-            "name": "SenseVoice Small",
-            "size": "236MB",
-            "backend": "Onnx",
+            "id": "qwen3-asr-1.7b",
+            "name": "Qwen3-ASR 1.7B",
+            "size": "1.7GB",
+            "backend": "TranscribeCpp",
             "languages": ["zh"]
         }"#;
 
@@ -684,7 +680,7 @@ mod tests {
     #[test]
     fn test_find_preset_by_id() {
         // Should find at least one ASR preset
-        let asr_preset = find_asr_preset_by_id("sensevoice-small");
+        let asr_preset = find_asr_preset_by_id("Qwen3-ASR-1.7B");
         assert!(asr_preset.is_some());
         assert!(asr_preset.unwrap().is_asr());
 

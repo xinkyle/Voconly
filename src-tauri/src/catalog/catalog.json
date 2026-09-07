@@ -207,6 +207,56 @@
       ]
     },
     {
+      "id": "sensevoice-small",
+      "name": "SenseVoice Small",
+      "architecture": "sensevoice",
+      "backend": "TranscribeCpp",
+      "languages": ["zh", "en", "yue", "ja", "ko"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 85,
+      "accuracy_score": 88,
+      "description": "阿里开源，中文粤语效果极佳，支持情感识别，非自回归架构高效推理",
+      "files": [
+        {
+          "filename": "sensevoice-small-Q5_K_M.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 172474880,
+          "is_recommended": true
+        },
+        {
+          "filename": "sensevoice-small-Q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 252684608,
+          "is_recommended": false
+        },
+        {
+          "filename": "sensevoice-small-F16.gguf",
+          "quant": "F16",
+          "size_bytes": 470412128,
+          "is_recommended": false
+        }
+      ],
+      "default_quant": "Q5_K_M",
+      "download_urls": [
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/sensevoice-small-gguf/resolve/main/",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/voconly-org/sensevoice-small-gguf/resolve/main/",
+          "is_china_accessible": false,
+          "priority": 1
+        }
+      ]
+    },
+    {
       "id": "whisper-large-v3-turbo",
       "name": "Whisper Large v3 Turbo",
       "architecture": "whisper",
@@ -253,35 +303,6 @@
           "url": "https://huggingface.co/voconly-org/whisper-large-v3-turbo-gguf/resolve/main/",
           "is_china_accessible": false,
           "priority": 1
-        }
-      ]
-    },
-    {
-      "id": "sensevoice-small",
-      "name": "SenseVoice Small",
-      "architecture": "sensevoice",
-      "backend": "Onnx",
-      "languages": ["zh", "zh-yue", "en", "ja", "ko"],
-      "capabilities": {
-        "streaming": false,
-        "translate": false,
-        "lang_detect": true
-      },
-      "speed_score": 95,
-      "accuracy_score": 86,
-      "description": "纯中文识别效果不错，中英混合识别一般，系统资源要求不高",
-      "download_urls": [
-        {
-          "name": "ModelScope",
-          "url": "https://modelscope.cn/models/voconly/sensevoice-small/resolve/main/sensevoice-small.zip",
-          "is_china_accessible": true,
-          "priority": 0
-        },
-        {
-          "name": "HuggingFace",
-          "url": "https://huggingface.co/voconly-org/sensevoice-small/resolve/main/sensevoice-small.zip",
-          "is_china_accessible": false,
-          "priority": 2
         }
       ]
     }

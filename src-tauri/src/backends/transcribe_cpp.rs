@@ -46,7 +46,7 @@ use std::sync::{Arc, Mutex};
 // Re-export Stream for use in mod.rs trait definition
 pub use transcribe_cpp::Stream;
 use transcribe_cpp::{
-    Backend, Model, ModelOptions, RunOptions, Session, StreamOptions, StreamText, StreamUpdate,
+    Backend, Itn, Model, ModelOptions, RunOptions, Session, StreamOptions, StreamText, StreamUpdate,
     Task,
 };
 
@@ -424,15 +424,25 @@ impl SpeechBackend for TranscribeCppBackend {
             Some(lang)
         };
 
+        // Determine ITN setting based on architecture
+        // SenseVoice requires ITN for punctuation and text normalization
+        let itn = if self.capabilities.architecture.as_deref() == Some("sensevoice") {
+            info!("[TranscribeCppBackend] Enabling ITN for SenseVoice architecture");
+            Itn::On
+        } else {
+            Itn::Default
+        };
+
         let run_options = RunOptions {
             task: Task::Transcribe,
             language,
+            itn,
             ..Default::default()
         };
 
         debug!(
-            "[TranscribeCppBackend] Running transcription with language: {:?}",
-            run_options.language
+            "[TranscribeCppBackend] Running transcription with language: {:?}, itn: {:?}",
+            run_options.language, run_options.itn
         );
 
         // Execute transcription (need to lock session for thread safety)

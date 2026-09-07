@@ -57,6 +57,9 @@ export default function ProviderConfigModal({
   // 是否正在自动连接（首次进入时）
   const [autoConnecting, setAutoConnecting] = useState(false);
 
+  // 高级设置展开状态（默认收起）
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+
   // 已配置时，自动加载模型列表
   useEffect(() => {
     if (isConfigured) {
@@ -337,48 +340,67 @@ export default function ProviderConfigModal({
 
             {/* Ollama 高级配置 */}
             {isOllama && testResult === 'success' && (
-              <div className="space-y-4 pt-4 border-t border-gray-100">
-                <h4 className="text-sm font-medium text-gray-700">
-                  {t('provider.advancedSettings')}
-                </h4>
-
-                {/* Keep Alive 配置 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('provider.keepAlive')}
-                  </label>
-                  <select
-                    value={keepAlive}
-                    onChange={(e) => setKeepAlive(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
+              <div className="pt-4 border-t border-gray-100">
+                {/* 标题栏 + 展开按钮 */}
+                <button
+                  onClick={() => setAdvancedExpanded(!advancedExpanded)}
+                  className="flex items-center gap-2 w-full text-left"
+                >
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${advancedExpanded ? 'rotate-90' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <option value="0">{t('provider.keepAliveOptions.immediate')}</option>
-                    <option value="2m">{t('provider.keepAliveOptions.short')}</option>
-                    <option value="5m">{t('provider.keepAliveOptions.medium')}</option>
-                    <option value="10m">{t('provider.keepAliveOptions.long')}</option>
-                    <option value="-1">{t('provider.keepAliveOptions.always')}</option>
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {t('provider.keepAliveDescription')}
-                  </p>
-                </div>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <h4 className="text-sm font-medium text-gray-700">
+                    {t('provider.advancedSettings')}
+                  </h4>
+                </button>
 
-                {/* Context Limit 配置 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('provider.contextLimit')}
-                  </label>
-                  <input
-                    type="number"
-                    value={contextLimit}
-                    onChange={(e) => setContextLimit(e.target.value)}
-                    placeholder="4096"
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {t('provider.contextLimitDescription')}
-                  </p>
-                </div>
+                {/* 配置内容 - 展开时显示 */}
+                {advancedExpanded && (
+                  <div className="space-y-4 mt-4">
+                    {/* Keep Alive 配置 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('provider.keepAlive')}
+                      </label>
+                      <select
+                        value={keepAlive}
+                        onChange={(e) => setKeepAlive(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
+                      >
+                        <option value="0">{t('provider.keepAliveOptions.immediate')}</option>
+                        <option value="2m">{t('provider.keepAliveOptions.short')}</option>
+                        <option value="5m">{t('provider.keepAliveOptions.medium')}</option>
+                        <option value="10m">{t('provider.keepAliveOptions.long')}</option>
+                        <option value="-1">{t('provider.keepAliveOptions.always')}</option>
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {t('provider.keepAliveDescription')}
+                      </p>
+                    </div>
+
+                    {/* Context Limit 配置 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('provider.contextLimit')}
+                      </label>
+                      <input
+                        type="number"
+                        value={contextLimit}
+                        onChange={(e) => setContextLimit(e.target.value)}
+                        placeholder="4096"
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        {t('provider.contextLimitDescription')}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

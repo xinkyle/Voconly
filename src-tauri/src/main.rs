@@ -1,4 +1,6 @@
-// #![windows_subsystem = "windows"]  // 开发时显示 CMD 控制台窗口
+// Windows: 隐藏 CMD 控制台窗口
+// macOS/Linux: 不需要此属性
+ //#![cfg_attr(windows, windows_subsystem = "windows")]
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,6 +47,7 @@ mod log_settings;
 mod model_manager;
 mod paths;
 mod performance;
+mod permissions;
 mod presets;
 mod updater;
 mod utils; // Crash report module for enhanced crash tracking
@@ -57,7 +60,7 @@ use history::{
 use paths::resolve_resource_path;
 use utils::downloader::{
     cancel_model_download, check_model_exists_cmd, download_model_from_url, download_model_with_source,
-    get_downloading_model_ids, get_model_storage_path_cmd,
+    get_downloading_model_ids, get_model_storage_path_cmd, invalidate_asr_models_cache,
 };
 
 /// Double-tap detection time window (ms)
@@ -381,9 +384,82 @@ fn is_terminal_window() -> bool {
     }
 }
 
-#[cfg(not(windows))]
+/// Detect if the current foreground application is a terminal on macOS
+/// Uses NSWorkspace to get the frontmost application's bundle identifier
+#[cfg(target_os = "macos")]
 fn is_terminal_window() -> bool {
-    // On non-Windows platforms, default to Ctrl+V
+    use cocoa::foundation::NSString;
+    use objc::{class, msg_send, sel, sel_impl};
+    use objc::runtime::Object;
+
+    unsafe {
+        // Get NSWorkspace shared instance
+        let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        if workspace.is_null() {
+            info!("[is_terminal_window] Failed to get NSWorkspace");
+            return false;
+        }
+
+        // Get the frontmost application (NSRunningApplication)
+        let frontmost_app: *mut Object = msg_send![workspace, frontmostApplication];
+        if frontmost_app.is_null() {
+            info!("[is_terminal_window] No frontmost application");
+            return false;
+        }
+
+        // Get bundle identifier (NSString)
+        let bundle_id: *mut Object = msg_send![frontmost_app, bundleIdentifier];
+        if bundle_id.is_null() {
+            info!("[is_terminal_window] No bundle identifier");
+            return false;
+        }
+
+        // Convert to Rust string
+        let bundle_str = NSString::UTF8String(bundle_id);
+        if bundle_str.is_null() {
+            return false;
+        }
+
+        let c_str = std::ffi::CStr::from_ptr(bundle_str);
+        let bundle_id_str = c_str.to_string_lossy().to_lowercase();
+
+        // macOS terminal bundle identifiers
+        let terminal_bundles = [
+            "com.apple.terminal",         // macOS Terminal.app
+            "com.googlecode.iterm2",      // iTerm2
+            "io.alacritty",               // Alacritty
+            "com.github.wez.wezterm",     // WezTerm
+            "dev.warp.warp-stable",       // Warp
+            "com.mitchellh.ghostty",      // Ghostty
+            "org.hammerspoon.Hammerspoon",// Hammerspoon (often used with terminal)
+            "com.kovidgoyal.kitty",       // Kitty
+            "net.kovidgoyal.kitty",       // Kitty (alternative)
+            "com.github.alacritty",       // Alacritty (alternative)
+            "org.vim.macvim",             // MacVim (terminal-like)
+            "com.apple.dt.Xcode",         // Xcode (has terminal)
+        ];
+
+        for terminal_bundle in terminal_bundles {
+            if bundle_id_str.contains(terminal_bundle) {
+                info!(
+                    "[is_terminal_window] Detected terminal by bundle: {}",
+                    bundle_id_str
+                );
+                return true;
+            }
+        }
+
+        info!(
+            "[is_terminal_window] Not a terminal. Bundle: {}",
+            bundle_id_str
+        );
+        false
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn is_terminal_window() -> bool {
+    // On other platforms (Linux, etc.), default to Ctrl+V
     false
 }
 
@@ -395,6 +471,39 @@ async fn get_registered_shortcuts(app: AppHandle) -> Result<Vec<String>, String>
         }
     }
     Ok(Vec::new())
+}
+
+/// 检查辅助功能权限，如果未授权则自动清理老版本的授权条目
+/// （macOS 查询 AX 信任状态，不弹任何系统弹窗；Windows 恒为 true）
+///
+/// 清理逻辑：如果当前未授权，说明列表中的记录（如果有）是无效的，
+/// 可以安全清理，让用户重新授权。
+#[tauri::command]
+fn check_accessibility_permission(app: AppHandle) -> bool {
+    let identifier = app.config().identifier.clone();
+    if permissions::ax_is_trusted(false) {
+        return true;
+    }
+
+    // 未授权 → 清理老条目（包括用户拒绝的记录）
+    // 这不会影响用户的选择权，只是让列表更干净
+    permissions::reset_tcc_service("Accessibility", &identifier);
+    false
+}
+
+/// 请求辅助功能权限：清理失效的授权条目并触发系统重新注册（仅 macOS 有效），
+/// 用户在系统设置里拨动开关即可，无需手动删除旧条目
+#[tauri::command]
+fn request_accessibility_permission(app: AppHandle) -> bool {
+    permissions::request_accessibility(&app.config().identifier)
+}
+
+/// 重置输入监控权限条目（仅 macOS 有效）。
+/// 重置后需要调用 keyhook 的 startListen 来触发授权引导。
+/// 注意：调用此函数前应先确认辅助功能权限已授权。
+#[tauri::command]
+fn reset_input_monitoring_permission(app: AppHandle) {
+    permissions::reset_input_monitoring(&app.config().identifier);
 }
 
 #[tauri::command]
@@ -443,76 +552,139 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let is_terminal = is_terminal_window();
     info!("[simulate_input] Is terminal window: {}", is_terminal);
 
-    // 4. Create enigo instance for simulating keystrokes
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
-        error!("[simulate_input] FAILED to create enigo instance: {}", e);
-        format!("Failed to create enigo instance: {}", e)
-    })?;
+    // 4. Create enigo instance and simulate keystrokes
+    // On macOS, both Enigo::new() and key() must run on main thread
+    #[cfg(target_os = "macos")]
+    {
+        use dispatch2::DispatchQueue;
+        use std::sync::{Arc, Mutex};
 
-    if is_terminal {
-        // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
-        // Ctrl+V doesn't work in these environments
-        info!("[simulate_input] Using Shift+Insert for terminal");
+        info!("[simulate_input] Using Cmd+V for macOS");
 
-        enigo
-            .key(Key::Shift, enigo::Direction::Press)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to press Shift: {}", e);
-                format!("Failed to press Shift: {}", e)
-            })?;
+        // exec_sync doesn't support return values, use Arc<Mutex> to pass errors
+        let error_msg = Arc::new(Mutex::new(None::<String>));
+        let error_msg_clone = error_msg.clone();
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+        DispatchQueue::main().exec_sync(move || {
+            // 关闭 enigo 内置的系统授权弹窗：无权限时不再每次转录都弹系统窗，
+            // 而是返回结构化错误，由前端做一次性引导（文字已写入剪贴板，可手动 ⌘V）
+            let settings = Settings {
+                open_prompt_to_get_permissions: false,
+                ..Settings::default()
+            };
+            let mut enigo = match Enigo::new(&settings) {
+                Ok(e) => e,
+                Err(enigo::NewConError::NoPermission) => {
+                    error!("[simulate_input] macOS accessibility permission denied; text kept in clipboard");
+                    *error_msg_clone.lock().unwrap() = Some("ACCESSIBILITY_DENIED".to_string());
+                    return;
+                }
+                Err(e) => {
+                    error!("[simulate_input] FAILED to create enigo instance: {}", e);
+                    *error_msg_clone.lock().unwrap() = Some(format!("Failed to create enigo instance: {}", e));
+                    return;
+                }
+            };
 
-        enigo
-            .key(Key::Insert, enigo::Direction::Click)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to click Insert: {}", e);
-                format!("Failed to click Insert: {}", e)
-            })?;
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Press) {
+                error!("[simulate_input] FAILED to press Meta: {}", e);
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to press Meta: {}", e));
+                return;
+            }
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        enigo
-            .key(Key::Shift, enigo::Direction::Release)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to release Shift: {}", e);
-                format!("Failed to release Shift: {}", e)
-            })?;
-    } else {
-        // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
-        // This avoids the Insert key "overwrite mode" issue
-        info!("[simulate_input] Using Ctrl+V for regular application");
-
-        enigo
-            .key(Key::Control, enigo::Direction::Press)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to press Control: {}", e);
-                format!("Failed to press Control: {}", e)
-            })?;
-
-        std::thread::sleep(std::time::Duration::from_millis(30));
-
-        enigo
-            .key(Key::Unicode('v'), enigo::Direction::Click)
-            .map_err(|e| {
+            if let Err(e) = enigo.key(Key::Unicode('v'), enigo::Direction::Click) {
                 error!("[simulate_input] FAILED to click V: {}", e);
-                format!("Failed to click V: {}", e)
-            })?;
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to click V: {}", e));
+                return;
+            }
 
-        std::thread::sleep(std::time::Duration::from_millis(30));
+            std::thread::sleep(std::time::Duration::from_millis(30));
 
-        enigo
-            .key(Key::Control, enigo::Direction::Release)
-            .map_err(|e| {
-                error!("[simulate_input] FAILED to release Control: {}", e);
-                format!("Failed to release Control: {}", e)
-            })?;
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Release) {
+                error!("[simulate_input] FAILED to release Meta: {}", e);
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to release Meta: {}", e));
+                return;
+            }
+        });
+
+        // Check if any error occurred
+        if let Some(err) = error_msg.lock().unwrap().take() {
+            return Err(err);
+        }
+        info!("[simulate_input] Paste operation completed");
     }
 
-    info!("[simulate_input] Paste operation completed");
+    #[cfg(target_os = "windows")]
+    {
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
+            error!("[simulate_input] FAILED to create enigo instance: {}", e);
+            format!("Failed to create enigo instance: {}", e)
+        })?;
 
-    // Drop enigo first
-    drop(enigo);
+        if is_terminal {
+            // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
+            // Ctrl+V doesn't work in these environments
+            info!("[simulate_input] Using Shift+Insert for terminal");
+
+            enigo
+                .key(Key::Shift, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Shift: {}", e);
+                    format!("Failed to press Shift: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Insert, enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click Insert: {}", e);
+                    format!("Failed to click Insert: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Shift, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Shift: {}", e);
+                    format!("Failed to release Shift: {}", e)
+                })?;
+        } else {
+            // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
+            // This avoids the Insert key "overwrite mode" issue
+            info!("[simulate_input] Using Ctrl+V for regular application");
+
+            enigo
+                .key(Key::Control, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Control: {}", e);
+                    format!("Failed to press Control: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Unicode('v'), enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click V: {}", e);
+                    format!("Failed to click V: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Control, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Control: {}", e);
+                    format!("Failed to release Control: {}", e)
+                })?;
+        }
+
+        info!("[simulate_input] Paste operation completed");
+    }
 
     // 4. Restore old clipboard content after a delay
     if let Some(old_text) = old_clipboard {
@@ -676,6 +848,27 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
 
     info!("[show_float_panel] Event emitted to float-panel window");
 
+    // 【优化】首次显示时预初始化音频捕获（减少首次录音延迟）
+    // 如果 audio_capture 未初始化，异步调用预初始化
+    let app_state = app.state::<AppState>();
+    let needs_preinit = {
+        let capture_guard = app_state.audio_capture.lock().map_err(|e| e.to_string())?;
+        capture_guard.is_none()
+    };
+
+    if needs_preinit {
+        info!("[show_float_panel] 首次显示浮动面板，异步预初始化音频捕获...");
+        let app_for_preinit = app.clone();
+        // 异步执行，不阻塞窗口显示
+        tokio::spawn(async move {
+            if let Err(e) = crate::preinit_audio_capture(app_for_preinit).await {
+                warn!("[show_float_panel] 预初始化音频捕获失败: {}", e);
+            } else {
+                info!("[show_float_panel] 预初始化音频捕获完成");
+            }
+        });
+    }
+
     // Check if the panel is already shown using our tracked state
     let already_shown = app
         .try_state::<AppState>()
@@ -687,22 +880,31 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
         if let Ok(monitor) = float_window.primary_monitor() {
             if let Some(monitor) = monitor {
                 let monitor_size = monitor.size();
+                let scale_factor = monitor.scale_factor();
 
                 // 初始显示：药丸模式（仅显示状态栏）
-                let window_width = 520u32;
-                let window_height = 60u32; // 药丸高度：60 物理像素
+                // 使用逻辑像素，统一所有平台的视觉大小
+                let window_width_logical = 480.0; // 窗口宽度
+                let window_height_logical = 40.0; // 药丸高度：40 逻辑像素（与 set_float_panel_height 保持一致）
+
+                // 转换为物理像素用于定位计算
+                let window_width_physical = (window_width_logical * scale_factor) as i32;
+                let window_height_physical = (window_height_logical * scale_factor) as i32;
 
                 // 计算窗口位置：底部居中，距任务栏固定间距
-                let x = (monitor_size.width as i32 - window_width as i32) / 2;
-                let y = monitor_size.height as i32 - window_height as i32 - 80;
+                let x = (monitor_size.width as i32 - window_width_physical) / 2;
+                let y = monitor_size.height as i32 - window_height_physical - 80;
 
-                // 设置窗口大小和位置
-                let _ = float_window.set_size(PhysicalSize::new(window_width, window_height));
+                // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
+                let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                    window_width_logical,
+                    window_height_logical,
+                )));
                 let _ = float_window.set_position(PhysicalPosition::new(x, y));
 
                 info!(
-                    "Float panel positioned at: x={}, y={}, height={} (pill mode)",
-                    x, y, window_height
+                    "Float panel positioned at: x={}, y={}, height={}px (logical), scale_factor={}",
+                    x, y, window_height_logical, scale_factor
                 );
             }
         }
@@ -791,7 +993,8 @@ async fn hide_float_panel(app: AppHandle, reason: Option<String>) -> Result<(), 
     if let Some(float_window) = app.get_webview_window("float-panel") {
         // 【关键修复】先将窗口大小设置为最小，避免隐藏后仍遮挡鼠标事件
         // 透明窗口即使隐藏后，其区域仍可能接收鼠标事件
-        let _ = float_window.set_size(PhysicalSize::new(1, 1));
+        // 使用逻辑像素，与显示时保持一致
+        let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1.0, 1.0)));
 
         float_window
             .hide()
@@ -838,32 +1041,41 @@ async fn set_float_panel_height(
     if let Ok(monitor) = float_window.primary_monitor() {
         if let Some(monitor) = monitor {
             let monitor_size = monitor.size();
+            let scale_factor = monitor.scale_factor();
 
-            // 使用 PhysicalSize 设置物理像素尺寸
-            let window_width = 520u32;
+            // 使用逻辑像素设置窗口大小，统一所有平台的视觉高度
+            let window_width_logical = 480.0; // 窗口宽度
 
-            // 根据高度档位设置不同的展开高度
-            let target_height = if expanded {
+            // 根据高度档位设置不同的展开高度（逻辑像素）
+            // 压缩到原来的 2/3，所有平台呈现相同的视觉高度
+            let target_height_logical = if expanded {
                 match preview_height.as_deref() {
-                    Some("low") => 150u32,    // 低：约3行
-                    Some("medium") => 280u32, // 中：适中
-                    _ => 500u32,              // 高（默认）：500px
+                    Some("low") => 100.0,    // 低：约3行文字
+                    Some("medium") => 160.0, // 中：约5行文字
+                    _ => 280.0,              // 高（默认）：约10行文字
                 }
             } else {
-                60u32 // 药丸高度：60 物理像素
+                40.0 // 药丸高度：40 逻辑像素
             };
 
-            // 计算窗口位置：底部居中，距任务栏固定间距
-            let x = (monitor_size.width as i32 - window_width as i32) / 2;
-            let y = monitor_size.height as i32 - target_height as i32 - 80;
+            // 转换为物理像素用于定位计算
+            let window_width_physical = (window_width_logical * scale_factor) as i32;
+            let target_height_physical = (target_height_logical * scale_factor) as i32;
 
-            // 设置窗口大小和位置（物理像素）
-            let _ = float_window.set_size(PhysicalSize::new(window_width, target_height));
+            // 计算窗口位置：底部居中，距任务栏固定间距
+            let x = (monitor_size.width as i32 - window_width_physical) / 2;
+            let y = monitor_size.height as i32 - target_height_physical - 80;
+
+            // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
+            let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                window_width_logical,
+                target_height_logical,
+            )));
             let _ = float_window.set_position(PhysicalPosition::new(x, y));
 
             info!(
-                "Float panel height set to: {}px (expanded={}, preview_height={:?})",
-                target_height, expanded, preview_height
+                "Float panel height set to: {}px logical ({}px physical at scale_factor={}), expanded={}, preview_height={:?}",
+                target_height_logical, target_height_physical, scale_factor, expanded, preview_height
             );
         }
     }
@@ -1019,6 +1231,48 @@ async fn enable_autostart() -> Result<(), String> {
 
         info!("Autostart enabled successfully via registry");
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
+
+        let plist_content = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.voconly.desktop</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>"#,
+            exe_path.display()
+        );
+
+        // 确保 LaunchAgents 目录存在
+        if let Some(parent) = plist_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建 LaunchAgents 目录失败: {}", e))?;
+        }
+
+        std::fs::write(&plist_path, plist_content)
+            .map_err(|e| format!("写入 plist 文件失败: {}", e))?;
+
+        info!("Autostart enabled successfully via LaunchAgent");
+    }
+
     Ok(())
 }
 
@@ -1045,6 +1299,22 @@ async fn disable_autostart() -> Result<(), String> {
             return Err("Failed to open registry key for writing".to_string());
         }
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        if plist_path.exists() {
+            std::fs::remove_file(&plist_path)
+                .map_err(|e| format!("删除 plist 文件失败: {}", e))?;
+            info!("Autostart disabled successfully via LaunchAgent removal");
+        } else {
+            info!("LaunchAgent plist not found, nothing to disable");
+        }
+    }
+
     Ok(())
 }
 
@@ -1060,17 +1330,31 @@ async fn is_autostart_enabled() -> Result<bool, String> {
             let result: Result<String, _> = key.get_value("Voconly");
             return Ok(result.is_ok());
         }
+        return Ok(false);
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        let plist_path = dirs::home_dir()
+            .map(|p| p.join("Library/LaunchAgents/com.voconly.desktop.plist"))
+            .ok_or("无法获取用户主目录")?;
+
+        return Ok(plist_path.exists());
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     Ok(false)
 }
 
 /// Start VAD-based recording
 #[tauri::command]
 async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), String> {
-    info!("Starting VAD recording... (scene: {})", scene_id);
+    let start_time = std::time::Instant::now();
+    info!("[TIMING] [Main] start_vad_recording 命令入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
 
     // Get VAD model path from Application directory
     let vad_model_path = resolve_resource_path("resources/models/silero_vad_v6.2.1_16k.onnx")?;
+    info!("[TIMING] [Main] 获取 VAD 模型路径后 - elapsed: {}ms", start_time.elapsed().as_millis());
     info!("VAD model path: {:?}", vad_model_path);
 
     // 从配置读取分段转录开关
@@ -1083,7 +1367,9 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     let state = app.state::<AppState>();
 
     // Get or create audio capture
+    let get_capture_start = std::time::Instant::now();
     let mut capture_guard = state.audio_capture.lock().map_err(|e| e.to_string())?;
+    info!("[TIMING] [Main] 获取/创建 AudioCapture 前 - elapsed: {}ms", start_time.elapsed().as_millis());
 
     let capture = match capture_guard.as_mut() {
         Some(c) => c,
@@ -1095,11 +1381,25 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
             capture_guard.as_mut().unwrap()
         }
     };
+    info!("[TIMING] [Main] 获取/创建 AudioCapture 后 - elapsed: {}ms", start_time.elapsed().as_millis());
+
+    // 【新设计】发送麦克风初始化事件，让前端显示红灯 + 灰色波浪
+    if let Err(e) = app.emit("microphone-initializing", ()) {
+        warn!("[TIMING] Failed to emit microphone-initializing event: {}", e);
+    } else {
+        info!("[TIMING] Emitted microphone-initializing event");
+    }
 
     // Open microphone if not already open
-    capture
-        .open()
-        .map_err(|e| format!("Failed to open microphone: {}", e))?;
+    let open_start = std::time::Instant::now();
+    info!("[TIMING] [Main] 调用 capture.open() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
+    if let Err(e) = capture.open() {
+        // 清空半初始化的 capture 实例，下次会重新创建
+        // 场景：麦克风被拔掉后，旧的 capture 实例指向已断开的设备，即使重新插上也无法使用
+        *capture_guard = None;
+        return Err(format!("Failed to open microphone: {}", e));
+    }
+    info!("[TIMING] [Main] 调用 capture.open() 后 - elapsed: {}ms (open耗时: {}ms)", start_time.elapsed().as_millis(), open_start.elapsed().as_millis());
 
     // Apply streaming mode setting
     if streaming_enabled {
@@ -1109,9 +1409,12 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     }
 
     // Start recording
+    let record_start = std::time::Instant::now();
+    info!("[TIMING] [Main] 调用 capture.start() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
     capture
         .start(&scene_id)
         .map_err(|e| format!("Failed to start recording: {}", e))?;
+    info!("[TIMING] [Main] 调用 capture.start() 后 - elapsed: {}ms (start耗时: {}ms)", start_time.elapsed().as_millis(), record_start.elapsed().as_millis());
 
     // Set is_recording flag to true
     {
@@ -1119,8 +1422,16 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
         *is_recording_guard = true;
     }
 
+    // 发送录音开始事件，让前端立即显示波浪动画
+    if let Err(e) = app.emit("recording-started", ()) {
+        warn!("[TIMING] Failed to emit recording-started event: {}", e);
+    } else {
+        info!("[TIMING] Emitted recording-started event");
+    }
+
     info!(
-        "VAD recording started successfully (streaming: {})",
+        "[TIMING] [Main] VAD recording started successfully (总耗时: {}ms, streaming: {})",
+        start_time.elapsed().as_millis(),
         streaming_enabled
     );
     Ok(())
@@ -1155,8 +1466,7 @@ async fn set_streaming_mode(app: AppHandle, enabled: bool) -> Result<(), String>
 /// This loads the VAD model so that subsequent recordings can start faster
 /// Note: We do NOT open the microphone stream here, to avoid showing the
 /// microphone-in-use indicator in the system tray on startup
-#[tauri::command]
-async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
+fn preinit_audio_capture_internal(app: AppHandle) -> Result<(), String> {
     info!("Pre-initializing audio capture (loading VAD model only)...");
 
     // Get VAD model path from Application directory
@@ -1182,6 +1492,11 @@ async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
 
     info!("Audio capture pre-initialized successfully (VAD model loaded)");
     Ok(())
+}
+
+#[tauri::command]
+async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
+    preinit_audio_capture_internal(app)
 }
 
 /// Stop VAD-based recording
@@ -1628,17 +1943,6 @@ fn main() {
     );
 
     // Load config first to initialize model manager
-    #[cfg(windows)]
-    unsafe {
-        let dpi_start = Instant::now();
-        let _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        info!(
-            "[STARTUP] DPI 设置完成, 耗时: {}ms",
-            dpi_start.elapsed().as_millis()
-        );
-    }
-
-    // Load config first to initialize model manager
     let config_start = Instant::now();
     let config = load_config()
         .map(|r| r.config)
@@ -1778,8 +2082,8 @@ fn main() {
                         .filter(move |metadata| console_filter_clone.enabled(metadata)),
                     // 通道 2: 文件输出
                     Target::new(TargetKind::Folder {
-                        path: app_data_dir.join("logs"),
-                        file_name: Some("talk-free".into()),
+                        path: paths::logs_dir().expect("Failed to get logs directory"),
+                        file_name: Some("voconly".into()),
                     })
                     .filter(|metadata| {
                         let file_level =
@@ -1795,6 +2099,9 @@ fn main() {
             unregister_all_shortcuts,
             get_registered_shortcuts,
             simulate_input,
+            check_accessibility_permission,
+            request_accessibility_permission,
+            reset_input_monitoring_permission,
             load_config,
             save_config,
             get_model_storage_path,
@@ -1871,6 +2178,7 @@ fn main() {
             download_model_from_url,
             get_model_storage_path_cmd,
             check_model_exists_cmd,
+            invalidate_asr_models_cache,
             cancel_model_download,
             get_downloading_model_ids,
             open_model_folder,
@@ -1964,8 +2272,9 @@ fn main() {
                 .resizable(true)
                 .fullscreen(false)
                 .decorations(false)
+                .shadow(false) // 禁用系统阴影，使用 CSS 控制边框和阴影
                 .always_on_top(false)
-                .transparent(false)
+                .transparent(true) // 透明窗口，让 CSS 控制外观，确保跨平台一致
                 .skip_taskbar(false)
                 .visible(false) // Initially hidden, show after page loads
                 .center()
@@ -1973,14 +2282,14 @@ fn main() {
                 .on_page_load(|window, _payload| {
                     debug!("[STARTUP] Main window page loaded, showing window");
                     let _ = window.show();
+                    let _ = window.set_focus();
                 })
                 .build()
                 .expect("Failed to create main window");
 
-            // Set main window background color to match HTML background (#F5F5F7)
-            // This ensures the window shows correct color immediately when shown
+            // 透明窗口：背景色完全透明，由 HTML/CSS 控制外观
             let _ = main_window
-                .set_background_color(Some(tauri::window::Color(0xF5, 0xF5, 0xF7, 0xFF)));
+                .set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
 
             debug!(
                 "[STARTUP] 主窗口创建完成 (初始隐藏, 页面加载后显示), 耗时: {}ms",
@@ -1988,6 +2297,8 @@ fn main() {
             );
 
             // Create float panel window with same WebView data directory
+            // 窗口高度统一使用逻辑像素，让 Tauri 自动处理 DPI 缩放
+            // 药丸模式：60px，展开模式：最大 500px
             let float_window_start = Instant::now();
             let float_window = WebviewWindowBuilder::new(
                 app,
@@ -1995,7 +2306,7 @@ fn main() {
                 tauri::WebviewUrl::App("float.html".into()),
             )
             .title("Voconly 悬浮窗")
-            .inner_size(520.0, 160.0)
+            .inner_size(480.0, 40.0) // 药丸：480px 宽 × 40px 高
             .resizable(false)
             .decorations(false)
             .always_on_top(true)
@@ -2124,6 +2435,16 @@ fn main() {
                                 }
                             }
 
+                            // 【macOS Metal 修复】等待 GPU 操作完成
+                            // Metal 的 ResidencySet 需要等待所有 GPU 操作完成才能正确销毁
+                            // 否则在退出时会触发断言错误：GGML_ASSERT([rsets->data count] == 0)
+                            #[cfg(target_os = "macos")]
+                            {
+                                info!("[Quit] 等待 Metal 资源同步...");
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                info!("[Quit] Metal 资源同步完成");
+                            }
+
                             info!("[Quit] 所有资源清理完成，退出应用");
                             app.exit(0);
                         }
@@ -2200,28 +2521,59 @@ fn main() {
             // ===== 异步预加载常驻模型 =====
             // 在窗口显示后后台加载，避免阻塞启动
             // 包括 GPU 加速器初始化和模型预加载
-            info!("[STARTUP] 启动后台初始化线程...");
+            info!("[STARTUP] 准备后台初始化线程（等待前端就绪）...");
             let preload_thread_start = Instant::now();
             let app_for_preload = app.handle().clone();
+
+            // 创建通道用于通知前端就绪
+            let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+
+            // 注册一次性事件监听器，等待前端发送 "app-ready" 事件
+            let app_for_listener = app.handle().clone();
+            let ready_tx_clone = ready_tx.clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri::Listener;
+
+                let unlisten = app_for_listener.listen("app-ready", move |_event| {
+                    info!("[AsyncInit] 收到前端 app-ready 事件");
+                    let _ = ready_tx_clone.send(());
+                });
+
+                // 最多等待 10 秒，超时后自动移除监听器
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                drop(unlisten);
+            });
+
+            // 后台初始化线程
             std::thread::spawn(move || {
                 let async_init_start = Instant::now();
-                info!("[AsyncInit] 后台初始化线程开始");
+                info!("[AsyncInit] 后台初始化线程启动，等待前端就绪...");
 
-                // 等待 WebView 完全渲染
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                info!(
-                    "[AsyncInit] WebView 渲染等待完成, 耗时: {}ms",
-                    async_init_start.elapsed().as_millis()
-                );
+                // 等待前端发送 "app-ready" 事件（最多等待 5 秒，超时也继续）
+                let wait_result = ready_rx.recv_timeout(std::time::Duration::from_secs(5));
+
+                if wait_result.is_ok() {
+                    info!(
+                        "[AsyncInit] 前端已就绪，开始预加载，等待耗时: {}ms",
+                        async_init_start.elapsed().as_millis()
+                    );
+                } else {
+                    warn!("[AsyncInit] 未收到前端就绪事件（超时 5 秒），仍然开始预加载");
+                }
+
+                // 0. 预初始化音频捕获（加载 VAD 模型，减少首次录音延迟）
+                let preinit_audio_start = Instant::now();
+                info!("[AsyncInit] 预初始化音频捕获（VAD 模型）...");
+                if let Err(e) = preinit_audio_capture_internal(app_for_preload.clone()) {
+                    warn!("[AsyncInit] 预初始化音频捕获失败: {}", e);
+                } else {
+                    info!(
+                        "[AsyncInit] 预初始化音频捕获完成, 耗时: {}ms",
+                        preinit_audio_start.elapsed().as_millis()
+                    );
+                }
 
                 // 1. 初始化 GPU 加速器
-                let onnx_gpu_start = Instant::now();
-                crate::backends::onnx::apply_ort_accelerator("cuda");
-                info!(
-                    "[AsyncInit] ONNX GPU 加速器初始化完成, 耗时: {}ms",
-                    onnx_gpu_start.elapsed().as_millis()
-                );
-
                 // Initialize transcribe-cpp backend (for GGUF ASR models like Qwen3-ASR)
                 // This loads Vulkan/Metal/CUDA backend modules before any model load
                 let transcribe_cpp_start = Instant::now();
@@ -2237,7 +2589,17 @@ fn main() {
                     if let Ok(mut mgr_guard) = state.model_manager.lock() {
                         if let Some(mgr) = mgr_guard.as_mut() {
                             info!("[AsyncInit] 开始预加载常驻模型...");
-                            mgr.preload_always_models();
+                            // 传入 app_handle 以发送加载事件
+                            match mgr.preload_always_models(Some(app_for_preload.clone())) {
+                                Ok(model_id) => {
+                                    if !model_id.is_empty() {
+                                        info!("[AsyncInit] 预加载成功: {}", model_id);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("[AsyncInit] 预加载失败: {}", e);
+                                }
+                            }
                             info!(
                                 "[AsyncInit] 预加载完成, 耗时: {}ms",
                                 preload_start.elapsed().as_millis()
@@ -2344,11 +2706,25 @@ fn main() {
             debug!("[STARTUP] ASR 模型闲置检测定时器已启动");
 
             Ok(())
-        })
-        .run(tauri::generate_context!());
+        });
 
-    if let Err(e) = result {
-        error!("Error running Tauri application: {:?}", e);
-        std::process::exit(1);
-    }
+    // 构建应用
+    let app = result
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    // 运行应用并处理 macOS Dock 图标点击重新打开窗口
+    app.run(|app, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+            // has_visible_windows 为 false 表示没有可见窗口，需要重新显示
+            if !has_visible_windows {
+                if let Some(main_window) = app.get_webview_window("main") {
+                    info!("[macOS] Reopening main window on Dock click");
+                    let _ = main_window.show();
+                    let _ = main_window.set_focus();
+                }
+            }
+        }
+    });
 }

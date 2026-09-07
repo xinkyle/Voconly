@@ -10,6 +10,7 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [],
     "security": {
       "csp": null
@@ -18,7 +19,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis"],
+    "targets": ["nsis", "dmg", "app"],
     "icon": [
       "icons/64x64.png",
       "icons/128x128.png",
@@ -28,6 +29,9 @@
     ],
     "resources": {
       "resources/models/*": "resources/models/"
+    },
+    "macOS": {
+      "entitlements": "./entitlements.plist"
     },
     "windows": {
       "nsis": {

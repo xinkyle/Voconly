@@ -12,7 +12,7 @@ import ProviderPanel from './components/ProviderPanel';
 import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
-import { loadConfig, saveConfig, loadConfigWithNotice } from './services/config';
+import { loadConfig, saveConfig, loadConfigWithNotice, parseModelId } from './services/config';
 import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, type DownloadProgress } from './services/downloader';
   import { updateTrayMenu } from './services/tray';
 import { useSceneShortcuts } from './hooks/useShortcut';
@@ -32,6 +32,7 @@ import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
 import { checkModelExists } from './services/downloader';
+import { switchAsrModel } from './services/whisper';
 import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
@@ -39,7 +40,10 @@ import { countWords, getSceneNameFromPromptType } from './utils/i18n';
 import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
+import AccessibilityBanner from './components/AccessibilityBanner';
+import AccessibilityModal from './components/AccessibilityModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
+import { checkAccessibilityPermission, requestAccessibilityPermission, resetInputMonitoringPermission } from './services/permissions';
 import type { RemoteVersionInfo } from './types/updater';
 import { eventManager } from './services/eventManager';
 
@@ -145,6 +149,9 @@ function App() {
   // Trigger model selection from App.tsx (used when download fails and user wants to select other model)
   const [triggerSelectModelSceneId, setTriggerSelectModelSceneId] = useState<string | null>(null);
 
+  // Pending download model ID (used when user clicks download in shortcut trigger dialog)
+  const [pendingDownloadModelId, setPendingDownloadModelId] = useState<string | null>(null);
+
   // Update dialog state
   const [hasUpdate, setHasUpdate] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -154,6 +161,13 @@ function App() {
   // Permission modal state
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [permissionChecked, setPermissionChecked] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false); // 标记权限是否被拒绝
+
+  // Accessibility permission state (macOS only, other platforms always granted)
+  const [showAccessibilityBanner, setShowAccessibilityBanner] = useState(false);
+  const [showAccessibilityModal, setShowAccessibilityModal] = useState(false);
+  const [accessibilityChecked, setAccessibilityChecked] = useState(false);
+  const [showKeyhookBanner, setShowKeyhookBanner] = useState(false);
 
   // Download error dialog state
   const [showDownloadErrorDialog, setShowDownloadErrorDialog] = useState(false);
@@ -184,11 +198,13 @@ function App() {
         // First time - request permission directly (system will show its own dialog)
         const granted = await requestMicrophonePermission();
         if (!granted) {
-          // User denied - show our guidance modal
+          // User denied - show our guidance modal with "打开系统设置" button
+          setPermissionDenied(true);
           setShowPermissionModal(true);
         }
       } else if (state === 'denied') {
-        // Previously denied - show guidance modal
+        // Previously denied - show guidance modal with "打开系统设置" button
+        setPermissionDenied(true);
         setShowPermissionModal(true);
       }
       // 'granted' - nothing to do
@@ -197,6 +213,30 @@ function App() {
       log.error(`Permission check failed: ${error}`);
     }
   }, [permissionChecked]);
+
+  // Check accessibility permission (macOS only)
+  const checkAccessibility = useCallback(async () => {
+    if (accessibilityChecked) return;
+
+    try {
+      const granted = await checkAccessibilityPermission();
+      log.info(`Accessibility permission: ${granted}`);
+
+      if (!granted) {
+        // 未授权 → 显示引导弹窗（首次）或横幅（后续）
+        setShowAccessibilityModal(!showAccessibilityBanner);
+        setShowAccessibilityBanner(true);
+      } else {
+        // 已授权 → 清除所有引导 UI
+        setShowAccessibilityBanner(false);
+        setShowAccessibilityModal(false);
+      }
+      setAccessibilityChecked(true);
+    } catch (error) {
+      log.error(`Accessibility check failed: ${error}`);
+      setAccessibilityChecked(true); // 失败时也标记已检查，避免反复尝试
+    }
+  }, [accessibilityChecked, showAccessibilityBanner]);
 
   // Check permission when config is loaded and tutorial is already completed
   useEffect(() => {
@@ -295,6 +335,86 @@ function App() {
       unlistenRef.current?.();
     };
   }, []);
+
+  // Listen for accessibility permission denied (paste failed on macOS)
+  useEffect(() => {
+    const handleAccessibilityDenied = () => {
+      log.info('Accessibility permission denied during paste');
+      setShowAccessibilityBanner(true);
+      showToast({ type: 'warning', title: t('accessibility.pasteFailedToast') });
+    };
+    window.addEventListener('voconly:accessibility-denied', handleAccessibilityDenied);
+    return () => window.removeEventListener('voconly:accessibility-denied', handleAccessibilityDenied);
+  }, [showToast, t]);
+
+  // Listen for keyhook listen state (keyboard monitoring permission on macOS)
+  useEffect(() => {
+    const unlistenStarted = { current: null as (() => void) | null };
+    const unlistenFailed = { current: null as (() => void) | null };
+    let mounted = true;
+
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (!mounted) return;
+
+      listen<void>('keyhook:listen-started', () => {
+        log.info('Keyhook started, clearing keyhook banner');
+        setShowKeyhookBanner(false);
+      }).then(fn => { if (mounted) unlistenStarted.current = fn; });
+
+      listen<void>('keyhook:listen-failed', () => {
+        log.info('Keyhook failed, showing keyhook banner');
+        setShowKeyhookBanner(true);
+      }).then(fn => { if (mounted) unlistenFailed.current = fn; });
+    });
+
+    return () => {
+      mounted = false;
+      unlistenStarted.current?.();
+      unlistenFailed.current?.();
+    };
+  }, []);
+
+  // Re-check permissions when window regains focus (user may have authorized in system settings)
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (showAccessibilityBanner) {
+        // 检查辅助功能权限（静默检查，不会触发弹窗）
+        log.info('Window focused, re-checking accessibility permission');
+        const granted = await checkAccessibilityPermission();
+        if (granted) {
+          setShowAccessibilityBanner(false);
+          // 辅助功能已授权，尝试重启键盘监听
+          try {
+            const { commands } = await import('@tauri-keyhook');
+            const isListening = await commands.isListening();
+            if (!isListening) {
+              log.info('Restarting keyhook listener after accessibility permission granted');
+              await commands.startListen();
+            }
+          } catch (err) {
+            log.error(`Failed to restart keyhook: ${err}`);
+          }
+        }
+      }
+      if (showKeyhookBanner) {
+        // keyhook 横幅显示时，尝试重启键盘监听
+        // 如果成功，keyhook 会发送 listen-started 事件，清除横幅
+        // 如果失败，keyhook 会发送 listen-failed 事件，保持横幅
+        try {
+          const { commands } = await import('@tauri-keyhook');
+          const isListening = await commands.isListening();
+          if (!isListening) {
+            log.info('Window focused, trying to restart keyhook');
+            await commands.startListen();
+          }
+        } catch (err) {
+          log.error(`Failed to restart keyhook: ${err}`);
+        }
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [showAccessibilityBanner, showKeyhookBanner]);
 
   // Listen for recording cancelled event from float panel
   useEffect(() => {
@@ -419,7 +539,78 @@ function App() {
       });
       // Reload config to update downloaded status
       loadConfig()
-        .then(cfg => setConfig(cfg))
+        .then(cfg => {
+          if (!mounted) return;
+          setConfig(cfg);
+
+          // Check if the downloaded model matches the configured ASR model
+          const downloadedModel = parseModelId(event.modelId);
+          const currentAsrModel = cfg?.globalModelConfig?.asrModel;
+
+          if (currentAsrModel && downloadedModel.baseId === currentAsrModel.modelId) {
+            // User downloaded a quantization of the currently configured model
+            // Check if it's a different quantization
+            const currentQuant = currentAsrModel.quantization;
+            if (downloadedModel.quant && downloadedModel.quant !== currentQuant) {
+              // Different quantization downloaded - prompt user to switch
+              const model = cfg?.models?.find(m => m.id === downloadedModel.baseId);
+              const modelName = model?.name || downloadedModel.baseId;
+              const quantLabel = downloadedModel.quant.toUpperCase();
+
+              showToast({
+                type: 'success',
+                title: t('download.quantDownloadComplete', { model: modelName, quant: quantLabel }),
+                description: t('download.switchQuantHint'),
+                action: {
+                  label: t('download.switchNow'),
+                  onClick: async () => {
+                    try {
+                      const fullModelId = getFullModelId({
+                        modelId: downloadedModel.baseId,
+                        quantization: downloadedModel.quant,
+                      });
+                      // Unload current model and load new one
+                      const currentFullId = getFullModelId(currentAsrModel);
+                      const result = await switchAsrModel(currentFullId, fullModelId);
+                      if (result.success) {
+                        // Update config
+                        const newConfig = {
+                          ...cfg,
+                          globalModelConfig: {
+                            ...cfg.globalModelConfig,
+                            asrModel: {
+                              modelId: downloadedModel.baseId,
+                              quantization: downloadedModel.quant,
+                            },
+                          },
+                        };
+                        setConfig(newConfig);
+                        await saveConfig(newConfig);
+                        showToast({
+                          type: 'success',
+                          title: t('download.switchSuccess'),
+                        });
+                      } else {
+                        showToast({
+                          type: 'error',
+                          title: t('download.switchFailed'),
+                          description: result.error || undefined,
+                        });
+                      }
+                    } catch (err) {
+                      log.error(`Failed to switch model: ${err}`);
+                      showToast({
+                        type: 'error',
+                        title: t('download.switchFailed'),
+                        description: String(err),
+                      });
+                    }
+                  },
+                },
+              });
+            }
+          }
+        })
         .catch(err => log.error(`Failed to reload config: ${err}`));
     });
 
@@ -481,6 +672,15 @@ function App() {
           log.info('[启动] Tray menu 更新成功');
         } catch (err) {
           log.warn(`[启动] Tray menu 更新失败（非关键错误）: ${err}`);
+        }
+
+        // 通知后端前端已就绪，可以开始预加载模型
+        try {
+          const { emit } = await import('@tauri-apps/api/event');
+          await emit('app-ready');
+          log.info('[启动] 已发送 app-ready 事件，后端开始预加载模型');
+        } catch (err) {
+          log.error(`[启动] 发送 app-ready 事件失败: ${err}`);
         }
       })
       .catch((err) => {
@@ -1299,7 +1499,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="h-screen flex overflow-hidden">
+      <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
         {/* 左侧 */}
         <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
           {/* Logo + 标题 */}
@@ -1321,7 +1521,7 @@ function App() {
         </div>
 
         {/* 右侧 - 白色卡片 */}
-        <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+        <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-tr-xl rounded-bl-2xl rounded-br-xl">
           {/* 顶部 - 空白 */}
           <div className="h-9 select-none" data-tauri-drag-region />
 
@@ -1420,7 +1620,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
       {/* 左侧 - Logo + 标题 + 导航 */}
       <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
         {/* 顶部 - Logo + 标题（可拖动） */}
@@ -1450,7 +1650,7 @@ function App() {
       </div>
 
       {/* 右侧 - 完整的白色卡片 */}
-      <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+      <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-tr-xl rounded-bl-2xl rounded-br-xl">
         {/* 顶部 - 窗口控制按钮（可拖动） */}
         <div
           className="h-9 flex items-center justify-end select-none pt-3.5"
@@ -1508,6 +1708,8 @@ function App() {
                 }}
                 modelQuantPrefs={config?.modelQuantPrefs || {}}
                 onQuantPrefChange={handleQuantPrefChange}
+                pendingDownloadModelId={pendingDownloadModelId}
+                onPendingDownloadHandled={() => setPendingDownloadModelId(null)}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'shortcut' && (
@@ -1600,6 +1802,8 @@ function App() {
                     // 引导完成后检查麦克风权限
                     // 注意：toast 提示由 useEffect 统一处理，这里不重复显示
                     checkMicPermission();
+                    // 引导完成后检查辅助功能权限（macOS）
+                    checkAccessibility();
                   }
                 }}
               />
@@ -1638,18 +1842,16 @@ function App() {
               </button>
               <button
                 onClick={() => {
-                  // Find model info and trigger download directly
-                  const model = config?.models?.find(m => m.id === pendingModelId);
-                  if (model && model.downloadUrls && model.downloadUrls.length > 0) {
-                    handleDownload(model);
-                  }
+                  // Navigate to models page and trigger download
+                  setPendingDownloadModelId(pendingModelId);
                   setShowModelDialog(false);
                   setPendingModelId(null);
                   setPendingModelName('');
+                  setActiveNav('models');
                 }}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
               >
-                {t('dialog.download')}
+                {t('dialog.goToDownload')}
               </button>
             </div>
           </div>
@@ -1673,6 +1875,7 @@ function App() {
           log.info('Permission granted via modal');
           setShowPermissionModal(false);
         }}
+        initialDenied={permissionDenied}
       />
 
       {/* Download Error Dialog */}
@@ -1701,6 +1904,60 @@ function App() {
         availableMemory={memoryError.availableMemory}
         onClose={() => {
           setMemoryError(prev => ({ ...prev, visible: false }));
+        }}
+      />
+
+      {/* Accessibility Permission Banner (macOS only) */}
+      {showAccessibilityBanner && !showAccessibilityModal && (
+        <AccessibilityBanner
+          mode="accessibility"
+          onAuthorize={async () => {
+            const granted = await requestAccessibilityPermission();
+            if (granted) {
+              setShowAccessibilityBanner(false);
+            }
+          }}
+          onDismiss={() => setShowAccessibilityBanner(false)}
+        />
+      )}
+
+      {/* Keyhook Permission Banner (macOS Input Monitoring) */}
+      {showKeyhookBanner && (
+        <AccessibilityBanner
+          mode="keyhook"
+          onAuthorize={async () => {
+            // 输入监控权限需要先有辅助功能权限
+            const axGranted = await checkAccessibilityPermission();
+            if (!axGranted) {
+              // 辅助功能未授权，显示辅助功能横幅
+              setShowKeyhookBanner(false);
+              setShowAccessibilityBanner(true);
+              return;
+            }
+            // 重置输入监控条目，然后重启键盘监听触发授权引导
+            await resetInputMonitoringPermission();
+            try {
+              const { commands } = await import('@tauri-keyhook');
+              await commands.startListen();
+              log.info('Keyhook restarted after resetting input monitoring');
+            } catch (err) {
+              log.error(`Failed to restart keyhook: ${err}`);
+            }
+          }}
+          onDismiss={() => setShowKeyhookBanner(false)}
+        />
+      )}
+
+      {/* Accessibility Permission Modal (first-time onboarding) */}
+      <AccessibilityModal
+        isOpen={showAccessibilityModal}
+        onSkip={() => setShowAccessibilityModal(false)}
+        onAuthorize={async () => {
+          const granted = await requestAccessibilityPermission();
+          if (granted) {
+            setShowAccessibilityModal(false);
+            setShowAccessibilityBanner(false);
+          }
         }}
       />
     </div>

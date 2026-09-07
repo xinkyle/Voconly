@@ -50,6 +50,7 @@
     "dialog:allow-ask",
     "dialog:allow-confirm",
     "opener:default",
+    "opener:allow-open-url",
     "keyhook:allow-start-listen",
     "keyhook:allow-stop-listen",
     "keyhook:allow-is-listening",

@@ -145,6 +145,10 @@ fn main() {
     // default-features = false" contract. Off Apple the feature is a no-op (CMake
     // already defaults it OFF).
     if is_apple {
+        // Set macOS minimum deployment target to 10.15 to support std::filesystem
+        // Required for ggml's use of std::filesystem::path (available in macOS 10.15+)
+        cfg.define("CMAKE_OSX_DEPLOYMENT_TARGET", "10.15");
+
         if feature("METAL") {
             cfg.define("TRANSCRIBE_METAL", "ON");
             // Self-contained installed tree: embed the metallib instead of a
