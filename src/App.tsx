@@ -1415,7 +1415,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400 shadow-lg">
+      <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
         {/* 左侧 */}
         <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
           {/* Logo + 标题 */}
@@ -1437,7 +1437,7 @@ function App() {
         </div>
 
         {/* 右侧 - 白色卡片 */}
-        <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+        <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-tr-xl rounded-bl-2xl rounded-br-xl">
           {/* 顶部 - 空白 */}
           <div className="h-9 select-none" data-tauri-drag-region />
 
@@ -1536,7 +1536,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400 shadow-lg">
+    <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
       {/* 左侧 - Logo + 标题 + 导航 */}
       <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
         {/* 顶部 - Logo + 标题（可拖动） */}
@@ -1566,7 +1566,7 @@ function App() {
       </div>
 
       {/* 右侧 - 完整的白色卡片 */}
-      <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-bl-2xl">
+      <div className="flex-1 flex flex-col bg-white rounded-tl-2xl rounded-tr-xl rounded-bl-2xl rounded-br-xl">
         {/* 顶部 - 窗口控制按钮（可拖动） */}
         <div
           className="h-9 flex items-center justify-end select-none pt-3.5"
