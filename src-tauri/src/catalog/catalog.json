@@ -207,6 +207,56 @@
       ]
     },
     {
+      "id": "sensevoice-small",
+      "name": "SenseVoice Small",
+      "architecture": "sensevoice",
+      "backend": "TranscribeCpp",
+      "languages": ["zh", "en", "yue", "ja", "ko"],
+      "capabilities": {
+        "streaming": false,
+        "translate": false,
+        "lang_detect": true
+      },
+      "speed_score": 85,
+      "accuracy_score": 88,
+      "description": "阿里开源，中文粤语效果极佳，支持情感识别，非自回归架构高效推理",
+      "files": [
+        {
+          "filename": "sensevoice-small-q5_k_m.gguf",
+          "quant": "Q5_K_M",
+          "size_bytes": 172474880,
+          "is_recommended": true
+        },
+        {
+          "filename": "sensevoice-small-q8_0.gguf",
+          "quant": "Q8_0",
+          "size_bytes": 252684608,
+          "is_recommended": false
+        },
+        {
+          "filename": "sensevoice-small-f16.gguf",
+          "quant": "F16",
+          "size_bytes": 470412128,
+          "is_recommended": false
+        }
+      ],
+      "default_quant": "Q5_K_M",
+      "download_urls": [
+        {
+          "name": "HuggingFace",
+          "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall-GGUF/resolve/main/",
+          "is_china_accessible": true,
+          "priority": 0
+        },
+        {
+          "name": "ModelScope",
+          "url": "https://modelscope.cn/models/voconly/SenseVoiceSmall-GGUF/resolve/main/",
+          "is_china_accessible": true,
+          "priority": 1
+        }
+      ]
+    },
+    {
       "id": "whisper-large-v3-turbo",
       "name": "Whisper Large v3 Turbo",
       "architecture": "whisper",

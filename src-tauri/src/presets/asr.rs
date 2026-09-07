@@ -114,8 +114,8 @@ mod tests {
     #[test]
     fn test_language_filtering() {
         let zh_presets = get_asr_presets_by_language("zh");
-        // Qwen3-ASR, Cohere, Nemotron, Whisper Turbo support Chinese (4 GGUF)
-        assert_eq!(zh_presets.len(), 4);
+        // Qwen3-ASR, Cohere, Nemotron, Whisper Turbo, SenseVoice support Chinese (5 GGUF)
+        assert_eq!(zh_presets.len(), 5);
 
         let en_presets = get_asr_presets_by_language("en");
         // All 6 presets support English

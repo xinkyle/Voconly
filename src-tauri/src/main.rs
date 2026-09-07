@@ -2281,6 +2281,7 @@ fn main() {
                 .on_page_load(|window, _payload| {
                     debug!("[STARTUP] Main window page loaded, showing window");
                     let _ = window.show();
+                    let _ = window.set_focus();
                 })
                 .build()
                 .expect("Failed to create main window");
