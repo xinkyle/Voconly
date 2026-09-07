@@ -441,6 +441,18 @@ body {
   background: #8e8e93;
 }
 
+/* 【新设计】绿灯 - 系统就绪，可以正常使用 */
+.status-dot.ready {
+  background: #34c759;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* 【新设计】红灯 - 系统未就绪，麦克风正在初始化 */
+.status-dot.unavailable {
+  background: #ff3b30;
+  animation: pulse 1s ease-in-out infinite;
+}
+
 .status-text {
   color: #ffffff;
   font-size: 12px;
@@ -448,6 +460,16 @@ body {
   letter-spacing: -0.1px;
   white-space: nowrap;
   line-height: 1;
+}
+
+/* 【新设计】灰色文字 - 系统未就绪 */
+.status-text.unavailable {
+  color: rgba(128, 128, 128, 0.5);
+}
+
+/* 【新设计】白色文字 - 系统就绪 */
+.status-text.ready {
+  color: #ffffff;
 }
 
 /* Progress info - percentage and time */
@@ -491,6 +513,13 @@ body {
 .wave-bar.active {
   background: rgba(255, 255, 255, 0.9);
   animation: waveScaleAnimation 0.5s ease-in-out infinite;
+}
+
+/* 【新设计】灰色波浪条 - 系统不可用 */
+.wave-bar.unavailable {
+  background: rgba(128, 128, 128, 0.6);
+  /* 不播放动画，保持静态 */
+  animation: none;
 }
 
 .wave-bar:nth-child(1) {

@@ -1383,12 +1383,22 @@ async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), Str
     };
     info!("[TIMING] [Main] 获取/创建 AudioCapture 后 - elapsed: {}ms", start_time.elapsed().as_millis());
 
+    // 【新设计】发送麦克风初始化事件，让前端显示红灯 + 灰色波浪
+    if let Err(e) = app.emit("microphone-initializing", ()) {
+        warn!("[TIMING] Failed to emit microphone-initializing event: {}", e);
+    } else {
+        info!("[TIMING] Emitted microphone-initializing event");
+    }
+
     // Open microphone if not already open
     let open_start = std::time::Instant::now();
     info!("[TIMING] [Main] 调用 capture.open() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
-    capture
-        .open()
-        .map_err(|e| format!("Failed to open microphone: {}", e))?;
+    if let Err(e) = capture.open() {
+        // 清空半初始化的 capture 实例，下次会重新创建
+        // 场景：麦克风被拔掉后，旧的 capture 实例指向已断开的设备，即使重新插上也无法使用
+        *capture_guard = None;
+        return Err(format!("Failed to open microphone: {}", e));
+    }
     info!("[TIMING] [Main] 调用 capture.open() 后 - elapsed: {}ms (open耗时: {}ms)", start_time.elapsed().as_millis(), open_start.elapsed().as_millis());
 
     // Apply streaming mode setting

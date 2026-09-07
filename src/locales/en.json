@@ -590,7 +590,8 @@
       "idle": "Idle",
       "loadingModel": "Loading Model",
       "llmError": "LLM error, original text output",
-      "llmSkippedTooLong": "Text too long, LLM skipped"
+      "llmSkippedTooLong": "Text too long, LLM skipped",
+      "initializing": "Initializing..."
     },
     "confirmError": "Confirm",
     "collapsePreview": "Collapse preview",

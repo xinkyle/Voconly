@@ -590,7 +590,8 @@
       "idle": "空闲",
       "loadingModel": "加载模型中",
       "llmError": "LLM异常，已输出原文",
-      "llmSkippedTooLong": "文本过长，跳过LLM处理"
+      "llmSkippedTooLong": "文本过长，跳过LLM处理",
+      "initializing": "准备中..."
     },
     "confirmError": "确认",
     "collapsePreview": "折叠预览",

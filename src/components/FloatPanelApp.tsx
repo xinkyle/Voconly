@@ -65,11 +65,11 @@ function getStatusConfig(status: RecorderStatus, t: (key: string) => string, ski
 }
 
 // Simple waveform component - inline
-function Waveform({ isActive }: { isActive: boolean }) {
+function Waveform({ isActive, isUnavailable }: { isActive: boolean; isUnavailable?: boolean }) {
   return (
     <div className="waveform-container">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className={`wave-bar ${isActive ? 'active' : ''}`} />
+        <div key={i} className={`wave-bar ${isActive ? 'active' : ''} ${isUnavailable ? 'unavailable' : ''}`} />
       ))}
     </div>
   );
@@ -164,6 +164,9 @@ export default function FloatPanelApp() {
   const [voiceDetected, setVoiceDetected] = useState(false);
   const [isCacheReady, setIsCacheReady] = useState(false);
   const prevVoiceDetectedRef = useRef(false); // 追踪上一次的语音检测状态
+
+  // 【新设计】麦克风初始化状态：true 表示正在初始化，显示红灯 + 灰色波浪
+  const [isMicrophoneInitializing, setIsMicrophoneInitializing] = useState(false);
 
   // 预览窗口折叠状态（用户偏好，存储在 localStorage）
   // 默认展开（false = 不折叠，true = 折叠）
@@ -502,6 +505,11 @@ export default function FloatPanelApp() {
             setIsAwaitingTranscribe(false);
             prevVoiceDetectedRef.current = false;
             setVoiceDetected(false);
+            // 【修复】新录音开始时，假设麦克风正在初始化，显示"未准备好"状态
+            // 避免"准备好 → 未准备好 → 准备好"的闪烁
+            // 当收到 recording-started 事件后，会切换为"准备好"
+            setIsMicrophoneInitializing(true);
+            log.debug('[MicInit] 新录音开始，设置 isMicrophoneInitializing=true（假设麦克风正在初始化）');
             // 【Session ID 模式】结束当前会话，旧动画自动过期
             sessionRef.current = null;
             estimatedTimeRef.current = 0;
@@ -559,6 +567,8 @@ export default function FloatPanelApp() {
           isAudioBufferedRef.current = false;
           prevVoiceDetectedRef.current = false;
           setVoiceDetected(false);
+          // 【新设计】重置麦克风初始化状态
+          setIsMicrophoneInitializing(false);
           log.debug('[HIDE-EVENT] 状态已完全重置');
         }, 100);
       }).catch((e) => {
@@ -574,6 +584,28 @@ export default function FloatPanelApp() {
         setVoiceDetected(event.payload.isVoice);
       }).catch((e) => {
         log.error(`Failed to listen vad-status: ${e}`);
+        return () => {};
+      })
+    );
+
+    // 【新设计】监听麦克风初始化事件：显示红灯 + 灰色波浪
+    unlistenPromises.push(
+      listen<void>('microphone-initializing', () => {
+        log.debug('[Microphone] Received microphone-initializing event, showing red light');
+        setIsMicrophoneInitializing(true);
+      }).catch((e) => {
+        log.error(`Failed to listen microphone-initializing: ${e}`);
+        return () => {};
+      })
+    );
+
+    // 【新设计】监听录音开始事件：切换为绿灯 + 白色波浪
+    unlistenPromises.push(
+      listen<void>('recording-started', () => {
+        log.debug('[Microphone] Received recording-started event, switching to green light');
+        setIsMicrophoneInitializing(false);
+      }).catch((e) => {
+        log.error(`Failed to listen recording-started: ${e}`);
         return () => {};
       })
     );
@@ -1340,15 +1372,20 @@ export default function FloatPanelApp() {
   // 是否有预览内容（用于决定是否显示折叠按钮）
   const hasPreviewContent = previewVisible && previewText;
 
-  // 状态圆点样式：
-  // - 分段转录开启 + 录音中 + 说话中：绿点（正在实时转录）
-  // - 分段转录开启 + 录音中 + 静音：红点（等待说话）
-  // - 分段转录关闭 + 录音中：红点（等待结束后转录）
-  // - 其他状态：按原状态
-  const actualDotClass: string =
-    segmentTranscribeEnabledRef.current && state.status === 'recording'
-      ? (voiceDetected ? 'transcribing' : 'recording')  // 绿点/红点
-      : statusConfig.dotClass;
+  // 【新设计】状态圆点样式：
+  // - 红灯：麦克风正在初始化，系统未就绪
+  // - 绿灯：系统就绪，可以正常使用（录音中、转录中）
+  const actualDotClass: string = isMicrophoneInitializing ? 'unavailable' : 'ready';
+
+  // 波浪动画颜色：
+  // - 灰色：麦克风正在初始化（系统未就绪）
+  // - 白色：系统就绪，可以正常使用
+  const isWaveformUnavailable = isMicrophoneInitializing;
+
+  // 【新设计】状态文字颜色：
+  // - 灰色：麦克风正在初始化（系统未就绪）
+  // - 白色：系统就绪，可以正常使用
+  const statusTextClass = isMicrophoneInitializing ? 'unavailable' : 'ready';
 
   // 如果显示 LLM 错误状态，渲染错误状态 UI
   if (llmError.visible) {
@@ -1461,10 +1498,10 @@ export default function FloatPanelApp() {
               )}
 
               <span className={`status-dot ${actualDotClass}`} />
-              <span className="status-text">{statusConfig.text}</span>
+              <span className={`status-text ${statusTextClass}`}>{statusConfig.text}</span>
             </div>
 
-            {showWaveform && <Waveform isActive={waveformActive} />}
+            {showWaveform && <Waveform isActive={waveformActive} isUnavailable={isWaveformUnavailable} />}
           </div>
         </div>
         )}
