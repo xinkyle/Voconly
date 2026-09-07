@@ -231,13 +231,20 @@ pub async fn download_update(
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     // 发送请求
-    let response = client
-        .get(&download_url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to start download: {}", e))?;
+    let response = match client.get(&download_url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Failed to start download from {}: {}", download_url, e);
+            return Err(format!("Failed to start download: {}", e));
+        }
+    };
 
     if !response.status().is_success() {
+        warn!(
+            "HTTP error {} when downloading from {}",
+            response.status(),
+            download_url
+        );
         return Err(format!("HTTP error: {}", response.status()));
     }
 
@@ -252,6 +259,7 @@ pub async fn download_update(
     // 流式下载
     let mut downloaded: u64 = 0;
     let mut stream = response.bytes_stream();
+    let mut last_log_time = std::time::Instant::now();
 
     while let Some(chunk_result) = stream.next().await {
         // 检查是否取消
@@ -261,12 +269,20 @@ pub async fn download_update(
             return Err("Download cancelled".to_string());
         }
 
-        let chunk = chunk_result.map_err(|e| format!("Failed to read chunk: {}", e))?;
+        let chunk = match chunk_result {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Download failed while reading chunk at {} bytes: {}", downloaded, e);
+                return Err(format!("Failed to read chunk at {} bytes: {}", downloaded, e));
+            }
+        };
 
         // 写入文件
         use std::io::Write;
-        file.write_all(&chunk)
-            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+        if let Err(e) = file.write_all(&chunk) {
+            warn!("Failed to write chunk to file at {} bytes: {}", downloaded, e);
+            return Err(format!("Failed to write chunk at {} bytes: {}", downloaded, e));
+        }
 
         downloaded += chunk.len() as u64;
 
@@ -276,6 +292,15 @@ pub async fn download_update(
         } else {
             0
         };
+
+        // 每 10 秒记录一次下载进度日志（方便排查中断问题）
+        if last_log_time.elapsed().as_secs() >= 10 {
+            info!(
+                "Download progress: {}% ({}/{} bytes)",
+                progress, downloaded, total_size
+            );
+            last_log_time = std::time::Instant::now();
+        }
 
         app_handle
             .emit(
