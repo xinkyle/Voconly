@@ -541,7 +541,9 @@
     "switchTo": "Switch",
     "selectPrompt": "Select Prompt",
     "moveUp": "Move up, homepage shows first two scenes",
-    "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage."
+    "hint": "Homepage displays only the first two scenes. Click 'Move Up' to adjust position. Other scenes remain functional via shortcuts even if not shown on homepage.",
+    "precisionTipTitle": "Selection Tip",
+    "precisionTipDesc": "Choose precision based on your PC specs. Higher precision = better results but more memory. Low-spec: choose low precision; High-spec: choose high precision for best results."
   },
   "keyboard": {
     "left": "Left",
