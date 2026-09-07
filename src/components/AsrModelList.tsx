@@ -146,7 +146,7 @@ const CheckIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
  * 3. First downloaded quantization
  * 4. First quantization in the list
  */
-function getDefaultQuant(
+export function getDefaultQuant(
   model: AsrModelWithStatus,
   modelQuantPrefs?: Record<string, string>
 ): { quant: string; isDownloaded: boolean } | null {

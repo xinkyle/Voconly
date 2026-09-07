@@ -1,6 +1,6 @@
 // Windows: 隐藏 CMD 控制台窗口
 // macOS/Linux: 不需要此属性
-#![cfg_attr(windows, windows_subsystem = "windows")]
+ //#![cfg_attr(windows, windows_subsystem = "windows")]
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ use history::{
 use paths::resolve_resource_path;
 use utils::downloader::{
     cancel_model_download, check_model_exists_cmd, download_model_from_url, download_model_with_source,
-    get_downloading_model_ids, get_model_storage_path_cmd,
+    get_downloading_model_ids, get_model_storage_path_cmd, invalidate_asr_models_cache,
 };
 
 /// Double-tap detection time window (ms)
@@ -2178,6 +2178,7 @@ fn main() {
             download_model_from_url,
             get_model_storage_path_cmd,
             check_model_exists_cmd,
+            invalidate_asr_models_cache,
             cancel_model_download,
             get_downloading_model_ids,
             open_model_folder,
@@ -2520,19 +2521,45 @@ fn main() {
             // ===== 异步预加载常驻模型 =====
             // 在窗口显示后后台加载，避免阻塞启动
             // 包括 GPU 加速器初始化和模型预加载
-            info!("[STARTUP] 启动后台初始化线程...");
+            info!("[STARTUP] 准备后台初始化线程（等待前端就绪）...");
             let preload_thread_start = Instant::now();
             let app_for_preload = app.handle().clone();
+
+            // 创建通道用于通知前端就绪
+            let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+
+            // 注册一次性事件监听器，等待前端发送 "app-ready" 事件
+            let app_for_listener = app.handle().clone();
+            let ready_tx_clone = ready_tx.clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri::Listener;
+
+                let unlisten = app_for_listener.listen("app-ready", move |_event| {
+                    info!("[AsyncInit] 收到前端 app-ready 事件");
+                    let _ = ready_tx_clone.send(());
+                });
+
+                // 最多等待 10 秒，超时后自动移除监听器
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                drop(unlisten);
+            });
+
+            // 后台初始化线程
             std::thread::spawn(move || {
                 let async_init_start = Instant::now();
-                info!("[AsyncInit] 后台初始化线程开始");
+                info!("[AsyncInit] 后台初始化线程启动，等待前端就绪...");
 
-                // 等待 WebView 完全渲染
-                std::thread::sleep(std::time::Duration::from_millis(1000));
-                info!(
-                    "[AsyncInit] WebView 渲染等待完成, 耗时: {}ms",
-                    async_init_start.elapsed().as_millis()
-                );
+                // 等待前端发送 "app-ready" 事件（最多等待 5 秒，超时也继续）
+                let wait_result = ready_rx.recv_timeout(std::time::Duration::from_secs(5));
+
+                if wait_result.is_ok() {
+                    info!(
+                        "[AsyncInit] 前端已就绪，开始预加载，等待耗时: {}ms",
+                        async_init_start.elapsed().as_millis()
+                    );
+                } else {
+                    warn!("[AsyncInit] 未收到前端就绪事件（超时 5 秒），仍然开始预加载");
+                }
 
                 // 0. 预初始化音频捕获（加载 VAD 模型，减少首次录音延迟）
                 let preinit_audio_start = Instant::now();
@@ -2562,7 +2589,17 @@ fn main() {
                     if let Ok(mut mgr_guard) = state.model_manager.lock() {
                         if let Some(mgr) = mgr_guard.as_mut() {
                             info!("[AsyncInit] 开始预加载常驻模型...");
-                            mgr.preload_always_models();
+                            // 传入 app_handle 以发送加载事件
+                            match mgr.preload_always_models(Some(app_for_preload.clone())) {
+                                Ok(model_id) => {
+                                    if !model_id.is_empty() {
+                                        info!("[AsyncInit] 预加载成功: {}", model_id);
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("[AsyncInit] 预加载失败: {}", e);
+                                }
+                            }
                             info!(
                                 "[AsyncInit] 预加载完成, 耗时: {}ms",
                                 preload_start.elapsed().as_millis()

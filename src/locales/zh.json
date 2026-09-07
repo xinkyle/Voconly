@@ -290,13 +290,15 @@
     "noCustomDirs": "暂无导入的目录",
     "asrMoreModelsInfo": "更多模型的量化版本可从以下平台下载：",
     "asrQuantizationPriority": "当模型提供多个量化版本时，系统将自动使用最高精度版本（F16 > Q8 > Q6 > Q5 > Q4），暂不支持手动选择量化版本。",
-    "asrDownloadHint": "下载后将模型文件放入默认 models 目录，或通过「导入外部模型」按钮添加模型文件夹即可使用。"
+    "asrDownloadHint": "下载后将模型文件放入默认 models 目录，或通过「导入外部模型」按钮添加模型文件夹即可使用。",
+    "modelFileNotFound": "模型文件不存在",
+    "modelFileNotFoundDesc": "该模型文件已被移除，请重新下载"
   },
   "dialog": {
     "modelNotDownloaded": "模型未下载",
-    "modelNotDownloadedDesc": "当前场景使用的模型「{{name}}」尚未下载，是否立即下载？",
+    "modelNotDownloadedDesc": "当前场景使用的模型「{{name}}」尚未下载，是否前往下载？",
     "cancel": "取消",
-    "download": "下载"
+    "goToDownload": "前往下载"
   },
   "toast": {
     "sceneDisabled": "场景已禁用",

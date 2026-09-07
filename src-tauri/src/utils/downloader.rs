@@ -343,32 +343,65 @@ fn find_in_custom_dirs(file_name: &str, is_file: bool) -> Option<PathBuf> {
 /// Check if model file exists
 /// For GGUF models (TranscribeCpp backend), checks if file exists
 pub fn model_exists(model_id: &str, backend: &str) -> bool {
-    check_model_available(model_id, Some(backend))
+    check_model_available_with_cache(model_id, Some(backend), None)
 }
 
-/// Unified model availability check
+/// Unified model availability check (without cache)
+///
+/// Convenience wrapper for backward compatibility.
+pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
+    check_model_available_with_cache(model_id, backend, None)
+}
+
+/// Unified model availability check with optional cache support
 ///
 /// Uses the scanner as the single source of truth, following design principles:
 /// - GGUF models: uses scan_available_asr_models() (already selects highest precision version)
 /// - LLM models: directly checks file
 ///
 /// # Performance optimization
+/// - If `services` is provided and cache is valid, uses cached model list
+/// - Otherwise falls back to filesystem scan
 /// - ASR scanner has internal caching mechanism (scan_available_asr_models)
 /// - Avoids duplicate filesystem access
-pub fn check_model_available(model_id: &str, backend: Option<&str>) -> bool {
+pub fn check_model_available_with_cache(
+    model_id: &str,
+    backend: Option<&str>,
+    services: Option<&crate::config::AppServices>,
+) -> bool {
     // LLM models: directly check file
     if is_llm_model(model_id) {
         return llm_model_exists(model_id);
     }
 
     // Determine backend type
-    let backend_type = backend
+    let _backend_type = backend
         .map(|b| b.to_string())
         .unwrap_or_else(|| get_model_backend_str(model_id));
 
-    // GGUF models: use scanner (already selected highest precision version, supports multi-quantization)
+    // GGUF models: use scanner or cache
     // 需要处理带量化后缀的模型 ID，如 "parakeet-unified-en-0.6b-Q8_0"
-    let scanned = scan_available_asr_models();
+    let scanned = if let Some(svc) = services {
+        // 尝试使用缓存
+        if let Ok(cache) = svc.asr_models_cache.lock() {
+            if cache.is_valid() {
+                log::debug!("[check_model_available] Using cached model list ({} models)", cache.models.len());
+                cache.models.clone()
+            } else {
+                // 缓存无效，释放锁后重新扫描
+                drop(cache);
+                log::debug!("[check_model_available] Cache invalid, scanning models...");
+                scan_available_asr_models()
+            }
+        } else {
+            // 无法获取锁，直接扫描
+            log::warn!("[check_model_available] Failed to lock cache, scanning models...");
+            scan_available_asr_models()
+        }
+    } else {
+        // 没有提供 services，直接扫描
+        scan_available_asr_models()
+    };
 
     // 提取基础 ID 和量化后缀
     let base_id = crate::utils::get_base_model_id(model_id);
@@ -792,7 +825,7 @@ pub async fn download_model_with_source(
         crate::backends::BackendType::TranscribeCpp => "transcribe_cpp",
     };
 
-    if check_model_available(&model_id, Some(backend)) {
+    if check_model_available_with_cache(&model_id, Some(backend), Some(&services)) {
         let path = get_model_path_from_preset(&model_id)?;
         // Debug: 检查 is_llm_model 的返回值
         let is_llm = is_llm_model(&model_id);
@@ -984,7 +1017,7 @@ pub async fn download_model_from_url(
         }
     });
 
-    if check_model_available(&model_id, Some(&backend_type)) {
+    if check_model_available_with_cache(&model_id, Some(&backend_type), Some(&services)) {
         let path = get_model_path_from_preset(&model_id)?;
         return Ok(DownloadResult {
             success: true,
@@ -1073,9 +1106,31 @@ pub fn get_model_storage_path_cmd(
 
 /// Check if a model file exists
 /// Automatically detects backend type based on preset definitions (exact match first)
+/// Uses cache if available for faster response
 #[tauri::command]
-pub fn check_model_exists_cmd(model_id: String, backend: Option<String>) -> bool {
-    check_model_available(&model_id, backend.as_deref())
+pub fn check_model_exists_cmd(
+    services: tauri::State<'_, AppServices>,
+    model_id: String,
+    backend: Option<String>,
+) -> bool {
+    check_model_available_with_cache(&model_id, backend.as_deref(), Some(&services))
+}
+
+/// Invalidate the ASR models cache
+///
+/// Should be called when model files are added/removed externally,
+/// forcing the next check to rescan the filesystem.
+#[tauri::command]
+pub fn invalidate_asr_models_cache(
+    services: tauri::State<'_, AppServices>,
+) -> Result<(), String> {
+    services
+        .asr_models_cache
+        .lock()
+        .map_err(|e| format!("Failed to lock cache: {}", e))?
+        .invalidate();
+    log::info!("[ASR] Cache invalidated via command");
+    Ok(())
 }
 
 /// Cancel an ongoing model download

@@ -149,6 +149,9 @@ function App() {
   // Trigger model selection from App.tsx (used when download fails and user wants to select other model)
   const [triggerSelectModelSceneId, setTriggerSelectModelSceneId] = useState<string | null>(null);
 
+  // Pending download model ID (used when user clicks download in shortcut trigger dialog)
+  const [pendingDownloadModelId, setPendingDownloadModelId] = useState<string | null>(null);
+
   // Update dialog state
   const [hasUpdate, setHasUpdate] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -669,6 +672,15 @@ function App() {
           log.info('[启动] Tray menu 更新成功');
         } catch (err) {
           log.warn(`[启动] Tray menu 更新失败（非关键错误）: ${err}`);
+        }
+
+        // 通知后端前端已就绪，可以开始预加载模型
+        try {
+          const { emit } = await import('@tauri-apps/api/event');
+          await emit('app-ready');
+          log.info('[启动] 已发送 app-ready 事件，后端开始预加载模型');
+        } catch (err) {
+          log.error(`[启动] 发送 app-ready 事件失败: ${err}`);
         }
       })
       .catch((err) => {
@@ -1696,6 +1708,8 @@ function App() {
                 }}
                 modelQuantPrefs={config?.modelQuantPrefs || {}}
                 onQuantPrefChange={handleQuantPrefChange}
+                pendingDownloadModelId={pendingDownloadModelId}
+                onPendingDownloadHandled={() => setPendingDownloadModelId(null)}
               />
             )}
             {activeNav === 'settings' && settingsTab === 'shortcut' && (
@@ -1828,18 +1842,16 @@ function App() {
               </button>
               <button
                 onClick={() => {
-                  // Find model info and trigger download directly
-                  const model = config?.models?.find(m => m.id === pendingModelId);
-                  if (model && model.downloadUrls && model.downloadUrls.length > 0) {
-                    handleDownload(model);
-                  }
+                  // Navigate to models page and trigger download
+                  setPendingDownloadModelId(pendingModelId);
                   setShowModelDialog(false);
                   setPendingModelId(null);
                   setPendingModelName('');
+                  setActiveNav('models');
                 }}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
               >
-                {t('dialog.download')}
+                {t('dialog.goToDownload')}
               </button>
             </div>
           </div>

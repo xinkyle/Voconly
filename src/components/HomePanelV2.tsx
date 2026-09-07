@@ -7,7 +7,7 @@ import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyb
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
-import { subscribeToDownloadComplete } from '../services/downloader';
+import { subscribeToDownloadComplete, invalidateAsrModelsCache } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
 import { getProviderList, getLlmPromptPresets } from '../services/llm';
 import { listen } from '@tauri-apps/api/event';
@@ -539,10 +539,15 @@ export default function HomePanelV2({
       } else {
         log.warn(`ASR model switch failed: ${result.error}`);
         setAsrModelLoaded(false); // 标记模型未加载
+
+        // 更新模型缓存
+        await invalidateAsrModelsCache();
+
+        // 显示提示：模型文件不存在
         showToast({
           type: 'warning',
-          title: t('common.saved'),
-          description: result.error || '模型加载失败，但配置已保存',
+          title: t('modelConfig.modelFileNotFound'),
+          description: t('modelConfig.modelFileNotFoundDesc'),
         });
       }
 

@@ -4,6 +4,8 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use tauri::Emitter;
+
 use crate::backends::{
     BackendType, LoadStrategy, SpeechBackend, StreamingBackend, TranscribeCppBackend,
 };
@@ -221,9 +223,9 @@ fn preset_to_model(preset: &ModelPreset, quant_override: Option<&str>) -> Option
             log::debug!("[preset_to_model] 使用 quant_paths[{}]: {}", quant, path.display());
             path
         } else {
-            log::warn!("[preset_to_model] 量化版本 {} 不在 quant_paths 中，尝试其他方式", quant);
-            // 回退到其他查找方式
-            find_model_path_fallback(preset, &backend_str)?
+            // 指定精度的模型文件不存在，直接返回 None，不进行 fallback
+            log::warn!("[preset_to_model] 指定精度的模型文件不存在: {} ({})", preset.id, quant);
+            return None;
         }
     } else {
         find_model_path_fallback(preset, &backend_str)?
@@ -790,7 +792,12 @@ impl ModelManager {
     ///
     /// 使用 GlobalModelConfig.asr_model 作为全局 ASR 模型。
     /// 所有场景共用同一个 ASR 模型。
-    pub fn preload_always_models(&mut self) {
+    ///
+    /// 参数:
+    /// - app_handle: Tauri AppHandle，用于发送加载事件给前端
+    ///
+    /// 返回: Ok(model_id) 成功加载的模型 ID，Err(error) 加载失败的错误信息
+    pub fn preload_always_models(&mut self, app_handle: Option<tauri::AppHandle>) -> Result<String, String> {
         info!("[ModelManager] 开始预加载全局 ASR 模型...");
 
         // 获取全局 ASR 模型
@@ -798,27 +805,44 @@ impl ModelManager {
             Ok(id) => {
                 if id.is_empty() {
                     info!("[ModelManager] 全局 ASR 模型未配置，跳过预加载");
-                    return;
+                    return Ok(String::new()); // 返回空字符串表示无配置
                 }
                 id
             }
             Err(e) => {
                 info!("[ModelManager] 获取全局 ASR 模型失败: {}", e);
-                return;
+                return Err(e);
             }
         };
 
         info!("[ModelManager] 预加载全局 ASR 模型: {}", model_id);
 
-        match self.load_model(&model_id, false) {
-            Ok(_) => info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id),
-            Err(e) => warn!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e),
+        // 发送加载开始事件
+        if let Some(ref handle) = app_handle {
+            let _ = handle.emit("asr-model-loading", &serde_json::json!({ "modelId": &model_id }));
         }
 
-        info!(
-            "[ModelManager] 预加载完成，当前已加载模型数: {}",
-            self.loaded_models.len()
-        );
+        match self.load_model(&model_id, false) {
+            Ok(_) => {
+                info!("[ModelManager] 全局 ASR 模型 {} 预加载成功", model_id);
+                // 发送加载成功事件
+                if let Some(ref handle) = app_handle {
+                    let _ = handle.emit("asr-model-loaded", &serde_json::json!({ "modelId": &model_id }));
+                }
+                Ok(model_id)
+            }
+            Err(e) => {
+                warn!("[ModelManager] 全局 ASR 模型 {} 预加载失败: {}", model_id, e);
+                // 发送加载失败事件
+                if let Some(ref handle) = app_handle {
+                    let _ = handle.emit("asr-model-load-failed", &serde_json::json!({
+                        "modelId": model_id,
+                        "error": &e
+                    }));
+                }
+                Err(e)
+            }
+        }
     }
 
     /// 获取已加载模型列表

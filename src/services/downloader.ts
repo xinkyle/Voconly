@@ -361,6 +361,16 @@ export async function checkModelExists(modelId: string): Promise<boolean> {
 }
 
 /**
+ * Invalidate the ASR models cache
+ *
+ * Should be called when model files are added/removed externally,
+ * forcing the next check to rescan the filesystem.
+ */
+export async function invalidateAsrModelsCache(): Promise<void> {
+  return invoke('invalidate_asr_models_cache');
+}
+
+/**
  * Get model download path from Rust backend
  * @deprecated Use getModelStoragePath instead
  */
