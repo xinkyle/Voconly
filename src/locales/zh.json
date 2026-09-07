@@ -646,7 +646,12 @@
     "errorTitle": "模型下载失败",
     "errorDesc": "{{name}} 下载出现问题，您可以重试或选择其他已下载的模型。",
     "retry": "重试下载",
-    "selectOther": "选择其他模型"
+    "selectOther": "选择其他模型",
+    "quantDownloadComplete": "{{model}} {{quant}} 下载完成",
+    "switchQuantHint": "是否切换到此精度版本？",
+    "switchNow": "立即切换",
+    "switchSuccess": "模型已切换",
+    "switchFailed": "模型切换失败"
   },
   "about": {
     "title": "关于",

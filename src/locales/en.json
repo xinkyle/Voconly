@@ -632,7 +632,12 @@
     "errorTitle": "Download Failed",
     "errorDesc": "{{name}} download failed. You can retry or select another downloaded model.",
     "retry": "Retry Download",
-    "selectOther": "Select Other Model"
+    "selectOther": "Select Other Model",
+    "quantDownloadComplete": "{{model}} {{quant}} download complete",
+    "switchQuantHint": "Switch to this quantization version?",
+    "switchNow": "Switch Now",
+    "switchSuccess": "Model switched",
+    "switchFailed": "Failed to switch model"
   },
   "about": {
     "title": "About",

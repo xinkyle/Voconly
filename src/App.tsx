@@ -12,7 +12,7 @@ import ProviderPanel from './components/ProviderPanel';
 import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
-import { loadConfig, saveConfig, loadConfigWithNotice } from './services/config';
+import { loadConfig, saveConfig, loadConfigWithNotice, parseModelId } from './services/config';
 import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDownloadError, subscribeToDownloadCancelled, type DownloadProgress } from './services/downloader';
   import { updateTrayMenu } from './services/tray';
 import { useSceneShortcuts } from './hooks/useShortcut';
@@ -32,6 +32,7 @@ import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
 import { checkModelExists } from './services/downloader';
+import { switchAsrModel } from './services/whisper';
 import { processTextForSceneWithProgress } from './services/llm';
 import { preinitAudioCapture, checkMicrophonePermission, requestMicrophonePermission } from './services/audio';
 import { createLogger } from './services/log';
@@ -535,7 +536,78 @@ function App() {
       });
       // Reload config to update downloaded status
       loadConfig()
-        .then(cfg => setConfig(cfg))
+        .then(cfg => {
+          if (!mounted) return;
+          setConfig(cfg);
+
+          // Check if the downloaded model matches the configured ASR model
+          const downloadedModel = parseModelId(event.modelId);
+          const currentAsrModel = cfg?.globalModelConfig?.asrModel;
+
+          if (currentAsrModel && downloadedModel.baseId === currentAsrModel.modelId) {
+            // User downloaded a quantization of the currently configured model
+            // Check if it's a different quantization
+            const currentQuant = currentAsrModel.quantization;
+            if (downloadedModel.quant && downloadedModel.quant !== currentQuant) {
+              // Different quantization downloaded - prompt user to switch
+              const model = cfg?.models?.find(m => m.id === downloadedModel.baseId);
+              const modelName = model?.name || downloadedModel.baseId;
+              const quantLabel = downloadedModel.quant.toUpperCase();
+
+              showToast({
+                type: 'success',
+                title: t('download.quantDownloadComplete', { model: modelName, quant: quantLabel }),
+                description: t('download.switchQuantHint'),
+                action: {
+                  label: t('download.switchNow'),
+                  onClick: async () => {
+                    try {
+                      const fullModelId = getFullModelId({
+                        modelId: downloadedModel.baseId,
+                        quantization: downloadedModel.quant,
+                      });
+                      // Unload current model and load new one
+                      const currentFullId = getFullModelId(currentAsrModel);
+                      const result = await switchAsrModel(currentFullId, fullModelId);
+                      if (result.success) {
+                        // Update config
+                        const newConfig = {
+                          ...cfg,
+                          globalModelConfig: {
+                            ...cfg.globalModelConfig,
+                            asrModel: {
+                              modelId: downloadedModel.baseId,
+                              quantization: downloadedModel.quant,
+                            },
+                          },
+                        };
+                        setConfig(newConfig);
+                        await saveConfig(newConfig);
+                        showToast({
+                          type: 'success',
+                          title: t('download.switchSuccess'),
+                        });
+                      } else {
+                        showToast({
+                          type: 'error',
+                          title: t('download.switchFailed'),
+                          description: result.error || undefined,
+                        });
+                      }
+                    } catch (err) {
+                      log.error(`Failed to switch model: ${err}`);
+                      showToast({
+                        type: 'error',
+                        title: t('download.switchFailed'),
+                        description: String(err),
+                      });
+                    }
+                  },
+                },
+              });
+            }
+          }
+        })
         .catch(err => log.error(`Failed to reload config: ${err}`));
     });
 
