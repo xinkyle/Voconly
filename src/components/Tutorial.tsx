@@ -77,18 +77,32 @@ const customStyles = `
     position: absolute;
     top: 12px;
     right: 12px;
-    width: 28px;
-    height: 28px;
+    width: auto;
+    height: auto;
+    padding: 4px 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 6px;
-    color: #9ca3af;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid #e5e7eb;
     transition: all 0.2s ease;
   }
   .driver-popover-close-btn:hover {
     background: #f3f4f6;
-    color: #6b7280;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+  /* 隐藏默认的 X 图标 */
+  .driver-popover-close-btn svg {
+    display: none;
+  }
+  /* 用伪元素显示"跳过"文字 */
+  .driver-popover-close-btn::after {
+    content: "跳过";
   }
   .driver-popover-footer {
     padding-top: 12px;
@@ -135,9 +149,42 @@ export function Tutorial({ onComplete }: TutorialProps) {
     // Create driver instance
     const driverInstance = driver({
       showProgress: true,
-      allowClose: true,
+      allowClose: false,
+      showButtons: ['next', 'previous'],
       overlayColor: 'rgba(0, 0, 0, 0.5)',
       steps: TUTORIAL_STEPS,
+      onPopoverRender: (popover) => {
+        // 创建跳过按钮
+        const skipBtn = document.createElement('button');
+        skipBtn.textContent = '跳过';
+        skipBtn.style.cssText = `
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          padding: 4px 10px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #6b7280;
+          background: transparent;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        `;
+        skipBtn.onmouseenter = () => {
+          skipBtn.style.background = '#f3f4f6';
+          skipBtn.style.color = '#374151';
+        };
+        skipBtn.onmouseleave = () => {
+          skipBtn.style.background = 'transparent';
+          skipBtn.style.color = '#6b7280';
+        };
+        skipBtn.onclick = () => {
+          onComplete();
+          driverInstance.destroy();
+        };
+        popover.wrapper.appendChild(skipBtn);
+      },
       onDestroyStarted: () => {
         // Call onComplete to save config and close tutorial
         onComplete();
