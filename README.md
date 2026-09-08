@@ -49,10 +49,10 @@ Assign each workflow its own hotkey and switch modes with a single keystroke.
 
 | Mode | You say... | You get... |
 |---|---|---|
-| 📝 Quick Note | "呃就是那个方案我觉得可以再改改..." | Typos fixed, punctuation cleaned, meaning untouched |
-| 💼 Professional | Spoken rambling | Well-structured, polished writing that keeps your core idea |
-| 🌐 Translate | Chinese (or English) | The other language at your cursor — any language your LLM supports |
-| 🗂️ Meeting | Meeting discussion | Structured summary with key points |
+| 📝 Light Polish | "I mean, I think this plan is actually pretty good, you know, it's just that the timeline is kind of a little too long, and maybe we could, like, make some adjustments and try to shorten it a bit." | "I think this plan is actually pretty good, it's just that the timeline is a little too long, and maybe we could make some adjustments and try to shorten it a bit." |
+| 💼 Professional Polish | "I mean, I think this plan is actually pretty good, you know, it's just that the timeline is kind of a little too long, and maybe we could, like, make some adjustments and try to shorten it a bit." | "I think the plan is viable overall, but the current execution timeline is too long. We should optimize the implementation plan to shorten the overall timeline and improve execution efficiency." |
+| 🌐 Translate | "I think the plan is pretty good overall, but the timeline is a bit too long. Maybe we could optimize it a little further." | "嗯，我觉得这个方案整体其实还不错，就是这个时间周期吧，感觉还是有点长，我们是不是可以再优化一下？" |
+| 🗂️ Meeting Secretary | Meeting discussion | Structured summary with key points |
 | 🛠️ Custom | Anything | Your own prompt, your own logic |
 
 Each mode has its own **hotkey and processing prompt**, while your ASR model and LLM provider work across all modes.
