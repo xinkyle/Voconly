@@ -1,160 +1,178 @@
-# Voconly - Local AI Voice Input Assistant
+# Voconly — Voice in. Text out. Done.
 
-[中文版](README_CN.md) | English
+**Speak naturally. Voconly transcribes locally, refines with AI, and puts finished text right at your cursor — in any app.**
 
-**Voconly is a free, open-source, local-first AI voice input assistant that runs entirely on your device.**
-> It turns speech into text locally and uses AI to polish, translate, organize, and transform your words into usable content, letting you replace keyboard input with your voice in any application. No audio uploads. No cloud dependency. Your voice stays on your device.
-> Supports Whisper, SenseVoice, Parakeet ,Qwen-asr speech recognition models.
-> Perfect for content creation, email drafting, meeting records, quick note-taking.
+No cloud. No quota. No copy-paste.
 
 ![Voconly Demo](demo-en.webp)
 
-[Download Now](https://github.com/xinkyle/Voconly/releases) | [Website](https://www.voconly.com) | [Use Cases](#use-cases) | [Contributing](#contributing)
+[Download](https://github.com/xinkyle/Voconly/releases) · [Website](https://www.voconly.com) · [中文文档](README_CN.md)
 
 ---
 
-## Core Features
+## Your Thoughts Move Faster Than Your Fingers
 
-### Scenario-based Configuration
+Speaking is natural. Typing is slow. Most ideas die in the gap between them.
 
-Configure dedicated combinations for different use cases:
-
-- Custom scenario names
-- Bind hotkeys for one-click recording
-- Choose ASR models (Whisper / SenseVoice / Parakeet / Qwen-Asr)
-- Optional LLM post-processing (light polish, translation, professional polish, meeting secretary, custom prompts supported)
-
-### Real-time Transcription
-
-See text as you speak, with results ready the moment you finish. Automatic optimization for streaming and non-streaming models.
-
-### Local ASR, Privacy-first
-
-- Local speech recognition engine, data never leaves your device
-- Supports multiple models: Whisper, SenseVoice, Parakeet, Qwen-Asr
-- Zero network latency, always available
-
-### Flexible LLM Support
-
-- Local models: Run via Ollama
-- Cloud APIs: Support for multiple providers
-- Built-in processing modes: light polish, translation, professional polish, meeting secretary
-- Custom presets: Configure processing logic as needed
-
-### Quick Trigger
-
-Global hotkey activation. One keystroke completes: recording → transcription → LLM processing → output to cursor position. Double-press the hotkey to skip LLM processing for added flexibility.
+Voconly closes that gap — speak freely, and let AI handle the cleanup.
 
 ---
 
-## LLM Processing Modes
+## Most Voice Tools Stop at Transcription. Voconly Doesn't.
 
-| Mode | Description |
-|------|-------------|
-| Light Polish | Fix typos and punctuation, preserve original meaning |
-| Translation | Chinese→English, cross-language expression |
-| Professional Polish | Convert spoken to written style, formal expression |
-| Meeting Secretary | Summarize meeting key points, structured output |
-| Custom Preset | Configure processing logic as needed |
+Traditional voice tools turn speech into a transcript — then you copy, paste, and edit.
+
+Voconly turns speech into **finished writing**.
+
+ **Speak naturally**
+↓
+ **Local transcription**
+↓
+ **AI understands and refines**
+↓
+ **Finished text appears at your cursor**
+
+No switching windows. No copy-paste. It lands exactly where you're typing.
+
+**Two ways to finish, one key:**
+
+- **Press to start → press again to stop:** full pipeline, AI-polished output
+- **Press to start → double-press to stop:** raw transcript, straight out — skip AI entirely
 
 ---
 
-## Use Cases
+## One Voice. Different Intentions.
 
-| Scenario | Typical Uses |
-|----------|--------------|
-| Content Creation | Article ideas, video scripts, creative thoughts |
-| Workplace | Email drafting, work summaries, meeting notes |
-| Developers | Requirement descriptions, technical ideas, issue writing |
-| Daily Records | Inspiration notes, learning insights, life logging |
+The same voice can mean different things — a quick thought, a professional email, a translation, a meeting summary. 
+
+Assign each workflow its own hotkey and switch modes with a single keystroke.
+
+| Mode | You say... | You get... |
+|---|---|---|
+| 📝 Quick Note | "呃就是那个方案我觉得可以再改改..." | Typos fixed, punctuation cleaned, meaning untouched |
+| 💼 Professional | Spoken rambling | Well-structured, polished writing that keeps your core idea |
+| 🌐 Translate | Chinese (or English) | The other language at your cursor — any language your LLM supports |
+| 🗂️ Meeting | Meeting discussion | Structured summary with key points |
+| 🛠️ Custom | Anything | Your own prompt, your own logic |
+
+Each mode has its own **hotkey and processing prompt**, while your ASR model and LLM provider work across all modes.
+
+> Press the assigned key to start speaking, then press it again to finish.
 
 ---
 
-## Installation
+## Built for Everyday Use
 
-### Download
+**⚡ See your words as you speak**
+No matter which ASR model you use, Voconly gives you a live transcription experience. Text appears while you speak — and it's ready the moment you stop. No spinner. No waiting.
 
-Go to the [Releases](https://github.com/xinkyle/Voconly/releases) page to download the latest version.
+**♾️ Dictate for hours, accuracy stays stable**
+Speak for minutes or hours without the gradual accuracy drop common in long transcription sessions.
 
-### Requirements
+**📍 Works everywhere you can type**
+Browsers, Word, Notion, VS Code, WeChat, your email client — if you can type there, Voconly works there.
 
-- Windows 10/11
-- GPU recommended for better performance
+---
 
-### Build from Source
+## Why Voconly?
+
+|  | Voconly | Traditional dictation workflow |
+|---|---|---|
+|  Privacy | Audio never leaves your device | Often uploaded to the cloud |
+|  Limits | Unlimited, forever | Free quotas or subscriptions |
+|  Output | Finished, polished text | Raw transcript |
+|  Workflow | Appears at your cursor | Copy → paste → edit |
+|  Long sessions | Stable for hours | Accuracy may degrade over time |
+|  Models | Choose the ones you prefer | Locked into one provider |
+
+---
+
+## Use the Models You Prefer
+
+You're not locked into a single AI stack. Choose between fully local workflows or connect your preferred cloud models.
+
+- **ASR:** Whisper · SenseVoice · Parakeet · Qwen-ASR
+- **LLM:** Ollama (local) + major cloud API providers
+
+---
+
+## Get Started in 60 Seconds
+
+1. **Download** Voconly → [Releases](https://github.com/xinkyle/Voconly/releases)
+2. **Launch** it — pick a recommended model
+3. **Press hotkey and start talking** — press again for polished text, double-press for raw transcript
+
+That's it.
+
+**Build from source (Windows):**
 
 ```powershell
-# 1. Setup environment (check and install dependencies)
-.\setup.ps1
-
-# 2. Start development server
-.\start-dev.ps1
+.\setup.ps1        # check & install dependencies
+.\start-dev.ps1    # start dev server
+No GPU / no Vulkan SDK? Use .\setup.ps1 -SkipVulkan (CPU mode). GPU recommended for best speed.
 ```
 
-> **Tip**: If you don't have a GPU or don't want to install Vulkan SDK, use `.\setup.ps1 -SkipVulkan`
-
----
+Platforms
+| Platform | Status |
+|----------|--------|
+| Windows 10 / 11 | ✅ Available |
+| macOS | 🚧 Coming soon |
+| Linux | — Not planned |
 
 ## Roadmap
 
-Completed:
-- Local speech recognition (Whisper / SenseVoice / Parakeet / Qwen-Asr)
-- LLM post-processing (light polish, translation, professional polish, meeting secretary, custom)
-- Scenario-based configuration (hotkey + model + LLM)
-- Desktop application (Windows)
+### Done
 
-Planned:
-- macOS / Linux support
-- More features welcome your feedback.
+-   Local ASR: Whisper / SenseVoice / Parakeet / Qwen-ASR
+    
+-   Real-time transcription for every model
+    
+-   Long-session transcription without drift
+    
+-   LLM post-processing: quick note / professional / translation / meeting / custom
+    
+-   Single-key hotkey modes with optional AI pass
+    
+-   Windows app
+    
 
-If you have ideas, feel free to submit an [Issue](https://github.com/xinkyle/Voconly/issues).
+### Coming soon
 
----
+-   macOS
+    
 
-## Why Open Source?
+### Why Open Source?
 
-The biggest opportunity in the AI era isn't just having AI tools, but enabling everyone to use AI to create their own tools.
+I built Voconly because I wanted a voice tool that felt truly mine:
 
-Voconly is the beginning of this exploration. I hope to validate: what one person + AI can create.
+-   No subscription quotas
+    
+-   No audio uploaded by default
+    
+-   No dependency on a single company
+    
+-   No black box I couldn't control
+    
 
-As a daily voice transcription tool, I really dislike being limited by free usage quotas. I believe many people share this concern, so I open-sourced this project to let everyone use it locally without restrictions.
+So I open-sourced it.
 
-If this helps you, a Star would be appreciated.
+Voconly is also my experiment in what one person + AI can build today. If it helps you, a ⭐ means a lot.
 
----
+### Contributing
 
-## Contributing
+Issues, ideas, and PRs welcome — let's explore productivity in the AI era, together.
 
-Bug reports, suggestions, and code improvements are welcome. Let's explore new ways of productivity in the AI era together.
+### License
 
----
+MIT License — Copyright (c) 2026 Xing Yong
 
-## License
+### About
 
-MIT License
+Built by Xing Yong (老幸.AI) — exploring a simple question:  
+What can one person build with AI today?  
+Voconly is one of those experiments.  
+📧 laoxingai@139.com
 
-Copyright (c) 2026 Xing Yong
+### Tech Stack
 
----
-
-## About the Author
-
-**Xing Yong (Laoxing.AI)**
-
-15 years of entrepreneurship, long-term focus on AI, big data, and personal creativity. Currently exploring how individuals can regain creative abilities in the AI era.
-
-Started exploring AI in depth in 2024, from not knowing how to use AI for programming to completing products independently with AI. Gradually discovered: AI's greatest value is not replacing programmers, but enabling more ordinary people to regain creative abilities.
-
-Follow me on WeChat Official Account, Xiaohongshu, and other platforms: **老幸.AI**
-
-- Email: laoxingai@139.com
-
----
-
-## Tech Stack
-
-- Desktop Framework: Tauri 2.0
-- Frontend: React + TypeScript
-- Speech Recognition: Whisper.cpp (local)
-- AI Processing: Local LLM + Cloud API
-- Language: Rust + TypeScript
+Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp
