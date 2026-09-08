@@ -66,8 +66,8 @@ Each mode has its own **hotkey and processing prompt**, while your ASR model and
 **⚡ See your words as you speak**
 No matter which ASR model you use, Voconly gives you a live transcription experience. Text appears while you speak — and it's ready the moment you stop. No spinner. No waiting.
 
-**♾️ Dictate for hours, accuracy stays stable**
-Speak for minutes or hours without the gradual accuracy drop common in long transcription sessions.
+**♾️ Dictate for hours, stay in the flow**
+Speak for minutes or hours with a transcription experience built for long sessions.
 
 **📍 Works everywhere you can type**
 Browsers, Word, Notion, VS Code, WeChat, your email client — if you can type there, Voconly works there.
@@ -79,7 +79,7 @@ Browsers, Word, Notion, VS Code, WeChat, your email client — if you can type t
 |  | Voconly | Traditional dictation workflow |
 |---|---|---|
 |  Privacy | Audio never leaves your device | Often uploaded to the cloud |
-|  Limits | Unlimited, forever | Free quotas or subscriptions |
+|  Limits | Unlimited. No quotas. | Free quotas or subscriptions |
 |  Output | Finished, polished text | Raw transcript |
 |  Workflow | Appears at your cursor | Copy → paste → edit |
 |  Long sessions | Stable for hours | Accuracy may degrade over time |
