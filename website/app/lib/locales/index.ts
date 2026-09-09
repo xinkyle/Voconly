@@ -22,6 +22,20 @@ export interface Translation {
       offline: string;
       multiLang: string;
       crossPlatform: string;
+      speed: string;
+    };
+    painPoint: string;
+    valuePromise: string;
+    workflow: {
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+    };
+    differentiation: {
+      traditional: string;
+      voconly: string;
+      highlight: string;
     };
   };
   features: {
@@ -52,6 +66,15 @@ export interface Translation {
       description: string;
     };
     downloadCta: string;
+  };
+  comparison: {
+    title: string;
+    subtitle: string;
+    items: {
+      label: string;
+      voconly: string;
+      traditional: string;
+    }[];
   };
   pricing: {
     title: string;
@@ -137,9 +160,9 @@ export const zh: Translation = {
     learnMore: '了解更多',
   },
   hero: {
-    title: '说出来，就行了',
-    subtitle: '开源离线语音输入，不用联网，在任何应用中直接语音打字',
-    description: '写文档手指累？开会腾不出手？Voconly 让你按一下快捷键就能语音输入。更棒的是——可为不同场景配置不同快捷键：简单润色、专业改写、会议总结、翻译……双击直出结果，效率翻倍。本地运行，隐私无忧。',
+    title: '说话，就是最自然的输入',
+    subtitle: '你只管说出来，剩下的交给 AI',
+    description: 'Voconly 将你的语音实时转成文字，并理解、润色、整理成可以直接使用的内容',
     downloadBtn: '免费下载',
     learnMoreBtn: '看看怎么用',
     shortcutHint: '或按下',
@@ -147,9 +170,23 @@ export const zh: Translation = {
     badge: '本地运行，离线可用，数据安全',
     freeOpenSource: '免费开源',
     trustBadges: {
-      offline: '断网也能用',
-      multiLang: '说中文/英文都行',
-      crossPlatform: '双平台',
+      offline: '免费开源，无限量使用',
+      multiLang: '本地运行，离线可用',
+      crossPlatform: '数据从不上传',
+      speed: '4× 效率提升',
+    },
+    painPoint: '说话是本能，打字却很慢。大多数灵感，都死在这两者之间的空隙。',
+    valuePromise: 'Voconly 填平了这个空隙 —— 语音进，文字出，搞定。',
+    workflow: {
+      step1: '自然说话',
+      step2: '本地转录',
+      step3: 'AI 润色',
+      step4: '成品文字',
+    },
+    differentiation: {
+      traditional: '传统工具止步于"转文字"——然后你复制、粘贴、再编辑',
+      voconly: 'Voconly 把语音变成成品文字——说完就出现在光标处',
+      highlight: '成品文字，不是转录稿',
     },
   },
   features: {
@@ -180,6 +217,17 @@ export const zh: Translation = {
       description: '自动识别 99 种语言，不用切换输入法。跟外国同事开会、看外文资料，说就行。',
     },
     downloadCta: '免费下载，每天无限使用',
+  },
+  comparison: {
+    title: '为什么选择 Voconly？',
+    subtitle: '与传统语音工具的对比',
+    items: [
+      { label: '隐私', voconly: '语音绝不出设备', traditional: '经常上传云端' },
+      { label: '限制', voconly: '无额度限制', traditional: '订阅或付费' },
+      { label: '输出', voconly: '成品级文字', traditional: '原始转录稿' },
+      { label: '流程', voconly: '直接出现在光标处', traditional: '复制 → 粘贴 → 编辑' },
+      { label: '长时使用', voconly: '数小时保持稳定', traditional: '准确度可能下降' },
+    ],
   },
   pricing: {
     title: '完全免费',
@@ -274,53 +322,78 @@ export const en: Translation = {
     learnMore: 'Learn More',
   },
   hero: {
-    title: 'Voice Input, Hands Free',
-    subtitle: 'Open source offline voice typing, no internet needed, type with your voice in any app',
-    description: 'Tired of typing? In a meeting with no free hands? Voconly lets you voice input with a shortcut. Even better — configure different shortcuts for different scenarios: light polish, professional rewrite, meeting summary, translation... Double-tap for instant results. Local processing, zero privacy risk.',
-    downloadBtn: 'Download Voconly',
-    learnMoreBtn: 'Learn More',
+    title: 'Speaking is the Most Natural Input',
+    subtitle: 'Just speak, leave the rest to AI.',
+    description: 'Voconly converts your voice to text in real-time, understanding, polishing, and organizing it into ready-to-use content.',
+    downloadBtn: 'Free Download',
+    learnMoreBtn: 'See How It Works',
     shortcutHint: 'or press',
     platformInfo: 'Available for Windows / Mac',
     badge: 'Local processing, offline ready, data stays private',
     freeOpenSource: 'Free & Open Source',
     trustBadges: {
-      offline: 'Local Run',
-      multiLang: 'Multi-Language',
-      crossPlatform: 'Dual-Platform',
+      offline: 'Free & open source, unlimited use',
+      multiLang: 'Local & offline ready',
+      crossPlatform: 'Data never leaves your device',
+      speed: '4× Efficiency Boost',
+    },
+    painPoint: 'Speaking is natural. Typing is slow. Most ideas die in the gap between them.',
+    valuePromise: 'Voconly closes that gap — Voice in. Text out. Done.',
+    workflow: {
+      step1: 'Speak',
+      step2: 'Local Transcription',
+      step3: 'AI Polish',
+      step4: 'Finished Text',
+    },
+    differentiation: {
+      traditional: 'Traditional tools stop at "transcription" — then you copy, paste, and edit',
+      voconly: 'Voconly turns speech into finished writing — appears right at your cursor',
+      highlight: 'Finished writing, not raw transcript',
     },
   },
   features: {
-    title: 'Offline Voice Typing, Privacy First',
-    subtitle: 'Privacy-focused, high-quality speech recognition without internet',
+    title: 'Offline Voice Input, Privacy First',
+    subtitle: 'Not replacing the keyboard, but making input easier',
     scenarios: {
       title: 'Scenario Shortcuts',
-      description: 'Configure shortcuts for different scenarios: light polish, professional polish, meeting summary, translation... One-tap access to what you need.',
+      description: 'Configure dedicated shortcuts for different scenarios: light polish, professional polish, meeting summary, translation... One-tap access, speak and get.',
     },
     shortcut: {
-      title: 'Global Shortcut',
+      title: 'No Window Switching',
       description: 'One tap to speak, double-tap for instant transcription. Works in Word, WeChat, VS Code... anywhere without breaking your flow.',
     },
     smart: {
-      title: 'Smart Post-processing',
-      description: 'Supports online or offline LLMs. Auto-polish, format, and summarize. Casual speech becomes professional text — configure API and go.',
+      title: 'Auto-organize into Drafts',
+      description: 'Supports online or offline LLMs. Auto-polish, segment, and summarize. Casual speech becomes professional text — privacy and intelligence combined.',
     },
     realtime: {
       title: 'Real-time Transcription',
-      description: 'Fast local recognition, see text as you speak. Supports Chinese, English, and Chinese-English mixed input.',
+      description: 'Fast local recognition, text appears as you speak. Supports Chinese, English, and Chinese-English mixed input.',
     },
     privacy: {
-      title: 'Local Voice Recognition, Data Stays Private',
-      description: 'Meeting notes, private journals, business secrets - speak freely. All data processed locally, zero cloud exposure.',
+      title: 'Local Voice Recognition, Data Never Uploads',
+      description: 'Meeting notes, private journals, business secrets — never uploaded to any server. Local processing, safer than any cloud recognition.',
     },
     multiLang: {
-      title: 'Multi-language Support',
-      description: 'Auto-detects Chinese, English, Japanese, Korean and 10+ other languages. No need to switch input methods.',
+      title: 'Speak Foreign Languages Too',
+      description: 'Auto-detects 99+ languages and dialects. No need to switch input methods. Perfect for meetings with foreign colleagues or reading foreign materials.',
     },
     downloadCta: 'Free Download, Unlimited Daily Use',
   },
+  comparison: {
+    title: 'Why Choose Voconly?',
+    subtitle: 'Compared to traditional voice tools',
+    items: [
+      { label: 'Privacy', voconly: 'Audio never leaves your device', traditional: 'Often uploaded to cloud' },
+      { label: 'Limits', voconly: 'No quotas, unlimited', traditional: 'Subscriptions or fees' },
+      { label: 'Output', voconly: 'Finished, polished text', traditional: 'Raw transcript' },
+      { label: 'Workflow', voconly: 'Appears at your cursor', traditional: 'Copy → Paste → Edit' },
+      { label: 'Long sessions', voconly: 'Stable for hours', traditional: 'Accuracy may degrade' },
+    ],
+  },
   pricing: {
-    title: 'Free & Open Source',
-    subtitle: 'Local voice recognition, privacy first',
+    title: 'Completely Free',
+    subtitle: 'Open source project, free forever',
     opensource: {
       name: 'Free & Open Source',
       price: '$0',
@@ -331,8 +404,8 @@ export const en: Translation = {
       github: 'View Source',
     },
     trust: {
-      whisper: 'Local Whisper model, zero privacy risk',
-      platforms: 'Supports Windows / Mac',
+      whisper: 'Runs entirely locally, audio never uploads',
+      platforms: 'Windows / Mac dual platform',
       opensource: 'Open source tech, trusted & secure',
     },
   },
@@ -374,11 +447,11 @@ export const en: Translation = {
     shortcutKey: 'Command + T',
   },
   footer: {
-    description: 'Desktop voice input tool with offline Whisper recognition. Privacy-first, hands-free in any app.',
-    ctaTitle: 'Try It Now',
-    ctaSubtitle: 'Start free, 50 inputs per day - try before you buy',
+    description: 'Just speak, and it\'s done. Local voice input, privacy first.',
+    ctaTitle: 'Save 30 minutes of typing every day',
+    ctaSubtitle: 'Local processing, offline ready, data safe',
     downloadBtn: 'More Downloads',
-    freeInfo: 'Free version forever',
+    freeInfo: 'Windows · macOS dual platform',
     links: {
       product: {
         title: 'Product',
@@ -422,6 +495,16 @@ export type TranslationKey =
   | 'hero.trustBadges.offline'
   | 'hero.trustBadges.multiLang'
   | 'hero.trustBadges.crossPlatform'
+  | 'hero.trustBadges.speed'
+  | 'hero.painPoint'
+  | 'hero.valuePromise'
+  | 'hero.workflow.step1'
+  | 'hero.workflow.step2'
+  | 'hero.workflow.step3'
+  | 'hero.workflow.step4'
+  | 'hero.differentiation.traditional'
+  | 'hero.differentiation.voconly'
+  | 'hero.differentiation.highlight'
   | 'features.title'
   | 'features.subtitle'
   | 'features.scenarios.title'
@@ -437,6 +520,9 @@ export type TranslationKey =
   | 'features.multiLang.title'
   | 'features.multiLang.description'
   | 'features.downloadCta'
+  | 'comparison.title'
+  | 'comparison.subtitle'
+  | 'comparison.items'
   | 'pricing.title'
   | 'pricing.subtitle'
   | 'pricing.opensource.name'

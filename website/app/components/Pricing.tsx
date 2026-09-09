@@ -1,16 +1,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Check, Heart, ArrowRight, Github } from 'lucide-react';
+import { Check, Heart, ArrowRight, Github, Cpu, Cloud, Shield, Globe, Zap } from 'lucide-react';
 import { useI18n } from '../lib/i18n-context';
 
 export default function Pricing() {
-  const { t, get } = useI18n();
+  const { t, get, lang } = useI18n();
 
   const features = get<string[]>('pricing.opensource.features');
 
   return (
-    <section id="pricing" className="relative py-24 overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
+    <section id="pricing" className="relative py-20 overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
       {/* 背景光晕 */}
       <div className="absolute inset-0 pointer-events-none">
         <div
@@ -30,6 +30,13 @@ export default function Pricing() {
           transition={{ duration: 0.5 }}
           className="text-center mb-12"
         >
+          <div className="inline-flex items-center gap-2 mb-5">
+            <span className="w-8 h-px" style={{ background: 'var(--color-accent)' }} />
+            <span className="font-body text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--color-accent)' }}>
+              {lang === 'zh' ? '04 · 定价' : '04 · Pricing'}
+            </span>
+            <span className="w-8 h-px" style={{ background: 'var(--color-accent)' }} />
+          </div>
           <h2 className="font-display text-4xl sm:text-5xl text-white mb-4">
             {t('pricing.title')}
           </h2>
@@ -106,7 +113,7 @@ export default function Pricing() {
           </div>
         </motion.div>
 
-        {/* 信任徽章 */}
+{/* 信任徽章 */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Download, Sparkles, Monitor, Apple } from 'lucide-react';
+import { Download, Sparkles, Monitor, Apple, Check } from 'lucide-react';
 import Navbar from './Navbar';
 import { useI18n } from '../lib/i18n-context';
 
@@ -32,15 +32,8 @@ export default function Hero() {
 
   return (
     <section className="relative min-h-screen overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
-      {/* 极简背景：单一光晕 + 网格 */}
+      {/* 极简背景：网格 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* 中心光晕 */}
-        <div
-          className="absolute top-[22%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-35"
-          style={{
-            background: 'radial-gradient(ellipse 80% 100% at 50% 0%, rgba(0, 212, 170, 0.3), transparent 70%)',
-          }}
-        />
         {/* 微妙网格 */}
         <div className="absolute inset-0 grid-bg opacity-50" />
       </div>
@@ -55,7 +48,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8"
+            className="mb-6"
           >
             <a
               href={GITHUB_RELEASE_URL}
@@ -75,7 +68,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-display text-5xl sm:text-6xl lg:text-7xl text-white mb-20 leading-[1.1] tracking-tight"
+            className="font-display text-5xl sm:text-6xl lg:text-7xl text-white mb-10 leading-[1.1] tracking-tight"
           >
             {t('hero.title')}
           </motion.h1>
@@ -85,7 +78,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="font-body text-xl sm:text-2xl text-white/60 mb-8 max-w-2xl mx-auto leading-relaxed"
+            className="font-body text-xl sm:text-2xl text-white/60 mb-4 max-w-2xl mx-auto leading-relaxed"
           >
             {t('hero.subtitle')}
           </motion.p>
@@ -95,7 +88,7 @@ export default function Hero() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="font-body text-base text-white/40 mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="font-body text-base text-white/40 mb-8 max-w-3xl mx-auto leading-relaxed"
           >
             {t('hero.description')}
           </motion.p>
@@ -134,6 +127,31 @@ export default function Hero() {
                 </motion.a>
               );
             })}
+          </motion.div>
+
+          {/* 信任指标行 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-4"
+          >
+            <span className="inline-flex items-center gap-2 font-body text-sm text-white/50">
+              <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              {t('hero.trustBadges.offline')}
+            </span>
+            <span className="inline-flex items-center gap-2 font-body text-sm text-white/50">
+              <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              {t('hero.trustBadges.multiLang')}
+            </span>
+            <span className="inline-flex items-center gap-2 font-body text-sm text-white/50">
+              <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              {t('hero.trustBadges.crossPlatform')}
+            </span>
+            <span className="inline-flex items-center gap-2 font-body text-sm text-white/50">
+              <Check className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              {t('hero.trustBadges.speed')}
+            </span>
           </motion.div>
 
           {/* 应用截图 */}

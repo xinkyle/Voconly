@@ -5,10 +5,11 @@ import { I18nProvider } from './lib/i18n-context';
 import { StructuredData } from './components/StructuredData';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import Features from './components/Features';
+import ShortcutShowcase from './components/ShortcutShowcase';
+import DictationGrid from './components/DictationGrid';
+import TechCapabilities from './components/TechCapabilities';
 import Pricing from './components/Pricing';
 import FaqSection from './components/FaqSection';
-import Testimonials from './components/Testimonials';
 import Footer from './components/Footer';
 
 const dmSerif = DM_Serif_Display({
@@ -74,10 +75,11 @@ export default function RootPage() {
           <Navbar />
           <main className="min-h-screen pt-16" style={{ background: 'var(--color-bg-primary)' }}>
             <Hero />
-            <Features />
+            <DictationGrid />
+            <ShortcutShowcase />
+            <TechCapabilities />
             <Pricing />
             <FaqSection />
-            <Testimonials />
             <Footer />
           </main>
         </I18nProvider>
