@@ -23,9 +23,21 @@ export function I18nProvider({ children, initialLang = 'zh' }: I18nProviderProps
   const [lang, setLangState] = useState<Language>(initialLang);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-    if (stored && (stored === 'zh' || stored === 'en')) {
-      setLangState(stored);
+    // 只有当 initialLang 是默认值时才读取 localStorage
+    // 如果 URL 明确指定了语言（/zh/ 或 /en/），则使用 URL 指定的语言
+    const urlLang = window.location.pathname.split('/')[1] as Language;
+    const isUrlLangValid = urlLang === 'zh' || urlLang === 'en';
+
+    if (isUrlLangValid) {
+      // URL 指定了语言，使用 URL 的语言并保存到 localStorage
+      setLangState(urlLang);
+      localStorage.setItem(STORAGE_KEY, urlLang);
+    } else {
+      // URL 没有指定语言（如根路径 /），才读取 localStorage
+      const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
+      if (stored && (stored === 'zh' || stored === 'en')) {
+        setLangState(stored);
+      }
     }
   }, []);
 
