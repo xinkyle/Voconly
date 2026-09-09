@@ -1,5 +1,7 @@
 # Voconly — 语音进，文字出，搞定。
 
+**开源、本地优先的 Wispr Flow 替代方案 —— 为 Windows 而生。**
+
 **自然地说话，Voconly 在本地完成转录、用 AI 润色，并把成品文字直接送到你的光标处——在任何应用中。**
 
 无云端。无额度限制。无需复制粘贴。
@@ -176,38 +178,4 @@ Voconly 是这些实验中的一个。
 
 ### 技术栈
 
-Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp平台支持
-表格
-平台	状态
-Windows 10 / 11	✅ 已可用
-macOS	🚧 即将推出
-Linux	— 暂无计划
-路线图
-已完成
-本地语音识别：Whisper / SenseVoice / Parakeet / Qwen-ASR
-所有模型均支持实时转录
-长时转录不漂移
-LLM 后处理：快速记录 / 专业润色 / 翻译 / 会议秘书 / 自定义
-单键快捷键模式，可选择是否经过 AI 处理
-Windows 桌面应用
-即将推出
-macOS
-为什么开源？
-我做 Voconly，是因为我想要一个真正"属于我自己"的语音工具：
-没有订阅额度
-语音数据始终在本地处理
-不依赖某一家公司
-不是一个我无法掌控的黑盒
-所以我把它开源了。
-Voconly 也是我的一个实验——一个人 + AI，今天能做出什么。如果它帮到了你，一个 ⭐ 就是最大的鼓励。
-参与贡献
-欢迎提交 Issue、想法和改进——让我们一起探索 AI 时代的生产力方式。
-许可证
-MIT License — Copyright (c) 2026 Xing Yong
-关于作者
-由 Xing Yong（老幸.AI） 开发——他在探索一个简单的问题：
-一个人，借助 AI，今天能做出什么？
-Voconly 就是这些实验之一。
-📧 laoxingai@139.com
-技术栈
 Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp
