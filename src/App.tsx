@@ -1145,7 +1145,7 @@ function App() {
       // 如果 LLM 失败或文本过长，药丸会显示错误状态等待用户确认，这里不隐藏
       if (!llmFailed && !llmFailedTextTooLong) {
         // 等待进度条动画完成（让用户看到100%后再隐藏，动画时长200ms + 缓冲）
-        await new Promise(resolve => setTimeout(resolve, 250));
+        await new Promise(resolve => setTimeout(resolve, 100));
         await hideFloatPanelStatus('workflow-complete');
       }
 
@@ -1183,7 +1183,7 @@ function App() {
       }
 
       // Small delay to ensure panel is hidden before showing text
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Step 5: Type the text using keyboard simulation
       // 分段转录模式：从预览窗口获取累积文字

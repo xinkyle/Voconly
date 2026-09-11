@@ -373,6 +373,7 @@ export default function FloatPanelApp() {
   // LLM 结束信号追踪
   const hasLlmConfigRef = useRef(false); // 是否有 LLM 配置且开关打开
   const llmCompleteReceivedRef = useRef(false); // 是否收到 LLM complete 事件
+  const skipLlmRef = useRef(false); // 是否双击跳过 LLM（用于快速动画）
 
   // 同步 progress 到 ref
   useEffect(() => {
@@ -386,13 +387,20 @@ export default function FloatPanelApp() {
     log.debug(`[StatusRef] Status updated: ${state.status}`);
   }, [state.status]);
 
-  // 平滑过渡到完成状态（200ms ease-out）
-  const smoothProgressToComplete = () => {
+  // 同步 skipLlm 到 ref（用于动画中判断是否双击跳过）
+  useEffect(() => {
+    skipLlmRef.current = state.skipLlm || false;
+    log.debug(`[SkipLlmRef] skipLlm=${state.skipLlm}`);
+  }, [state.skipLlm]);
+
+  // 平滑过渡到完成状态（默认 200ms ease-out，双击跳过时 50ms）
+  const smoothProgressToComplete = (customDuration?: number) => {
     const startProgress = progressRef.current;
-    const duration = 200;
+    const isSkipLlm = skipLlmRef.current;
+    const duration = customDuration ?? (isSkipLlm ? 50 : 200);
     const startTime = Date.now();
 
-    log.debug(`[SMOOTH] Starting smooth animation: ${startProgress.toFixed(2)}% → 100%, duration=${duration}ms, startTime=${startTime}`);
+    log.debug(`[SMOOTH] Starting smooth animation: ${startProgress.toFixed(2)}% → 100%, duration=${duration}ms, isSkipLlm=${isSkipLlm}`);
 
     // 清除之前的动画帧
     if (smoothAnimationRef.current) {
@@ -569,6 +577,8 @@ export default function FloatPanelApp() {
           setVoiceDetected(false);
           // 【新设计】重置麦克风初始化状态
           setIsMicrophoneInitializing(false);
+          // 【双击跳过】重置 skipLlm 标记
+          skipLlmRef.current = false;
           log.debug('[HIDE-EVENT] 状态已完全重置');
         }, 100);
       }).catch((e) => {
@@ -1164,7 +1174,12 @@ export default function FloatPanelApp() {
       };
       sessionRef.current = session;
       llmCompleteReceivedRef.current = false;
-      log.debug(`[TRACK] START NEW SESSION: id=${session.id}, estimated=${session.estimated}ms`);
+
+      // 【双击跳过】使用固定动画，150ms 走到 95%
+      const isSkipLlm = state.skipLlm || false;
+      const fixedDuration = 150; // 固定动画时长
+
+      log.debug(`[TRACK] START NEW SESSION: id=${session.id}, estimated=${session.estimated}ms, isSkipLlm=${isSkipLlm}`);
 
       // 启动动画
       const animate = () => {
@@ -1190,7 +1205,24 @@ export default function FloatPanelApp() {
         }
 
         const elapsed = now - currentSession.startTime;
-        const baseProgress = calculateProgress(elapsed, currentSession.estimated, `session-${session.id}`);
+
+        // 【双击跳过】固定动画：150ms 走到 95%
+        // 【正常流程】预估驱动：根据预估时间计算进度
+        let baseProgress: number;
+        if (isSkipLlm) {
+          // 固定动画：150ms 走到 95%，之后降速等待
+          const ratio = Math.min(elapsed / fixedDuration, 1);
+          if (ratio < 1) {
+            baseProgress = ratio * 95; // 0-95%
+          } else {
+            // 超过 150ms 还没完成，使用预估逻辑降速等待
+            baseProgress = calculateProgress(elapsed - fixedDuration + fixedDuration * 0.95 / 0.01, currentSession.estimated, `session-${session.id}-slowdown`);
+            baseProgress = Math.max(95, Math.min(99, baseProgress)); // 限制在 95-99%
+          }
+        } else {
+          // 正常流程：使用预估时间
+          baseProgress = calculateProgress(elapsed, currentSession.estimated, `session-${session.id}`);
+        }
 
         // 进度只增不减
         if (baseProgress > progressRef.current) {
@@ -1204,13 +1236,13 @@ export default function FloatPanelApp() {
 
         // 每500ms打印一次进度
         if (Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
-          console.log(`[PROGRESS-RAF][Session ${session.id}] elapsed=${elapsed}ms, progress=${baseProgress.toFixed(4)}%, estimated=${currentSession.estimated}ms`);
+          console.log(`[PROGRESS-RAF][Session ${session.id}] elapsed=${elapsed}ms, progress=${baseProgress.toFixed(4)}%, isSkipLlm=${isSkipLlm}`);
         }
 
         requestAnimationFrame(animate);
       };
 
-      console.log(`[PROGRESS-START][Session ${session.id}] 启动进度动画, estimated=${session.estimated}ms`);
+      console.log(`[PROGRESS-START][Session ${session.id}] 启动进度动画, estimated=${session.estimated}ms, isSkipLlm=${isSkipLlm}`);
       requestAnimationFrame(animate);
 
     } else if (shouldTrack && hasSession) {
@@ -1250,7 +1282,7 @@ export default function FloatPanelApp() {
     return () => {
       sessionRef.current = null;
     };
-  }, [state.status, state.isTranscribing, state.visible]);
+  }, [state.status, state.isTranscribing, state.visible, state.skipLlm]);
 
   // 取消录音处理
   const handleCancelRecording = useCallback(() => {
