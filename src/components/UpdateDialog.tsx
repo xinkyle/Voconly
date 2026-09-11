@@ -4,12 +4,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
+import { invoke } from '@tauri-apps/api/core';
 import {
   checkForUpdates,
   downloadAndInstallUpdate,
 } from '../services/updater';
 import type { DownloadProgress } from '../services/updater';
 import type { RemoteVersionInfo } from '../types/updater';
+import { createLogger } from '../services/log';
+
+const log = createLogger('UpdateDialog');
 
 type DialogState = 'idle' | 'checking' | 'available' | 'downloading' | 'error';
 
@@ -55,6 +59,9 @@ export default function UpdateDialog({
   // Use ref to store externalVersionInfo - changes won't trigger effect re-run
   const externalVersionInfoRef = useRef(externalVersionInfo);
   externalVersionInfoRef.current = externalVersionInfo;
+
+  // 用户是否主动取消下载
+  const userCancelledRef = useRef(false);
 
   // State
   const [dialogState, setDialogState] = useState<DialogState>('idle');
@@ -134,6 +141,9 @@ export default function UpdateDialog({
 
   // Handle download and install
   const handleInstall = useCallback(async () => {
+    // 重置取消标志
+    userCancelledRef.current = false;
+
     // Force sync update to show progress UI immediately
     flushSync(() => {
       setDialogState('downloading');
@@ -155,15 +165,30 @@ export default function UpdateDialog({
       }, i18n.language);
       // After successful install, the app will relaunch automatically
     } catch (err) {
+      // 如果是用户主动取消，不显示错误
+      if (userCancelledRef.current) {
+        log.info('[UpdateDialog] Download cancelled by user, ignoring error');
+        return;
+      }
       flushSync(() => {
         setError(String(err));
         setDialogState('error');
       });
     }
-  }, []);
+  }, [i18n.language]);
 
   // Handle cancel download - restore to available state
-  const handleCancelDownload = useCallback(() => {
+  const handleCancelDownload = useCallback(async () => {
+    // 标记为用户主动取消
+    userCancelledRef.current = true;
+
+    // 先通知后端取消下载
+    try {
+      await invoke('cancel_download');
+    } catch (err) {
+      console.warn('Failed to cancel download:', err);
+    }
+
     flushSync(() => {
       setDialogState('available');
       setProgress({ downloaded: 0, totalSize: 0, progress: 0 });
