@@ -17,6 +17,9 @@ export interface RemoteVersionInfo {
   currentVersion: string;
   date?: string;
   body?: string;
+  // V2 新增字段
+  url?: string;
+  signature?: string;
 }
 
 /**

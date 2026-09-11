@@ -184,7 +184,7 @@ export default function UpdateDialog({
 
     // 先通知后端取消下载
     try {
-      await invoke('cancel_download');
+      await invoke('cancel_download_v2');
     } catch (err) {
       console.warn('Failed to cancel download:', err);
     }

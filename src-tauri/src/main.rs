@@ -2202,16 +2202,15 @@ fn main() {
             commands::dictionary::add_dictionary_entry,
             commands::dictionary::remove_dictionary_entry,
             // Updater commands
-            updater::check_for_updates,
             updater::get_app_version,
             updater::get_update_state,
-            updater::download_update,
-            updater::cancel_download,
-            updater::install_update,
-            updater::cleanup_downloaded_update,
             updater::reset_remind_count,
             updater::increment_remind_count,
             updater::exit_app,
+            // Updater V2 commands
+            updater::check_for_updates_v2,
+            updater::download_and_install_update_v2,
+            updater::cancel_download_v2,
             // File operations (unified API from lib)
             voconly::file_ops::read_text_file,
             voconly::file_ops::write_text_file,

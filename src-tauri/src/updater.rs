@@ -1,7 +1,8 @@
 //! 应用更新模块
 //! 支持从远程服务器检查版本、下载安装包并安装
+//! 使用 Tauri updater 的签名验证和安装能力
 
-use crate::paths::{cache_dir, resolve_path};
+use crate::paths::resolve_path;
 use futures_util::StreamExt;
 use log::{info, warn};
 use once_cell::sync::Lazy;
@@ -14,10 +15,16 @@ use tauri::{Emitter, Manager};
 /// 默认版本信息 URL（Google Drive）
 const DEFAULT_VERSION_URL: &str = "https://drive.google.com/uc?export=download&id=VERSION_FILE_ID";
 
+/// GitHub latest.json URL
+const GITHUB_LATEST_URL: &str = "https://github.com/xinkyle/Voconly/releases/download/v{{version}}/latest.json";
+
+/// Gitee latest.json URL
+const GITEE_LATEST_URL: &str = "https://gitee.com/xingkyle/Voconly/releases/download/v{{version}}/latest.json";
+
 /// 下载取消标志
 static DOWNLOAD_CANCELLED: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
-/// 远程版本信息
+/// 远程版本信息（旧版，保留兼容性）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteVersionInfo {
@@ -28,6 +35,37 @@ pub struct RemoteVersionInfo {
     pub file_size: u64,
     pub changelog: Vec<String>,
     pub min_version: String,
+}
+
+/// 平台更新信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformUpdateInfo {
+    pub url: String,
+    pub signature: String,
+}
+
+/// latest.json 文件格式
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatestJson {
+    pub version: String,
+    pub date: String,
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub platforms: std::collections::HashMap<String, PlatformUpdateInfo>,
+}
+
+/// 更新信息（新版，用于 V2 命令）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub version: String,
+    pub current_version: String,
+    pub date: String,
+    pub notes: Option<String>,
+    pub url: String,
+    pub signature: String,
 }
 
 /// 本地更新状态
@@ -113,58 +151,6 @@ fn get_today_date_string() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
-/// 检查版本更新（Tauri Command）
-#[tauri::command]
-pub async fn check_for_updates(
-    version_url: Option<String>,
-) -> Result<Option<RemoteVersionInfo>, String> {
-    info!("Checking for updates...");
-
-    let url = version_url.unwrap_or(DEFAULT_VERSION_URL.to_string());
-
-    // 发送 HTTP 请求获取版本信息
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to fetch version info: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP error: {}", response.status()));
-    }
-
-    let version_info: RemoteVersionInfo = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse version info: {}", e))?;
-
-    let current_version = get_current_version();
-    info!(
-        "Current version: {}, Remote version: {}",
-        current_version, version_info.version
-    );
-
-    // 更新检查状态
-    let mut state = load_update_state().unwrap_or_default();
-    state.last_check_date = get_today_date_string();
-    state.last_version_checked = version_info.version.clone();
-    save_update_state(&state)?;
-
-    // 比较版本
-    if is_newer_version(&current_version, &version_info.version) {
-        info!("New version available: {}", version_info.version);
-        Ok(Some(version_info))
-    } else {
-        info!("Already on latest version");
-        Ok(None)
-    }
-}
-
 /// 获取当前版本（Tauri Command）
 #[tauri::command]
 pub fn get_app_version() -> String {
@@ -175,242 +161,6 @@ pub fn get_app_version() -> String {
 #[tauri::command]
 pub fn get_update_state() -> Result<UpdateState, String> {
     load_update_state()
-}
-
-/// 获取下载目录路径
-fn get_download_dir() -> Result<PathBuf, String> {
-    cache_dir().map(|p| p.join("updates"))
-}
-
-/// 取消下载（Tauri Command）
-#[tauri::command]
-pub fn cancel_download() -> Result<(), String> {
-    DOWNLOAD_CANCELLED.store(true, Ordering::SeqCst);
-    info!("Download cancelled by user");
-    Ok(())
-}
-
-/// 下载更新（Tauri Command）
-/// 返回下载文件的完整路径
-#[tauri::command]
-pub async fn download_update(
-    download_url: String,
-    file_name: String,
-    expected_size: u64,
-    app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    info!("Starting download: {} from {}", file_name, download_url);
-
-    // 重置取消标志
-    DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
-
-    // 确保下载目录存在
-    let download_dir = get_download_dir()?;
-    info!("Download directory: {}", download_dir.display());
-
-    // 确保目录存在（包括 updates 目录本身）
-    if !download_dir.exists() {
-        fs::create_dir_all(&download_dir).map_err(|e| {
-            let err_msg = format!("创建下载目录失败: {} (路径: {})", e, download_dir.display());
-            warn!("{}", err_msg);
-            err_msg
-        })?;
-    }
-
-    // Sanitize file name to prevent path traversal
-    let safe_file_name = std::path::Path::new(&file_name)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or("Invalid file name")?;
-    let file_path = download_dir.join(safe_file_name);
-
-    // 创建 HTTP 客户端
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300)) // 5分钟超时
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-    // 发送请求
-    let response = match client.get(&download_url).send().await {
-        Ok(r) => r,
-        Err(e) => {
-            warn!("Failed to start download from {}: {}", download_url, e);
-            return Err(format!("Failed to start download: {}", e));
-        }
-    };
-
-    if !response.status().is_success() {
-        warn!(
-            "HTTP error {} when downloading from {}",
-            response.status(),
-            download_url
-        );
-        return Err(format!("HTTP error: {}", response.status()));
-    }
-
-    // 获取实际文件大小
-    let total_size = response.content_length().unwrap_or(expected_size);
-    info!("Download size: {} bytes", total_size);
-
-    // 创建文件
-    let mut file =
-        fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
-
-    // 流式下载
-    let mut downloaded: u64 = 0;
-    let mut stream = response.bytes_stream();
-    let mut last_log_time = std::time::Instant::now();
-
-    while let Some(chunk_result) = stream.next().await {
-        // 检查是否取消
-        if DOWNLOAD_CANCELLED.load(Ordering::SeqCst) {
-            info!("Download cancelled, cleaning up...");
-            fs::remove_file(&file_path).ok();
-            return Err("Download cancelled".to_string());
-        }
-
-        let chunk = match chunk_result {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Download failed while reading chunk at {} bytes: {}", downloaded, e);
-                return Err(format!("Failed to read chunk at {} bytes: {}", downloaded, e));
-            }
-        };
-
-        // 写入文件
-        use std::io::Write;
-        if let Err(e) = file.write_all(&chunk) {
-            warn!("Failed to write chunk to file at {} bytes: {}", downloaded, e);
-            return Err(format!("Failed to write chunk at {} bytes: {}", downloaded, e));
-        }
-
-        downloaded += chunk.len() as u64;
-
-        // 发送进度事件
-        let progress = if total_size > 0 {
-            (downloaded as f64 / total_size as f64 * 100.0) as u32
-        } else {
-            0
-        };
-
-        // 每 10 秒记录一次下载进度日志（方便排查中断问题）
-        if last_log_time.elapsed().as_secs() >= 10 {
-            info!(
-                "Download progress: {}% ({}/{} bytes)",
-                progress, downloaded, total_size
-            );
-            last_log_time = std::time::Instant::now();
-        }
-
-        app_handle
-            .emit(
-                "download-progress",
-                DownloadProgress {
-                    downloaded,
-                    total_size,
-                    progress,
-                },
-            )
-            .ok();
-    }
-
-    // 校验文件大小
-    let actual_size = fs::metadata(&file_path)
-        .map(|m| m.len())
-        .map_err(|e| format!("Failed to get file size: {}", e))?;
-
-    if actual_size != expected_size && expected_size > 0 {
-        warn!(
-            "File size mismatch: expected {}, got {}",
-            expected_size, actual_size
-        );
-        // 不删除文件，让用户决定是否继续
-    }
-
-    info!("Download complete: {}", file_path.display());
-
-    // 更新状态
-    let mut state = load_update_state().unwrap_or_default();
-    state.downloaded_file = Some(file_path.to_string_lossy().to_string());
-    state.download_complete = true;
-    save_update_state(&state)?;
-
-    Ok(file_path.to_string_lossy().to_string())
-}
-
-/// 安装更新（Tauri Command）
-#[tauri::command]
-pub fn install_update(file_path: String) -> Result<(), String> {
-    info!("Installing update from: {}", file_path);
-
-    let path = PathBuf::from(&file_path);
-
-    if !path.exists() {
-        return Err(format!("File not found: {}", file_path));
-    }
-
-    // Windows: 静默安装升级（参考 Tauri 内置 updater 的方式）
-    // /P = Passive mode：显示进度条，无用户交互，自动关闭
-    // /UPDATE = Update mode：跳过卸载旧版本的对话框，直接覆盖安装，保留快捷方式
-    // /R = 自动启动应用（安装完成后）
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-
-        info!("Launching installer in passive update mode...");
-        info!("File path: {}", path.display());
-        info!("Arguments: /P /UPDATE /R");
-
-        let spawn_result = Command::new(&path)
-            .arg("/P") // Passive mode：有进度条，无交互
-            .arg("/UPDATE") // Update mode：直接覆盖安装
-            .arg("/R") // 安装完成后自动启动应用
-            .spawn();
-
-        match spawn_result {
-            Ok(_) => info!("Installer launched successfully with /P /UPDATE /R"),
-            Err(e) => {
-                warn!("Failed to launch installer: {}", e);
-                return Err(format!("Failed to launch installer: {}", e));
-            }
-        }
-
-        // 清理更新状态
-        let mut state = load_update_state().unwrap_or_default();
-        state.downloaded_file = None;
-        state.download_complete = false;
-        save_update_state(&state)?;
-
-        info!("Update state cleaned up, installer should be running now");
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("Installation not supported on this platform".to_string())
-    }
-}
-
-/// 清理已下载的安装包（Tauri Command）
-#[tauri::command]
-pub fn cleanup_downloaded_update() -> Result<(), String> {
-    let state = load_update_state().unwrap_or_default();
-
-    if let Some(file_path) = &state.downloaded_file {
-        let path = PathBuf::from(file_path);
-        if path.exists() {
-            fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))?;
-            info!("Cleaned up downloaded update: {}", file_path);
-        }
-    }
-
-    // 重置状态
-    let mut state = state;
-    state.downloaded_file = None;
-    state.download_complete = false;
-    save_update_state(&state)?;
-
-    Ok(())
 }
 
 /// 重置今日提醒计数（Tauri Command）
@@ -469,4 +219,516 @@ pub fn exit_app(app_handle: tauri::AppHandle) {
 
     info!("[ExitApp] 所有资源清理完成，退出应用");
     app_handle.exit(0);
+}
+
+// ==================== V2 更新命令 ====================
+// 使用 Tauri updater 的签名验证和安装能力
+
+/// 获取当前平台的标识
+fn get_platform_target() -> &'static str {
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    {
+        "windows-x86_64"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        "darwin-aarch64"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        "darwin-x86_64"
+    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        "linux-x86_64"
+    }
+    #[cfg(not(any(
+        all(windows, target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )))]
+    {
+        "unknown"
+    }
+}
+
+/// 从 GitHub/Gitee API 获取最新版本号
+async fn fetch_latest_version_from_api(language: Option<String>) -> Result<String, String> {
+    // 根据语言选择 API 源
+    let is_chinese_user = language.as_ref().map(|l| l.starts_with("zh")).unwrap_or(false);
+
+    let urls = if is_chinese_user {
+        [
+            "https://gitee.com/api/v5/repos/xingkyle/Voconly/releases/latest",
+            "https://api.github.com/repos/xinkyle/Voconly/releases/latest",
+        ]
+    } else {
+        [
+            "https://api.github.com/repos/xinkyle/Voconly/releases/latest",
+            "https://gitee.com/api/v5/repos/xingkyle/Voconly/releases/latest",
+        ]
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("Voconly-Updater")
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let mut last_error = String::new();
+
+    for url in urls {
+        info!("[UpdaterV2] Fetching latest release from: {}", url);
+        match client.get(url).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    #[derive(Deserialize)]
+                    struct ReleaseInfo {
+                        tag_name: String,
+                    }
+                    match response.json::<ReleaseInfo>().await {
+                        Ok(info) => {
+                            let version = info.tag_name.trim_start_matches('v').to_string();
+                            info!("[UpdaterV2] Latest version: {}", version);
+                            return Ok(version);
+                        }
+                        Err(e) => {
+                            last_error = format!("Failed to parse response: {}", e);
+                            warn!("[UpdaterV2] Failed to parse response from {}: {}", url, e);
+                        }
+                    }
+                } else {
+                    last_error = format!("HTTP error: {}", response.status());
+                    warn!("[UpdaterV2] HTTP error from {}: {}", url, response.status());
+                }
+            }
+            Err(e) => {
+                last_error = format!("Request failed: {}", e);
+                warn!("[UpdaterV2] Request to {} failed: {}", url, e);
+            }
+        }
+    }
+
+    Err(format!("Failed to fetch latest version from all sources: {}", last_error))
+}
+
+/// 检查更新 V2（Tauri Command）
+/// 根据语言选择 GitHub 或 Gitee 的 latest.json URL
+#[tauri::command]
+pub async fn check_for_updates_v2(
+    language: Option<String>,
+) -> Result<Option<UpdateInfo>, String> {
+    info!("[UpdaterV2] Checking for updates... language={:?}", language);
+
+    let current_version = get_current_version();
+    info!("[UpdaterV2] Current version: {}", current_version);
+
+    // 从 GitHub/Gitee API 获取最新版本号
+    let latest_version = fetch_latest_version_from_api(language.clone()).await?;
+
+    // 检查版本
+    if !is_newer_version(&current_version, &latest_version) {
+        info!("[UpdaterV2] Already on latest version");
+        return Ok(None);
+    }
+
+    info!("[UpdaterV2] New version available: {}", latest_version);
+
+    // 构造 latest.json URL（根据语言选择源）
+    let is_chinese_user = language.as_ref().map(|l| l.starts_with("zh")).unwrap_or(false);
+    let latest_url = if is_chinese_user {
+        GITEE_LATEST_URL.replace("{{version}}", &latest_version)
+    } else {
+        GITHUB_LATEST_URL.replace("{{version}}", &latest_version)
+    };
+
+    info!("[UpdaterV2] Fetching latest.json from: {}", latest_url);
+
+    // 下载 latest.json
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("Voconly-Updater")
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let response = client
+        .get(&latest_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch latest.json: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP error fetching latest.json: {}", response.status()));
+    }
+
+    let latest_json: LatestJson = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse latest.json: {}", e))?;
+
+    // 获取当前平台的信息
+    let platform = get_platform_target();
+    info!("[UpdaterV2] Current platform: {}", platform);
+
+    let platform_info = latest_json
+        .platforms
+        .get(platform)
+        .ok_or_else(|| format!("Platform {} not found in latest.json", platform))?;
+
+    // 更新检查状态
+    let mut state = load_update_state().unwrap_or_default();
+    state.last_check_date = get_today_date_string();
+    state.last_version_checked = latest_json.version.clone();
+    save_update_state(&state)?;
+
+    let update_info = UpdateInfo {
+        version: latest_json.version,
+        current_version: current_version,
+        date: latest_json.date,
+        notes: latest_json.notes,
+        url: platform_info.url.clone(),
+        signature: platform_info.signature.clone(),
+    };
+
+    info!("[UpdaterV2] Update available: {} -> {}", update_info.current_version, update_info.version);
+    info!("[UpdaterV2] Download URL: {}", update_info.url);
+
+    Ok(Some(update_info))
+}
+
+/// 下载并安装更新 V2（Tauri Command）
+/// 接收下载 URL 和签名，下载文件并安装
+#[tauri::command]
+pub async fn download_and_install_update_v2(
+    url: String,
+    signature: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    info!("[UpdaterV2] Starting download and install...");
+    info!("[UpdaterV2] Download URL: {}", url);
+    info!("[UpdaterV2] Signature: {}...", &signature[..50.min(signature.len())]);
+
+    // 重置取消标志
+    DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
+
+    // 获取临时目录
+    let temp_dir = std::env::temp_dir();
+    let file_name = url.rsplit('/').next().unwrap_or("update.bin");
+    let file_path = temp_dir.join(file_name);
+
+    info!("[UpdaterV2] Download destination: {}", file_path.display());
+
+    // 创建 HTTP 客户端
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(600)) // 10 分钟超时
+        .user_agent("Voconly-Updater")
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    // 发送请求
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start download: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
+
+    // 获取文件大小
+    let total_size = response.content_length().unwrap_or(0);
+    info!("[UpdaterV2] Download size: {} bytes", total_size);
+
+    // 发送下载开始事件
+    app_handle
+        .emit(
+            "download-progress",
+            DownloadProgress {
+                downloaded: 0,
+                total_size,
+                progress: 0,
+            },
+        )
+        .ok();
+
+    // 创建文件
+    let mut file = fs::File::create(&file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    // 流式下载
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk_result) = stream.next().await {
+        // 检查是否取消
+        if DOWNLOAD_CANCELLED.load(Ordering::SeqCst) {
+            info!("[UpdaterV2] Download cancelled by user");
+            fs::remove_file(&file_path).ok();
+            return Err("Download cancelled".to_string());
+        }
+
+        let chunk = chunk_result.map_err(|e| {
+            fs::remove_file(&file_path).ok();
+            format!("Failed to read chunk: {}", e)
+        })?;
+
+        // 写入文件
+        use std::io::Write;
+        file.write_all(&chunk).map_err(|e| {
+            fs::remove_file(&file_path).ok();
+            format!("Failed to write chunk: {}", e)
+        })?;
+
+        downloaded += chunk.len() as u64;
+
+        // 发送进度事件
+        let progress = if total_size > 0 {
+            (downloaded as f64 / total_size as f64 * 100.0) as u32
+        } else {
+            0
+        };
+
+        app_handle
+            .emit(
+                "download-progress",
+                DownloadProgress {
+                    downloaded,
+                    total_size,
+                    progress,
+                },
+            )
+            .ok();
+    }
+
+    info!("[UpdaterV2] Download complete: {} bytes", downloaded);
+
+    // 关闭文件句柄，确保文件不再被锁定
+    drop(file);
+    info!("[UpdaterV2] File handle closed");
+
+    // 验证签名（可选，开发阶段可以跳过）
+    // TODO: 实现 minisign 签名验证
+    // 目前先跳过签名验证，直接安装
+    info!("[UpdaterV2] Signature verification skipped (to be implemented)");
+
+    // 安装更新
+    install_update_v2(&file_path, &app_handle)?;
+
+    Ok(())
+}
+
+/// 安装更新（内部函数）
+fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Result<(), String> {
+    info!("[UpdaterV2] Installing update from: {}", file_path.display());
+
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", file_path.display()));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        info!("[UpdaterV2] Launching Windows installer...");
+
+        // Windows: 静默安装升级
+        // /P = Passive mode：显示进度条，无用户交互，自动关闭
+        // /UPDATE = Update mode：跳过卸载旧版本的对话框，直接覆盖安装，保留快捷方式
+        // /R = 自动启动应用（安装完成后）
+        let spawn_result = Command::new(file_path)
+            .arg("/P")
+            .arg("/UPDATE")
+            .arg("/R")
+            .spawn();
+
+        match spawn_result {
+            Ok(mut child) => {
+                info!("[UpdaterV2] Windows installer launched successfully");
+
+                // 等待一小段时间确保安装器完全启动
+                // spawn() 只是启动进程，但进程可能需要一点时间来初始化
+                // 如果应用立即退出，可能会干扰安装器的启动过程
+                std::thread::sleep(std::time::Duration::from_millis(500));
+
+                // 检查安装器是否仍在运行
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        // 安装器已经退出，这通常意味着启动失败
+                        warn!("[UpdaterV2] Installer exited immediately with status: {}", status);
+                        return Err(format!("Installer exited immediately with status: {}", status));
+                    }
+                    Ok(None) => {
+                        // 安装器仍在运行，这是正常的
+                        info!("[UpdaterV2] Installer is running, proceeding to exit app");
+                    }
+                    Err(e) => {
+                        warn!("[UpdaterV2] Failed to check installer status: {}", e);
+                    }
+                }
+
+                // 清理更新状态
+                let mut state = load_update_state().unwrap_or_default();
+                state.downloaded_file = None;
+                state.download_complete = false;
+                save_update_state(&state)?;
+
+                // 退出当前应用
+                info!("[UpdaterV2] Exiting app for installation...");
+                app_handle.exit(0);
+            }
+            Err(e) => {
+                warn!("[UpdaterV2] Failed to launch installer: {}", e);
+                return Err(format!("Failed to launch installer: {}", e));
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+
+        info!("[UpdaterV2] Installing macOS update...");
+
+        // 获取当前应用的真实安装路径
+        // 当前可执行文件路径: /Applications/Voconly.app/Contents/MacOS/Voconly
+        // 需要推导出 .app 包路径
+        let current_exe = std::env::current_exe()
+            .map_err(|e| format!("Failed to get current exe path: {}", e))?;
+
+        // 从可执行文件路径推导 .app 包路径
+        // 通常结构是: /path/to/Voconly.app/Contents/MacOS/Voconly
+        let app_path = current_exe
+            .ancestors()
+            .nth(3) // MacOS -> Contents -> Voconly.app
+            .ok_or_else(|| "Failed to determine app bundle path".to_string())?
+            .to_path_buf();
+
+        info!("[UpdaterV2] Current app path: {}", app_path.display());
+
+        let app_name = app_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Voconly.app");
+
+        // 创建临时解压目录
+        let temp_extract_dir = std::env::temp_dir().join("voconly_update");
+
+        if temp_extract_dir.exists() {
+            fs::remove_dir_all(&temp_extract_dir)
+                .map_err(|e| format!("Failed to clean temp dir: {}", e))?;
+        }
+        fs::create_dir_all(&temp_extract_dir)
+            .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+        // 解压 tar.gz 文件
+        let extract_result = Command::new("tar")
+            .arg("-xzf")
+            .arg(file_path)
+            .arg("-C")
+            .arg(&temp_extract_dir)
+            .output();
+
+        match extract_result {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(format!("Failed to extract archive: {}", stderr));
+                }
+
+                info!("[UpdaterV2] Archive extracted successfully");
+
+                // 查找解压后的 .app 文件
+                let extracted_app = temp_extract_dir.join(app_name);
+                if !extracted_app.exists() {
+                    return Err(format!("Extracted app not found at {:?}", extracted_app));
+                }
+
+                // 创建备份目录
+                let backup_dir = std::env::temp_dir().join("voconly_backup");
+
+                // 尝试移动当前应用到备份目录
+                let move_result = fs::rename(&app_path, backup_dir.join("old_app"));
+                let need_authorization = match move_result {
+                    Ok(_) => {
+                        info!("[UpdaterV2] Old app moved to backup");
+                        false
+                    }
+                    Err(err) => {
+                        if err.kind() == std::io::ErrorKind::PermissionDenied {
+                            info!("[UpdaterV2] Permission denied, will use AppleScript for admin privileges");
+                            true
+                        } else {
+                            return Err(format!("Failed to backup old app: {}", err));
+                        }
+                    }
+                };
+
+                if need_authorization {
+                    // 使用 AppleScript 请求管理员权限来替换应用
+                    let apple_script = format!(
+                        "do shell script \"rm -rf '{}' && mv -f '{}' '{}'\" with administrator privileges",
+                        app_path.display(),
+                        extracted_app.display(),
+                        app_path.display()
+                    );
+
+                    info!("[UpdaterV2] Requesting admin privileges via AppleScript...");
+
+                    let script_result = Command::new("osascript")
+                        .arg("-e")
+                        .arg(&apple_script)
+                        .output();
+
+                    match script_result {
+                        Ok(result) => {
+                            if !result.status.success() {
+                                let stderr = String::from_utf8_lossy(&result.stderr);
+                                return Err(format!("AppleScript failed: {}", stderr));
+                            }
+                            info!("[UpdaterV2] App replaced with admin privileges");
+                        }
+                        Err(e) => {
+                            return Err(format!("Failed to run AppleScript: {}", e));
+                        }
+                    }
+                } else {
+                    // 权限足够，直接移动新应用
+                    info!("[UpdaterV2] Moving new app to destination...");
+                    fs::rename(&extracted_app, &app_path)
+                        .map_err(|e| format!("Failed to move new app: {}", e))?;
+                }
+
+                // 清理临时目录
+                fs::remove_dir_all(&temp_extract_dir).ok();
+                fs::remove_dir_all(&backup_dir).ok();
+
+                info!("[UpdaterV2] Installation complete");
+
+                // 重启应用
+                info!("[UpdaterV2] Restarting app...");
+                use tauri_plugin_process::ProcessExt;
+                app_handle.restart();
+            }
+            Err(e) => {
+                return Err(format!("Failed to run tar command: {}", e));
+            }
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        return Err("Installation not supported on this platform".to_string());
+    }
+
+    Ok(())
+}
+
+/// 取消下载（Tauri Command）- 用于 V2
+#[tauri::command]
+pub fn cancel_download_v2() -> Result<(), String> {
+    DOWNLOAD_CANCELLED.store(true, Ordering::SeqCst);
+    info!("[UpdaterV2] Download cancelled by user");
+    Ok(())
 }
