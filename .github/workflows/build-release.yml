@@ -129,22 +129,32 @@ jobs:
 
       - name: Update version
         if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
         run: |
-          version="${{ github.event.inputs.version }}"
-          # 使用 awk 来安全地替换 [package] 部分的版本
-          awk -v ver="$version" '
-          /^\[package\]/ { in_package=1 }
-          /^\[/ && !/^\[package\]/ { in_package=0 }
-          in_package && /^version[[:space:]]*=[[:space:]]*"[^"]*"/ {
-            print "version = \"" ver "\""
-            next
+          $version = "${{ github.event.inputs.version }}"
+          $cargoPath = "src-tauri/Cargo.toml"
+          # 读取文件内容
+          $lines = Get-Content $cargoPath
+          # 找到 [package] 后的第一个 version 行并替换
+          $inPackage = $false
+          $updated = $false
+          $newLines = @()
+          foreach ($line in $lines) {
+            if ($line -match '^\[package\]') {
+              $inPackage = $true
+            } elseif ($line -match '^\[') {
+              $inPackage = $false
+            }
+            if ($inPackage -and $line -match '^version\s*=\s*"[^"]*"' -and -not $updated) {
+              $line = "version = `"$version`""
+              $updated = $true
+            }
+            $newLines += $line
           }
-          { print }
-          ' src-tauri/Cargo.toml > src-tauri/Cargo.toml.tmp
-          mv src-tauri/Cargo.toml.tmp src-tauri/Cargo.toml
-          echo "Updated version to $version"
+          $newLines | Set-Content $cargoPath
+          Write-Host "Updated version to $version"
           # 验证修改
-          head -n 5 src-tauri/Cargo.toml
+          Get-Content $cargoPath | Select-Object -First 5
 
       - name: Build
         env:
