@@ -315,6 +315,7 @@ async fn fetch_latest_version_from_api(language: Option<String>) -> Result<Strin
 
 /// 检查更新 V2（Tauri Command）
 /// 根据语言选择 GitHub 或 Gitee 的 latest.json URL
+/// 支持通过环境变量 VOCONLY_UPDATE_URL 指定自定义更新服务器（用于测试）
 #[tauri::command]
 pub async fn check_for_updates_v2(
     language: Option<String>,
@@ -324,23 +325,62 @@ pub async fn check_for_updates_v2(
     let current_version = get_current_version();
     info!("[UpdaterV2] Current version: {}", current_version);
 
-    // 从 GitHub/Gitee API 获取最新版本号
-    let latest_version = fetch_latest_version_from_api(language.clone()).await?;
+    // 检查是否设置了自定义更新 URL（用于本地测试）
+    let custom_update_url = std::env::var("VOCONLY_UPDATE_URL").ok();
 
-    // 检查版本
-    if !is_newer_version(&current_version, &latest_version) {
-        info!("[UpdaterV2] Already on latest version");
-        return Ok(None);
-    }
+    let (latest_version, latest_url) = if let Some(custom_url) = custom_update_url {
+        info!("[UpdaterV2] Using custom update URL: {}", custom_url);
 
-    info!("[UpdaterV2] New version available: {}", latest_version);
+        // 从自定义 URL 获取 latest.json
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .user_agent("Voconly-Updater")
+            .build()
+            .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    // 构造 latest.json URL（根据语言选择源）
-    let is_chinese_user = language.as_ref().map(|l| l.starts_with("zh")).unwrap_or(false);
-    let latest_url = if is_chinese_user {
-        GITEE_LATEST_URL.replace("{{version}}", &latest_version)
+        let response = client
+            .get(&custom_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch from custom URL: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("HTTP error from custom URL: {}", response.status()));
+        }
+
+        let latest_json: LatestJson = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse latest.json: {}", e))?;
+
+        // 检查版本
+        if !is_newer_version(&current_version, &latest_json.version) {
+            info!("[UpdaterV2] Already on latest version");
+            return Ok(None);
+        }
+
+        (latest_json.version.clone(), custom_url)
     } else {
-        GITHUB_LATEST_URL.replace("{{version}}", &latest_version)
+        // 正常流程：从 GitHub/Gitee API 获取最新版本号
+        let latest_version = fetch_latest_version_from_api(language.clone()).await?;
+
+        // 检查版本
+        if !is_newer_version(&current_version, &latest_version) {
+            info!("[UpdaterV2] Already on latest version");
+            return Ok(None);
+        }
+
+        info!("[UpdaterV2] New version available: {}", latest_version);
+
+        // 构造 latest.json URL（根据语言选择源）
+        let is_chinese_user = language.as_ref().map(|l| l.starts_with("zh")).unwrap_or(false);
+        let latest_url = if is_chinese_user {
+            GITEE_LATEST_URL.replace("{{version}}", &latest_version)
+        } else {
+            GITHUB_LATEST_URL.replace("{{version}}", &latest_version)
+        };
+
+        (latest_version, latest_url)
     };
 
     info!("[UpdaterV2] Fetching latest.json from: {}", latest_url);
@@ -591,18 +631,18 @@ fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Resu
 
         info!("[UpdaterV2] Installing macOS update...");
 
-        // 获取当前应用的真实安装路径
-        // 当前可执行文件路径: /Applications/Voconly.app/Contents/MacOS/Voconly
-        // 需要推导出 .app 包路径
+        // 获取当前应用的可执行文件路径
         let current_exe = std::env::current_exe()
             .map_err(|e| format!("Failed to get current exe path: {}", e))?;
 
-        // 从可执行文件路径推导 .app 包路径
-        // 通常结构是: /path/to/Voconly.app/Contents/MacOS/Voconly
+        info!("[UpdaterV2] Current exe path: {}", current_exe.display());
+
+        // 从可执行文件路径向上查找 .app 包路径
+        // 这样无论从 .app 包内启动，还是从开发目录启动，都能正确找到路径
         let app_path = current_exe
             .ancestors()
-            .nth(3) // MacOS -> Contents -> Voconly.app
-            .ok_or_else(|| "Failed to determine app bundle path".to_string())?
+            .find(|p| p.extension().map(|ext| ext == "app").unwrap_or(false))
+            .ok_or_else(|| "Failed to find .app bundle in path".to_string())?
             .to_path_buf();
 
         info!("[UpdaterV2] Current app path: {}", app_path.display());
@@ -611,6 +651,12 @@ fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Resu
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("Voconly.app");
+
+        // 动态获取可执行文件名，而不是硬编码
+        let exe_name = current_exe
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("voconly-tauri");
 
         // 创建临时解压目录
         let temp_extract_dir = std::env::temp_dir().join("voconly_update");
@@ -708,8 +754,18 @@ fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Resu
 
                 // 重启应用
                 info!("[UpdaterV2] Restarting app...");
-                use tauri_plugin_process::ProcessExt;
-                app_handle.restart();
+
+                // 使用动态获取的可执行文件名
+                let app_exe = app_path.join("Contents").join("MacOS").join(exe_name);
+                if app_exe.exists() {
+                    // 启动新实例
+                    let _ = std::process::Command::new(&app_exe).spawn();
+                    // 等待一下确保新进程启动
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
+                // 退出当前应用
+                app_handle.exit(0);
             }
             Err(e) => {
                 return Err(format!("Failed to run tar command: {}", e));

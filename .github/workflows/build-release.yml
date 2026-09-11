@@ -1,0 +1,203 @@
+name: Build and Release
+
+# 触发条件：
+# 1. 手动触发（推荐）- 在 GitHub Actions 页面点击 "Run workflow"
+# 2. 推送 tag（可选）- 推送 v* 开头的 tag 时自动触发
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: 0.5.10)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ========================================
+  # 构建 Windows 版本
+  # ========================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Update version
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.inputs.version }}"
+          $cargoPath = "src-tauri/Cargo.toml"
+          $content = Get-Content $cargoPath -Raw
+          $content = $content -replace 'version = "[^"]+"', "version = `"$version`""
+          Set-Content $cargoPath $content
+          Write-Host "Updated version to $version"
+
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm tauri build
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
+            src-tauri/target/release/latest.json
+          retention-days: 1
+
+  # ========================================
+  # 构建 macOS 版本
+  # ========================================
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Update version
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          version="${{ github.event.inputs.version }}"
+          sed -i '' 's/version = "[^"]*"/version = "'$version'"/' src-tauri/Cargo.toml
+          echo "Updated version to $version"
+
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm tauri build --target aarch64-apple-darwin
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg.sig
+            src-tauri/target/aarch64-apple-darwin/release/bundle/Voconly.app.tar.gz
+            src-tauri/target/aarch64-apple-darwin/release/bundle/Voconly.app.tar.gz.sig
+          retention-days: 1
+
+  # ========================================
+  # 创建 Release 并上传所有文件
+  # ========================================
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: windows-artifacts
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: macos-artifacts
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          cp windows-artifacts/*.exe release-files/ 2>/dev/null || true
+          cp windows-artifacts/*.exe.sig release-files/ 2>/dev/null || true
+          cp macos-artifacts/*.dmg release-files/ 2>/dev/null || true
+          cp macos-artifacts/*.dmg.sig release-files/ 2>/dev/null || true
+          cp windows-artifacts/latest.json release-files/ 2>/dev/null || true
+          ls -la release-files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Voconly v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## 更新内容
+
+            请查看提交历史了解详细更改。
+
+            ## 下载
+
+            | 平台 | 文件 |
+            |------|------|
+            | Windows | `Voconly_${{ steps.version.outputs.VERSION }}_x64-setup.exe` |
+            | macOS (Apple Silicon) | `Voconly_${{ steps.version.outputs.VERSION }}_aarch64.dmg` |
+
+            ## 自动更新
+
+            已发布应用内更新所需的所有文件。
+          files: release-files/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## 发布完成 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "版本: v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 发布的文件" >> $GITHUB_STEP_SUMMARY
+          ls -la release-files/ >> $GITHUB_STEP_SUMMARY
