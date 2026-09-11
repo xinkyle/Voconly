@@ -52,7 +52,9 @@ jobs:
           $version = "${{ github.event.inputs.version }}"
           $cargoPath = "src-tauri/Cargo.toml"
           $content = Get-Content $cargoPath -Raw
-          $content = $content -replace 'version = "[^"]+"', "version = `"$version`""
+          # 只替换 [package] 部分的版本号（文件开头的第一个 version = "..."）
+          # 使用多行模式，匹配 [package] 后面紧跟的 version 行
+          $content = $content -replace '(?s)(\[package\].*?version = ")[^"]*(")', "`${1}$version`$2"
           Set-Content $cargoPath $content
           Write-Host "Updated version to $version"
 
@@ -107,7 +109,9 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           version="${{ github.event.inputs.version }}"
-          sed -i '' 's/version = "[^"]*"/version = "'$version'"/' src-tauri/Cargo.toml
+          # 只替换 [package] 部分的版本号
+          # 使用 perl 进行精确的多行匹配替换
+          perl -i -0pe 's/(\[package\].*?version = ")[^"]*(")/\1'"$version"'\2/s' src-tauri/Cargo.toml
           echo "Updated version to $version"
 
       - name: Build
