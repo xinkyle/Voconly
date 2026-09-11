@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { saveUserDictionary } from '../../services/dictionary';
 import { createLogger } from '../../services/log';
@@ -10,6 +10,9 @@ const log = createLogger('SettingsDictionary');
 
 // 默认阈值
 const DEFAULT_THRESHOLD = 0.13;
+
+// 防抖延迟（毫秒）
+const DEBOUNCE_DELAY = 1000;
 
 interface SettingsDictionaryProps {
   config: AppConfig;
@@ -35,11 +38,13 @@ export default function SettingsDictionary({ config, onSave }: SettingsDictionar
   });
   const [error, setError] = useState<string | null>(null);
 
-  // 当 config.userDictionary 变化时同步状态
+  // 防抖保存定时器
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 初始化时从 config.userDictionary 读取（仅一次）
   useEffect(() => {
     const dict = config.userDictionary;
-    if (dict) {
-      setEnabled(dict.enabled);
+    if (dict && dict.entries && dict.entries.length > 0) {
       const lines = dict.entries.map(e => {
         if (e.aliases && e.aliases.length > 0) {
           return `${e.word} (${e.aliases.join(', ')})`;
@@ -47,8 +52,10 @@ export default function SettingsDictionary({ config, onSave }: SettingsDictionar
         return e.word;
       });
       setWordsText(lines.join('\n'));
+      setEnabled(dict.enabled);
     }
-  }, [config.userDictionary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   // 解析文本为词条数组，只按换行和逗号分隔（空格保留在词内）
   const parseWordsText = (text: string): { word: string }[] => {
@@ -106,13 +113,34 @@ export default function SettingsDictionary({ config, onSave }: SettingsDictionar
     }
   }, [config, onSave, t, showToast]);
 
-  // 编辑后更新本地状态并保存
-  const handleWordsChange = async (value: string) => {
+  // 编辑后更新本地状态并保存（带防抖）
+  const handleWordsChange = (value: string) => {
+    // 立即更新本地状态，让用户看到输入
     setWordsText(value);
-    if (enabled) {
-      await saveDictionary(enabled, value);
+
+    if (!enabled) {
+      return;
     }
+
+    // 清除之前的定时器
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // 设置新的防抖定时器
+    debounceTimerRef.current = setTimeout(() => {
+      saveDictionary(enabled, value);
+    }, DEBOUNCE_DELAY);
   };
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // 切换启用状态
   const handleToggleEnabled = async () => {
