@@ -22,6 +22,7 @@ fn smart_copy(src: &Path, dest: &Path) -> bool {
     false
 }
 
+#[cfg(target_os = "windows")]
 fn copy_transcribe_dlls() {
     let src_dir = Path::new("transcribe-native-windows-x86_64-cpu-vulkan");
     let dest_dir = Path::new("resources");
@@ -59,6 +60,22 @@ fn copy_transcribe_dlls() {
 
     // Rerun if source DLLs change
     println!("cargo:rerun-if-changed=transcribe-native-windows-x86_64-cpu-vulkan");
+}
+
+#[cfg(not(target_os = "windows"))]
+fn copy_transcribe_dlls() {
+    // 在非 Windows 平台上创建占位 DLL 文件，避免 bundle.resources 的 glob pattern 匹配失败
+    let dest_dir = Path::new("resources");
+
+    if !dest_dir.exists() {
+        fs::create_dir_all(dest_dir).expect("Failed to create resources directory");
+    }
+
+    let placeholder = dest_dir.join("placeholder.dll");
+    if !placeholder.exists() {
+        fs::write(&placeholder, []).expect("Failed to create placeholder DLL");
+        println!("cargo:warning=Created placeholder.dll for non-Windows build");
+    }
 }
 
 fn main() {
