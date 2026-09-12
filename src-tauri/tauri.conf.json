@@ -29,13 +29,15 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "resources/models/*": "resources/models/",
-      "resources/*.dll": ""
+      "resources/models/*": "resources/models/"
     },
     "macOS": {
       "entitlements": "./entitlements.plist"
     },
     "windows": {
+      "resources": {
+        "resources/*.dll": ""
+      },
       "nsis": {
         "installMode": "currentUser",
         "installerHooks": "./hooks/nsis-hooks.nsh",
