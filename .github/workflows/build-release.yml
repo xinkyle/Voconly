@@ -109,7 +109,6 @@ jobs:
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/nsis/*.exe.sig
-            src-tauri/target/release/latest.json
           retention-days: 1
 
   # ========================================
@@ -185,8 +184,8 @@ jobs:
           path: |
             src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg.sig
-            src-tauri/target/aarch64-apple-darwin/release/bundle/Voconly.app.tar.gz
-            src-tauri/target/aarch64-apple-darwin/release/bundle/Voconly.app.tar.gz.sig
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Voconly.app.tar.gz
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Voconly.app.tar.gz.sig
           retention-days: 1
 
   # ========================================
@@ -220,14 +219,89 @@ jobs:
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Get current date
+        id: date
+        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for current version
+        id: changelog
+        run: |
+          # 从 CHANGELOG.md 提取当前版本的更新内容
+          # 使用 === 作为版本分隔符，提取第一个分隔符之前的内容
+          NOTES=$(awk '/^===$/{exit} {print}' CHANGELOG.md | tail -n +2)
+
+          # 如果没有找到内容，使用默认内容
+          if [ -z "$NOTES" ]; then
+            NOTES="更新内容请查看提交历史。"
+          fi
+
+          # 将多行内容保存到文件
+          echo "$NOTES" > /tmp/release_notes.md
+
+          # 输出到 GitHub output（用于显示）
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Read signatures
+        id: signatures
+        run: |
+          # 读取 Windows 签名
+          WINDOWS_SIG=""
+          if [ -f windows-artifacts/*.exe.sig ]; then
+            WINDOWS_SIG=$(cat windows-artifacts/*.exe.sig | base64 -w0)
+          fi
+          echo "windows_signature=$WINDOWS_SIG" >> $GITHUB_OUTPUT
+
+          # 读取 macOS 签名
+          MACOS_SIG=""
+          if [ -f macos-artifacts/*.app.tar.gz.sig ]; then
+            MACOS_SIG=$(cat macos-artifacts/*.app.tar.gz.sig | base64 -w0)
+          fi
+          echo "macos_signature=$MACOS_SIG" >> $GITHUB_OUTPUT
+
+      - name: Generate latest.json
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DATE="${{ steps.date.outputs.DATE }}"
+          WINDOWS_SIG="${{ steps.signatures.outputs.windows_signature }}"
+          MACOS_SIG="${{ steps.signatures.outputs.macos_signature }}"
+
+          # 读取 release notes
+          NOTES=$(cat /tmp/release_notes.md | jq -Rs .)
+
+          # 获取实际的文件名
+          WINDOWS_FILE=$(ls windows-artifacts/*.exe | head -n1 | xargs basename)
+          MACOS_FILE=$(ls macos-artifacts/*.dmg | head -n1 | xargs basename)
+
+          # 生成 latest.json
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "date": "$DATE",
+            "notes": $NOTES,
+            "platforms": {
+              "windows-x86_64": {
+                "url": "https://github.com/xinkyle/Voconly/releases/download/v$VERSION/$WINDOWS_FILE",
+                "signature": "$WINDOWS_SIG"
+              },
+              "darwin-aarch64": {
+                "url": "https://github.com/xinkyle/Voconly/releases/download/v$VERSION/$MACOS_FILE",
+                "signature": "$MACOS_SIG"
+              }
+            }
+          }
+          EOF
+
+          echo "Generated latest.json:"
+          cat latest.json
+
       - name: Prepare release files
         run: |
           mkdir -p release-files
           cp windows-artifacts/*.exe release-files/ 2>/dev/null || true
-          cp windows-artifacts/*.exe.sig release-files/ 2>/dev/null || true
           cp macos-artifacts/*.dmg release-files/ 2>/dev/null || true
-          cp macos-artifacts/*.dmg.sig release-files/ 2>/dev/null || true
-          cp windows-artifacts/latest.json release-files/ 2>/dev/null || true
+          cp latest.json release-files/ 2>/dev/null || true
           ls -la release-files/
 
       - name: Create GitHub Release
@@ -238,7 +312,7 @@ jobs:
           body: |
             ## 更新内容
 
-            请查看提交历史了解详细更改。
+            ${{ steps.changelog.outputs.notes }}
 
             ## 下载
 
@@ -249,7 +323,7 @@ jobs:
 
             ## 自动更新
 
-            已发布应用内更新所需的所有文件。
+            已发布 `latest.json` 用于应用内更新检测。
           files: release-files/*
           draft: false
           prerelease: false
@@ -258,7 +332,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 发布完成 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## 发布完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "版本: v${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
