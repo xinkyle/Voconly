@@ -255,8 +255,8 @@ jobs:
 
           # 读取 macOS 签名
           MACOS_SIG=""
-          if [ -f macos-artifacts/*.app.tar.gz.sig ]; then
-            MACOS_SIG=$(cat macos-artifacts/*.app.tar.gz.sig | base64 -w0)
+          if [ -f macos-artifacts/macos/*.app.tar.gz.sig ]; then
+            MACOS_SIG=$(cat macos-artifacts/macos/*.app.tar.gz.sig | base64 -w0)
           fi
           echo "macos_signature=$MACOS_SIG" >> $GITHUB_OUTPUT
 
@@ -272,7 +272,7 @@ jobs:
 
           # 获取实际的文件名
           WINDOWS_FILE=$(ls windows-artifacts/*.exe | head -n1 | xargs basename)
-          MACOS_FILE=$(ls macos-artifacts/*.dmg | head -n1 | xargs basename)
+          MACOS_FILE=$(ls macos-artifacts/dmg/*.dmg | head -n1 | xargs basename)
 
           # 生成 latest.json
           cat > latest.json << EOF
@@ -300,7 +300,8 @@ jobs:
         run: |
           mkdir -p release-files
           cp windows-artifacts/*.exe release-files/ 2>/dev/null || true
-          cp macos-artifacts/*.dmg release-files/ 2>/dev/null || true
+          cp macos-artifacts/dmg/*.dmg release-files/ 2>/dev/null || true
+          cp macos-artifacts/macos/*.app.tar.gz release-files/ 2>/dev/null || true
           cp latest.json release-files/ 2>/dev/null || true
           ls -la release-files/
 
