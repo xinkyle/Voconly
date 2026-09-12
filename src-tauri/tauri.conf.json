@@ -29,7 +29,19 @@
     ],
     "resources": {
       "resources/models/*": "resources/models/",
-      "resources/*.dll": ""
+      "../target/release/ggml.dll": "",
+      "../target/release/ggml-base.dll": "",
+      "../target/release/ggml-cpu-alderlake.dll": "",
+      "../target/release/ggml-cpu-cannonlake.dll": "",
+      "../target/release/ggml-cpu-cascadelake.dll": "",
+      "../target/release/ggml-cpu-haswell.dll": "",
+      "../target/release/ggml-cpu-icelake.dll": "",
+      "../target/release/ggml-cpu-sandybridge.dll": "",
+      "../target/release/ggml-cpu-skylakex.dll": "",
+      "../target/release/ggml-cpu-sse42.dll": "",
+      "../target/release/ggml-cpu-x64.dll": "",
+      "../target/release/ggml-vulkan.dll": "",
+      "../target/release/transcribe.dll": ""
     },
     "macOS": {
       "entitlements": "./entitlements.plist"
