@@ -97,7 +97,39 @@ jobs:
           # 验证修改
           Get-Content $cargoPath | Select-Object -First 5
 
-      - name: Build
+      - name: Build Rust (generate DLLs)
+        run: cd src-tauri && cargo build --release
+
+      - name: Copy GPU backend DLLs to resources
+        shell: pwsh
+        run: |
+          $dest = "src-tauri/resources"
+          $dlls = @(
+            "ggml.dll",
+            "ggml-base.dll",
+            "ggml-cpu-alderlake.dll",
+            "ggml-cpu-cannonlake.dll",
+            "ggml-cpu-cascadelake.dll",
+            "ggml-cpu-haswell.dll",
+            "ggml-cpu-icelake.dll",
+            "ggml-cpu-sandybridge.dll",
+            "ggml-cpu-skylakex.dll",
+            "ggml-cpu-sse42.dll",
+            "ggml-cpu-x64.dll",
+            "ggml-vulkan.dll",
+            "transcribe.dll"
+          )
+          foreach ($dll in $dlls) {
+            $src = "src-tauri/target/release/$dll"
+            if (Test-Path $src) {
+              Copy-Item $src $dest -Force
+              Write-Host "Copied: $dll"
+            } else {
+              Write-Host "Not found: $dll"
+            }
+          }
+
+      - name: Build Tauri package
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: pnpm tauri build
