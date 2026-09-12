@@ -6,7 +6,7 @@
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1421",
     "beforeBuildCommand": "npm run build",
-    "beforeBundleCommand": "node scripts/copy-dlls.cjs",
+    "beforeBundleCommand": "node src-tauri/copy-dlls.cjs",
     "frontendDist": "../dist"
   },
   "app": {
