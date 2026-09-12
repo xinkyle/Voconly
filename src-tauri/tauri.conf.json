@@ -35,9 +35,6 @@
       "entitlements": "./entitlements.plist"
     },
     "windows": {
-      "resources": {
-        "resources/*.dll": ""
-      },
       "nsis": {
         "installMode": "currentUser",
         "installerHooks": "./hooks/nsis-hooks.nsh",
