@@ -335,6 +335,8 @@ jobs:
           cp macos-artifacts/dmg/*.dmg release-files/ 2>/dev/null || true
           cp macos-artifacts/macos/*.app.tar.gz release-files/ 2>/dev/null || true
           cp latest.json release-files/ 2>/dev/null || true
+          # macOS 安装说明文档
+          cp macOS-Installation-Guide.md release-files/ 2>/dev/null || true
           ls -la release-files/
 
       - name: Create GitHub Release
