@@ -752,6 +752,29 @@ fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Resu
 
                 info!("[UpdaterV2] Installation complete");
 
+                // 移除隔离标记，避免 Gatekeeper 阻止新应用
+                // 下载的 .app.tar.gz 解压后会被 macOS 标记为"隔离"
+                // 必须移除这个标记，否则更新后的应用无法启动
+                info!("[UpdaterV2] Removing quarantine attribute...");
+                let xattr_result = Command::new("xattr")
+                    .arg("-cr")
+                    .arg(&app_path)
+                    .output();
+
+                match xattr_result {
+                    Ok(output) => {
+                        if output.status.success() {
+                            info!("[UpdaterV2] Quarantine attribute removed successfully");
+                        } else {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            warn!("[UpdaterV2] Failed to remove quarantine attribute: {}", stderr);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("[UpdaterV2] Failed to run xattr command: {}", e);
+                    }
+                }
+
                 // 重启应用
                 info!("[UpdaterV2] Restarting app...");
 
