@@ -43,10 +43,9 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        uses: jakoch/install-vulkan-sdk-action@v1.0.0
         with:
-          vulkan-query-version: latest
-          vulkan-use-cache: true
+          vulkan_version: 1.3.296.0
 
       - name: Install dependencies
         run: pnpm install
