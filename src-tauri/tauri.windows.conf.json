@@ -1,7 +1,7 @@
 {
   "bundle": {
     "resources": {
-      "../target/release/*.dll": ""
+      "transcribe-libs": "."
     }
   }
 }
