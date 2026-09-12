@@ -76,14 +76,15 @@ function Waveform({ isActive, isUnavailable }: { isActive: boolean; isUnavailabl
 }
 
 /**
- * 计算进度 - 时间驱动，95%后减速，最大100%
+ * 计算进度 - 时间驱动，90%后减速，最大100%
+ * 使用 cubic-bezier 缓动函数实现丝滑减速效果
  */
 function calculateProgress(elapsed: number, estimatedTime: number, debugId?: string): number {
   const id = debugId || 'calc';
 
   if (estimatedTime <= 0) {
-    // 没有预估时间，缓慢增长到95%
-    const result = Math.min(95, elapsed / 100);
+    // 没有预估时间，缓慢增长到90%
+    const result = Math.min(90, elapsed / 100);
     console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms (no estimate) → ${result.toFixed(4)}%`);
     return result;
   }
@@ -91,11 +92,16 @@ function calculateProgress(elapsed: number, estimatedTime: number, debugId?: str
   const ratio = elapsed / estimatedTime;
   const baseProgress = ratio * 100;
 
-  // 95%之后减速前进（1%速度），避免"卡住"的感觉
-  if (baseProgress >= 95) {
-    // 最大限制为100%，防止进度无限增长
-    const result = Math.min(100, 95 + (baseProgress - 95) * 0.01);
-    console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, base=${baseProgress.toFixed(4)}% (>=95%, SLOWDOWN) → ${result.toFixed(4)}%`);
+  // 90%之后使用 cubic-bezier 缓动减速到原来的1/3速度
+  // 这提供了更丝滑、自然的减速体验
+  if (baseProgress >= 90) {
+    // 使用 cubic-bezier 缓动函数模拟减速效果
+    // 参数：0.4, 0, 0.2, 1（Material Design 标准缓动）
+    const progressBeyond90 = baseProgress - 90;
+    // 将剩余10%的距离按1/3速度推进，使用缓动函数让减速更自然
+    const easedProgress = 90 + progressBeyond90 * 0.33 * (1 - Math.pow(1 - Math.min(progressBeyond90 / 10, 1), 2));
+    const result = Math.min(100, easedProgress);
+    console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, base=${baseProgress.toFixed(4)}% (>=90%, SMOOTH SLOWDOWN) → ${result.toFixed(4)}%`);
     return result;
   }
 
@@ -1175,7 +1181,7 @@ export default function FloatPanelApp() {
       sessionRef.current = session;
       llmCompleteReceivedRef.current = false;
 
-      // 【双击跳过】使用固定动画，150ms 走到 95%
+      // 【双击跳过】使用固定动画，150ms 走到 90%，之后丝滑减速
       const isSkipLlm = state.skipLlm || false;
       const fixedDuration = 150; // 固定动画时长
 
@@ -1206,18 +1212,23 @@ export default function FloatPanelApp() {
 
         const elapsed = now - currentSession.startTime;
 
-        // 【双击跳过】固定动画：150ms 走到 95%
+        // 【双击跳过】固定动画：150ms 走到 90%，之后丝滑减速
         // 【正常流程】预估驱动：根据预估时间计算进度
         let baseProgress: number;
         if (isSkipLlm) {
-          // 固定动画：150ms 走到 95%，之后降速等待
-          const ratio = Math.min(elapsed / fixedDuration, 1);
-          if (ratio < 1) {
-            baseProgress = ratio * 95; // 0-95%
+          // 固定动画：150ms 走到 90%，之后以 1/3 速度丝滑减速
+          if (elapsed < fixedDuration) {
+            // 前150ms：线性从 0% 走到 90%
+            const ratio = elapsed / fixedDuration;
+            baseProgress = ratio * 90; // 0-90%
           } else {
-            // 超过 150ms 还没完成，使用预估逻辑降速等待
-            baseProgress = calculateProgress(elapsed - fixedDuration + fixedDuration * 0.95 / 0.01, currentSession.estimated, `session-${session.id}-slowdown`);
-            baseProgress = Math.max(95, Math.min(99, baseProgress)); // 限制在 95-99%
+            // 超过 150ms：从 90% 开始，以 1/3 速度丝滑减速到 99%
+            const extraTime = elapsed - fixedDuration;
+            // 使用 ease-out 缓动让减速更丝滑
+            const slowdownProgress = 1 - Math.pow(1 - Math.min(extraTime / 2000, 1), 2);
+            // 从90%开始，最多走到99%，速度为原来的1/3
+            baseProgress = 90 + slowdownProgress * 9; // 90-99%
+            baseProgress = Math.min(99, baseProgress); // 严格限制在 99% 以下
           }
         } else {
           // 正常流程：使用预估时间

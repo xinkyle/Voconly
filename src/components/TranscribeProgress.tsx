@@ -18,7 +18,7 @@ interface TranscribeProgressProps {
 
 /**
  * 计算匀速进度
- * 从 0% 匀速增长到 100%
+ * 从 0% 匀速增长到 90%，之后丝滑减速到100%
  */
 function calculateProgress(elapsed: number, estimatedTime: number): number {
   if (estimatedTime <= 0) {
@@ -27,8 +27,16 @@ function calculateProgress(elapsed: number, estimatedTime: number): number {
   }
 
   const ratio = elapsed / estimatedTime;
-  // 线性进度，最高到95%等待完成
-  return Math.min(95, ratio * 100);
+  const baseProgress = ratio * 100;
+
+  // 90%之后丝滑减速到原来的1/3速度
+  if (baseProgress >= 90) {
+    const progressBeyond90 = baseProgress - 90;
+    const easedProgress = 90 + progressBeyond90 * 0.33 * (1 - Math.pow(1 - Math.min(progressBeyond90 / 10, 1), 2));
+    return Math.min(100, easedProgress);
+  }
+
+  return Math.min(90, baseProgress);
 }
 
 /**
@@ -134,7 +142,7 @@ export function TranscribeProgress({
           style={{ width: `${progress}%` }}
         />
         {/* 动画效果 */}
-        {isTranscribing && progress < 95 && (
+        {isTranscribing && progress < 90 && (
           <div className="absolute top-0 left-0 h-full w-full animate-pulse">
             <div className="absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-white/30 to-transparent" />
           </div>
