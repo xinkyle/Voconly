@@ -6,7 +6,7 @@
 
 ### 首次安装后无法打开？或提示安装文件损坏？
 
-这是 macOS 的安全保护机制导致的。Voconly 是免费开源软件，目前没有购买 Apple 开发者账号（每年需要 $99 美元），所以无法通过 Apple 的官方认证。但请放心，Voconly 完全安全，所有代码都可以在 GitHub 上查看。
+这是 macOS 的安全保护机制导致的。Voconly 是免费开源软件，所有代码在 GitHub 公开可审计。目前采用社区分发模式，暂未完成 Apple 签名认证。随着项目成长，我们计划加入开发者计划以改善安装体验。在此之前，首次使用需要手动信任应用。
 
 ### 解决方法（只需一次）
 
@@ -30,7 +30,7 @@ xattr -cr /Applications/Voconly.app
 
 ### Can't open after first install? Or says the file is damaged?
 
-This is due to macOS security protection. Voconly is a free, open-source app. We haven't purchased an Apple Developer account ($99/year) yet, so it cannot be officially verified by Apple. But don't worry - Voconly is completely safe, and all source code is publicly available on GitHub.
+This is due to macOS security protection. Voconly is a free, open-source app with all code publicly auditable on GitHub. We currently use community distribution and have not yet completed Apple signing certification. As the project grows, we plan to join the Developer Program to improve the installation experience. Until then, manual trust is required on first use.
 
 ### Solution (one-time setup)
 
