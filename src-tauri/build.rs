@@ -36,7 +36,8 @@ fn stage_transcribe_runtime_libs() {
 
     let mut copied = 0usize;
     for dir in &dirs {
-        println!("cargo:rerun-if-changed={}", dir.display());
+        // NOTE: 不监听 DLL 输出目录的变化，避免编译循环
+        // DLL 文件是编译产物，变化不应触发重新编译
         for entry in std::fs::read_dir(dir)
             .unwrap_or_else(|e| panic!("read {}: {e}", dir.display()))
             .flatten()

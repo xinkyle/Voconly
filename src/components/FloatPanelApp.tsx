@@ -92,14 +92,14 @@ function calculateProgress(elapsed: number, estimatedTime: number, debugId?: str
   const ratio = elapsed / estimatedTime;
   const baseProgress = ratio * 100;
 
-  // 90%之后使用 cubic-bezier 缓动减速到原来的1/3速度
+  // 90%之后使用 cubic-bezier 缓动减速为原来的0.8速度
   // 这提供了更丝滑、自然的减速体验
   if (baseProgress >= 90) {
     // 使用 cubic-bezier 缓动函数模拟减速效果
     // 参数：0.4, 0, 0.2, 1（Material Design 标准缓动）
     const progressBeyond90 = baseProgress - 90;
-    // 将剩余10%的距离按1/3速度推进，使用缓动函数让减速更自然
-    const easedProgress = 90 + progressBeyond90 * 0.33 * (1 - Math.pow(1 - Math.min(progressBeyond90 / 10, 1), 2));
+    // 将剩余10%的距离按原速90%速度推进，使用缓动函数让减速更自然
+    const easedProgress = 85 + progressBeyond90 * 0.9 * (1 - Math.pow(1 - Math.min(progressBeyond90 / 10, 1), 2));
     const result = Math.min(100, easedProgress);
     console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, base=${baseProgress.toFixed(4)}% (>=90%, SMOOTH SLOWDOWN) → ${result.toFixed(4)}%`);
     return result;
@@ -1222,12 +1222,12 @@ export default function FloatPanelApp() {
             const ratio = elapsed / fixedDuration;
             baseProgress = ratio * 90; // 0-90%
           } else {
-            // 超过 150ms：从 90% 开始，以 1/3 速度丝滑减速到 99%
+            // 超过 150ms：从 90% 开始，以 1/2 速度丝滑减速到 99%
             const extraTime = elapsed - fixedDuration;
             // 使用 ease-out 缓动让减速更丝滑
             const slowdownProgress = 1 - Math.pow(1 - Math.min(extraTime / 2000, 1), 2);
-            // 从90%开始，最多走到99%，速度为原来的1/3
-            baseProgress = 90 + slowdownProgress * 9; // 90-99%
+            // 从90%开始，最多走到99%，速度为原来的1/2
+            baseProgress = 90 + slowdownProgress * 13.5; // 90-103.5%，但会被限制在99%
             baseProgress = Math.min(99, baseProgress); // 严格限制在 99% 以下
           }
         } else {
