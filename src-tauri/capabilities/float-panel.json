@@ -9,6 +9,7 @@
     "core:event:allow-emit",
     "core:window:allow-close",
     "core:window:allow-set-focus",
-    "core:window:allow-set-focusable"
+    "core:window:allow-set-focusable",
+    "core:webview:allow-internal-toggle-devtools"
   ]
 }

@@ -220,7 +220,7 @@ pub async fn llm_process_text(
     services: State<'_, AppServices>,
     request: LlmProcessRequest,
 ) -> Result<LlmResponse, String> {
-    info!("[LLM] Processing text: {} chars", request.text.len());
+    info!("[LLM] Processing text: {} chars", request.text.chars().count());
 
     let (mut llm_config, provider_meta, provider_instance) = build_llm_config_from_global(&services)?;
 
@@ -257,7 +257,7 @@ pub async fn llm_process_text_for_scene(
     info!(
         "[LLM] Processing text for scene: {}, {} chars",
         scene_id,
-        text.len()
+        text.chars().count()
     );
 
     // 获取全局 LLM 配置 + 场景提示词
@@ -451,7 +451,7 @@ pub async fn llm_process_text_for_scene(
 
     // 记录开始时间
     let start_time = Instant::now();
-    let text_len = text.len() as u32;
+    let text_len = text.chars().count() as u32;  // 使用字符数，而非字节长度
     let model_id = llm_config.provider.model.clone();
 
     let result = tokio::time::timeout(timeout, llm_service.process_text(&text))
@@ -484,7 +484,7 @@ pub async fn llm_process_text_for_scene_with_progress(
     info!(
         "[LLM] Processing text for scene with progress: {}, {} chars",
         scene_id,
-        text.len()
+        text.chars().count()
     );
 
     // 获取全局 LLM 配置 + 场景提示词
@@ -712,7 +712,7 @@ pub async fn llm_process_text_for_scene_with_progress(
 
     // 记录开始时间
     let start_time = Instant::now();
-    let text_len = text.len() as u32;
+    let text_len = text.chars().count() as u32;  // 使用字符数，而非字节长度
     let model_id = llm_config.provider.model.clone();
 
     // 调用带进度的处理方法

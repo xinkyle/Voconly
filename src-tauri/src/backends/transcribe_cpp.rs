@@ -481,7 +481,7 @@ impl SpeechBackend for TranscribeCppBackend {
 
         debug!(
             "[TranscribeCppBackend] Transcription complete: {} chars",
-            result.text.len()
+            result.text.chars().count()
         );
 
         // Accumulate duration and check for session recreation

@@ -34,11 +34,11 @@ export interface IntervalStats {
  * LLM 性能统计记录（区间模型）
  */
 export interface LlmStats {
-  short: IntervalStats;   // 短文本区间（<100字）- 固定值
-  medium: IntervalStats;  // 中文本区间（100-300字）- 固定值
+  short: IntervalStats;   // 短文本区间（<100字）- 动态更新
+  medium: IntervalStats;  // 中文本区间（100-300字）- 动态更新
   long: IntervalStats;    // 长文本区间（>300字）- 废弃，保留兼容
 
-  // 新增：300字以上的动态速度参数
+  // 300字以上的动态速度参数
   longCharsPerSec: number;  // EWMA更新的处理速度（字/秒），初始160
   longSamples: number;      // 300字以上样本计数
   longAvgSpeed: number;     // 累积平均速度（用于日志对比）
@@ -551,7 +551,7 @@ export function recordLlmPerformance(
 }
 
 /**
- * 预估 LLM 处理时间（300字以内固定值，300字以上线性预估+动态速度）
+ * 预估 LLM 处理时间（所有区间都支持动态更新）
  */
 export function estimateLlmTime(
   modelId: string,
@@ -565,30 +565,43 @@ export function estimateLlmTime(
 
   const SHORT_THRESHOLD = 100;
   const MEDIUM_THRESHOLD = 300;
-  const SHORT_TIME_MS = 500;
-  const MEDIUM_TIME_MS = 700;
+  const MIN_SAMPLES = 3;
+  const DEFAULT_SHORT_TIME_MS = 500;
+  const DEFAULT_MEDIUM_TIME_MS = 700;
   const BASE_TIME_MS = 700;
   const DEFAULT_CHARS_PER_SEC = 160;
 
-  // <100字：固定值
+  const cachedStats = llmMemoryCache[modelId];
+
+  // <100字：使用动态更新值或默认值
   if (textLen < SHORT_THRESHOLD) {
+    const hasSufficientData = (cachedStats?.short.samples || 0) >= MIN_SAMPLES;
+    const avgTimeMs = hasSufficientData
+      ? cachedStats!.short.avgTimeMs
+      : DEFAULT_SHORT_TIME_MS;
+
     return {
-      estimatedTime: SHORT_TIME_MS / 1000,
-      hasSufficientData: false,
+      estimatedTime: avgTimeMs / 1000,
+      hasSufficientData,
       interval: 'short',
-      samples: 0,
-      avgTimeMs: SHORT_TIME_MS,
+      samples: cachedStats?.short.samples || 0,
+      avgTimeMs,
     };
   }
 
-  // 100-300字：固定值
+  // 100-300字：使用动态更新值或默认值
   if (textLen <= MEDIUM_THRESHOLD) {
+    const hasSufficientData = (cachedStats?.medium.samples || 0) >= MIN_SAMPLES;
+    const avgTimeMs = hasSufficientData
+      ? cachedStats!.medium.avgTimeMs
+      : DEFAULT_MEDIUM_TIME_MS;
+
     return {
-      estimatedTime: MEDIUM_TIME_MS / 1000,
-      hasSufficientData: false,
+      estimatedTime: avgTimeMs / 1000,
+      hasSufficientData,
       interval: 'medium',
-      samples: 0,
-      avgTimeMs: MEDIUM_TIME_MS,
+      samples: cachedStats?.medium.samples || 0,
+      avgTimeMs,
     };
   }
 
@@ -596,12 +609,11 @@ export function estimateLlmTime(
   const extraChars = textLen - MEDIUM_THRESHOLD;
 
   // 使用动态速度参数（如果存在且有样本）或默认值
-  const cachedStats = llmMemoryCache[modelId];
   const charsPerSec = cachedStats?.longCharsPerSec && cachedStats.longSamples > 0
     ? cachedStats.longCharsPerSec
     : DEFAULT_CHARS_PER_SEC;
 
-  const hasSufficientData = cachedStats?.longSamples >= 3;
+  const hasSufficientData = (cachedStats?.longSamples || 0) >= MIN_SAMPLES;
 
   // 线性公式：基数时间 + 超出字数 / 速度 * 1000
   const extraTimeMs = (extraChars / charsPerSec) * 1000;
@@ -618,11 +630,11 @@ export function estimateLlmTime(
 
   return {
     estimatedTime: estimatedMs / 1000,
-    hasSufficientData: hasSufficientData,
+    hasSufficientData,
     interval: 'long',
     samples: cachedStats?.longSamples || 0,
     avgTimeMs: estimatedMs,
-    charsPerSec: charsPerSec,
+    charsPerSec,
   };
 }
 

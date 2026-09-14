@@ -76,36 +76,53 @@ function Waveform({ isActive, isUnavailable }: { isActive: boolean; isUnavailabl
 }
 
 /**
- * 计算进度 - 时间驱动，90%后减速，最大100%
- * 使用 cubic-bezier 缓动函数实现丝滑减速效果
+ * 计算进度 - 分段减速设计，确保进度条永不卡住
+ *
+ * 分段策略：
+ * - 0-60%：正常预估驱动（100% 速度）
+ * - 60-80%：第一次降速（50% 速度）
+ * - 80-90%：第二次降速（20% 速度）
+ * - 90-99%：极慢速（5% 速度），几乎不动但还在走
+ * - 99%：停止，等待 complete 信号
  */
 function calculateProgress(elapsed: number, estimatedTime: number, debugId?: string): number {
   const id = debugId || 'calc';
 
   if (estimatedTime <= 0) {
-    // 没有预估时间，缓慢增长到90%
-    const result = Math.min(90, elapsed / 100);
+    // 没有预估时间，缓慢增长到60%
+    const result = Math.min(60, elapsed / 125);
     console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms (no estimate) → ${result.toFixed(4)}%`);
     return result;
   }
 
   const ratio = elapsed / estimatedTime;
-  const baseProgress = ratio * 100;
 
-  // 90%之后使用 cubic-bezier 缓动减速为原来的0.8速度
-  // 这提供了更丝滑、自然的减速体验
-  if (baseProgress >= 90) {
-    // 使用 cubic-bezier 缓动函数模拟减速效果
-    // 参数：0.4, 0, 0.2, 1（Material Design 标准缓动）
-    const progressBeyond90 = baseProgress - 90;
-    // 将剩余10%的距离按原速90%速度推进，使用缓动函数让减速更自然
-    const easedProgress = 85 + progressBeyond90 * 0.9 * (1 - Math.pow(1 - Math.min(progressBeyond90 / 10, 1), 2));
-    const result = Math.min(100, easedProgress);
-    console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, base=${baseProgress.toFixed(4)}% (>=90%, SMOOTH SLOWDOWN) → ${result.toFixed(4)}%`);
-    return result;
+  // 分段减速计算
+  let progress: number;
+  let stage: string;
+
+  if (ratio < 0.6) {
+    // 阶段1：0-60%，正常速度（预估时间的 0-60% 对应进度的 0-60%）
+    progress = ratio / 0.6 * 60;
+    stage = 'FAST';
+  } else if (ratio < 0.8) {
+    // 阶段2：60-80%，50% 速度（预估时间的 60-80% 对应进度的 60-70%）
+    progress = 60 + (ratio - 0.6) / 0.2 * 10;
+    stage = 'SLOW1';
+  } else if (ratio < 1.0) {
+    // 阶段3：80-100%，20% 速度（预估时间的 80-100% 对应进度的 70-75%）
+    progress = 70 + (ratio - 0.8) / 0.2 * 5;
+    stage = 'SLOW2';
+  } else {
+    // 阶段4：100%+，5% 速度，最多到 99%
+    // 每超出 100% 预估时间，进度增加 5%
+    const extraRatio = ratio - 1.0;
+    progress = Math.min(99, 75 + extraRatio * 5);
+    stage = 'CRAWL';
   }
 
-  return baseProgress;
+  console.log(`[PROGRESS-CALC][${id}] elapsed=${elapsed}ms, estimated=${estimatedTime}ms, ratio=${ratio.toFixed(4)}, stage=${stage} → ${progress.toFixed(4)}%`);
+  return progress;
 }
 
 interface PreviewTextPayload {
@@ -399,11 +416,11 @@ export default function FloatPanelApp() {
     log.debug(`[SkipLlmRef] skipLlm=${state.skipLlm}`);
   }, [state.skipLlm]);
 
-  // 平滑过渡到完成状态（默认 200ms ease-out，双击跳过时 50ms）
+  // 平滑过渡到完成状态（默认 50ms ease-out，双击跳过时也是 50ms）
   const smoothProgressToComplete = (customDuration?: number) => {
     const startProgress = progressRef.current;
     const isSkipLlm = skipLlmRef.current;
-    const duration = customDuration ?? (isSkipLlm ? 50 : 200);
+    const duration = customDuration ?? 50; // 默认 50ms 快速完成
     const startTime = Date.now();
 
     log.debug(`[SMOOTH] Starting smooth animation: ${startProgress.toFixed(2)}% → 100%, duration=${duration}ms, isSkipLlm=${isSkipLlm}`);
@@ -556,17 +573,30 @@ export default function FloatPanelApp() {
     unlistenPromises.push(
       listen<void>('float-panel-hide', () => {
         const currentProgress = progressRef.current;
+        const currentStatus = statusRef.current; // 使用 ref 获取最新状态
         const currentSession = sessionRef.current;
-        log.debug(`[HIDE-EVENT] Received float-panel-hide: currentProgress=${currentProgress.toFixed(2)}%, sessionId=${currentSession?.id || 'null'}, smoothAnimationRef=${smoothAnimationRef.current || 'null'}`);
-        setIsHiding(true);
-        // 【修复】立即取消平滑过渡动画帧，防止延迟清理期间的 RAF 泄漏
-        if (smoothAnimationRef.current) {
-          log.debug(`[HIDE-EVENT] Cancelling smooth animation: ${smoothAnimationRef.current}`);
-          cancelAnimationFrame(smoothAnimationRef.current);
-          smoothAnimationRef.current = null;
+        log.debug(`[HIDE-EVENT] Received float-panel-hide: currentProgress=${currentProgress.toFixed(2)}%, currentStatus=${currentStatus}, sessionId=${currentSession?.id || 'null'}`);
+
+        // 如果进度还没走完且当前是转录状态，先快速完成进度条动画
+        if (currentProgress < 100 && currentStatus === 'transcribing') {
+          log.debug(`[HIDE-EVENT] Progress < 100% and status is transcribing, triggering fast completion animation`);
+          smoothProgressToComplete(50); // 50ms 快速完成，不取消动画让它跑完
         } else {
-          log.debug(`[HIDE-EVENT] No smooth animation to cancel`);
+          // 只在不需要新动画时，才取消现有的动画帧
+          if (smoothAnimationRef.current) {
+            log.debug(`[HIDE-EVENT] Cancelling smooth animation: ${smoothAnimationRef.current}`);
+            cancelAnimationFrame(smoothAnimationRef.current);
+            smoothAnimationRef.current = null;
+          } else {
+            log.debug(`[HIDE-EVENT] No smooth animation to cancel`);
+          }
         }
+
+        setIsHiding(true);
+
+        // 如果进度还没走完，等待动画完成（50ms + 缓冲）
+        const delay = currentProgress < 100 ? 70 : 100;
+
         setTimeout(() => {
           log.debug(`[HIDE-EVENT] Executing hide timeout cleanup`);
           setState(prev => ({ ...prev, visible: false }));
@@ -586,7 +616,7 @@ export default function FloatPanelApp() {
           // 【双击跳过】重置 skipLlm 标记
           skipLlmRef.current = false;
           log.debug('[HIDE-EVENT] 状态已完全重置');
-        }, 100);
+        }, delay);
       }).catch((e) => {
         log.error(`Failed to listen float-panel-hide: ${e}`);
         return () => {};

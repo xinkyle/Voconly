@@ -289,7 +289,7 @@ impl LlmPerformanceTracker {
 
     /// 记录一次 LLM 处理性能
     pub fn record(&mut self, model_id: &str, text_len: u32, process_time_ms: f64) {
-        let _interval = Self::get_interval(text_len);
+        let interval = Self::get_interval(text_len);
 
         let entry = self.stats.entry(model_id.to_string()).or_insert(LlmStats {
             short: IntervalStats::default(),
@@ -301,57 +301,99 @@ impl LlmPerformanceTracker {
             last_updated: 0,
         });
 
-        // 300字以上：EWMA更新动态速度参数
-        if text_len > INTERVAL_THRESHOLD_MEDIUM {
-            const BASE_TIME_MS: f64 = 700.0; // 300字基数时间
-
-            // 边界检查：实际耗时必须大于基数时间才能计算速度
-            if process_time_ms > BASE_TIME_MS {
-                // 实测速度 = (字数 - 300) / ((实际耗时 - 基数) / 1000)
-                let extra_chars = (text_len - INTERVAL_THRESHOLD_MEDIUM) as f64;
-                let extra_time_sec = (process_time_ms - BASE_TIME_MS) / 1000.0;
-                let measured_speed = extra_chars / extra_time_sec;
-
-                // EWMA更新: new = 0.8 * old + 0.2 * measured
-                let old_speed = entry.long_chars_per_sec;
-                entry.long_chars_per_sec = 0.8 * old_speed + 0.2 * measured_speed;
-                entry.long_samples += 1;
-
-                // 累积平均（用于日志对比）
-                let prev_avg = entry.long_avg_speed;
-                let prev_samples = entry.long_samples - 1;
-                if prev_samples > 0 {
-                    entry.long_avg_speed = (prev_avg * prev_samples as f64 + measured_speed)
-                        / entry.long_samples as f64;
+        // 根据区间更新统计
+        match interval {
+            "short" => {
+                // <100字：EWMA 更新平均时间
+                let old_avg = entry.short.avg_time_ms;
+                let new_samples = entry.short.samples + 1;
+                entry.short.avg_time_ms =
+                    Self::ewma_update(old_avg, process_time_ms, entry.short.samples);
+                entry.short.samples = new_samples;
+                entry.short.min_time_ms = if entry.short.min_time_ms > 0.0 {
+                    entry.short.min_time_ms.min(process_time_ms)
                 } else {
-                    entry.long_avg_speed = measured_speed;
-                }
+                    process_time_ms
+                };
+                entry.short.max_time_ms = entry.short.max_time_ms.max(process_time_ms);
 
                 log::info!(
-                    "[LLM Performance] {} >300 chars: len={}, time={}ms, measured={} chars/s, ewma={} chars/s, samples={}",
+                    "[LLM Performance] {} <100 chars: len={}, time={}ms, avg={}ms, samples={}",
                     model_id,
                     text_len,
                     process_time_ms as u32,
-                    measured_speed as u32,
-                    entry.long_chars_per_sec as u32,
-                    entry.long_samples
-                );
-            } else {
-                log::warn!(
-                    "[LLM Performance] {} >300 chars: time={}ms < base {}ms, skipping speed update",
-                    model_id,
-                    process_time_ms as u32,
-                    BASE_TIME_MS as u32
+                    entry.short.avg_time_ms as u32,
+                    entry.short.samples
                 );
             }
-        } else {
-            // 300字以内：不再更新区间统计，保持固定值
-            log::info!(
-                "[LLM Performance] {} <=300 chars: len={}, time={}ms (fixed estimate used)",
-                model_id,
-                text_len,
-                process_time_ms as u32
-            );
+            "medium" => {
+                // 100-300字：EWMA 更新平均时间
+                let old_avg = entry.medium.avg_time_ms;
+                let new_samples = entry.medium.samples + 1;
+                entry.medium.avg_time_ms =
+                    Self::ewma_update(old_avg, process_time_ms, entry.medium.samples);
+                entry.medium.samples = new_samples;
+                entry.medium.min_time_ms = if entry.medium.min_time_ms > 0.0 {
+                    entry.medium.min_time_ms.min(process_time_ms)
+                } else {
+                    process_time_ms
+                };
+                entry.medium.max_time_ms = entry.medium.max_time_ms.max(process_time_ms);
+
+                log::info!(
+                    "[LLM Performance] {} 100-300 chars: len={}, time={}ms, avg={}ms, samples={}",
+                    model_id,
+                    text_len,
+                    process_time_ms as u32,
+                    entry.medium.avg_time_ms as u32,
+                    entry.medium.samples
+                );
+            }
+            "long" => {
+                // >300字：EWMA更新动态速度参数
+                const BASE_TIME_MS: f64 = 700.0; // 300字基数时间
+
+                // 边界检查：实际耗时必须大于基数时间才能计算速度
+                if process_time_ms > BASE_TIME_MS {
+                    // 实测速度 = (字数 - 300) / ((实际耗时 - 基数) / 1000)
+                    let extra_chars = (text_len - INTERVAL_THRESHOLD_MEDIUM) as f64;
+                    let extra_time_sec = (process_time_ms - BASE_TIME_MS) / 1000.0;
+                    let measured_speed = extra_chars / extra_time_sec;
+
+                    // EWMA更新: new = 0.8 * old + 0.2 * measured
+                    let old_speed = entry.long_chars_per_sec;
+                    entry.long_chars_per_sec = 0.8 * old_speed + 0.2 * measured_speed;
+                    entry.long_samples += 1;
+
+                    // 累积平均（用于日志对比）
+                    let prev_avg = entry.long_avg_speed;
+                    let prev_samples = entry.long_samples - 1;
+                    if prev_samples > 0 {
+                        entry.long_avg_speed = (prev_avg * prev_samples as f64 + measured_speed)
+                            / entry.long_samples as f64;
+                    } else {
+                        entry.long_avg_speed = measured_speed;
+                    }
+
+                    log::info!(
+                        "[LLM Performance] {} >300 chars: len={}, time={}ms, measured={} chars/s, ewma={} chars/s, samples={}",
+                        model_id,
+                        text_len,
+                        process_time_ms as u32,
+                        measured_speed as u32,
+                        entry.long_chars_per_sec as u32,
+                        entry.long_samples
+                    );
+                } else {
+                    log::warn!(
+                        "[LLM Performance] {} >300 chars: time={}ms < base {}ms, skipping speed update",
+                        model_id,
+                        process_time_ms as u32,
+                        BASE_TIME_MS as u32
+                    );
+                }
+            }
+            _ => {}
         }
 
         entry.last_updated = std::time::SystemTime::now()
@@ -363,30 +405,54 @@ impl LlmPerformanceTracker {
         self.save_stats();
     }
 
+    /// EWMA 更新辅助函数
+    /// 新值权重 0.2，旧值权重 0.8
+    fn ewma_update(old_avg: f64, new_value: f64, old_samples: u32) -> f64 {
+        if old_samples == 0 {
+            new_value
+        } else {
+            0.8 * old_avg + 0.2 * new_value
+        }
+    }
+
     /// 预估 LLM 处理时间（毫秒）
     pub fn estimate_time_ms(&self, model_id: &str, text_len: u32) -> f64 {
-        const SHORT_TIME_MS: f64 = 500.0; // <100字固定值
-        const MEDIUM_TIME_MS: f64 = 700.0; // 100-300字固定值
-        const BASE_TIME_MS: f64 = 700.0; // 300字基数（与medium衔接）
+        // 默认值（无历史数据时使用）
+        const DEFAULT_SHORT_TIME_MS: f64 = 500.0; // <100字默认
+        const DEFAULT_MEDIUM_TIME_MS: f64 = 700.0; // 100-300字默认
+        const BASE_TIME_MS: f64 = 700.0; // 300字基数
         const DEFAULT_CHARS_PER_SEC: f64 = 160.0;
 
-        // <100字：固定值
+        // 获取模型统计数据
+        let stats = self.stats.get(model_id);
+
+        // <100字：使用动态更新值或默认值
         if text_len < INTERVAL_THRESHOLD_SHORT {
-            return SHORT_TIME_MS;
+            if let Some(s) = stats {
+                if s.short.samples >= MIN_SAMPLES_THRESHOLD {
+                    return s.short.avg_time_ms;
+                }
+            }
+            return DEFAULT_SHORT_TIME_MS;
         }
 
-        // 100-300字：固定值
+        // 100-300字：使用动态更新值或默认值
         if text_len <= INTERVAL_THRESHOLD_MEDIUM {
-            return MEDIUM_TIME_MS;
+            if let Some(s) = stats {
+                if s.medium.samples >= MIN_SAMPLES_THRESHOLD {
+                    return s.medium.avg_time_ms;
+                }
+            }
+            return DEFAULT_MEDIUM_TIME_MS;
         }
 
         // >300字：线性预估
         let extra_chars = (text_len - INTERVAL_THRESHOLD_MEDIUM) as f64;
 
         // 使用动态速度参数（如果存在）或默认值
-        let chars_per_sec = if let Some(stats) = self.stats.get(model_id) {
-            if stats.long_chars_per_sec > 0.0 {
-                stats.long_chars_per_sec
+        let chars_per_sec = if let Some(s) = stats {
+            if s.long_chars_per_sec > 0.0 {
+                s.long_chars_per_sec
             } else {
                 DEFAULT_CHARS_PER_SEC
             }

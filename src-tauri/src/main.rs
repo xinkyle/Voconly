@@ -512,7 +512,7 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let thread_id = std::thread::current().id();
     info!(
         "[simulate_input] START - {} characters, thread_id: {:?}",
-        text.len(),
+        text.chars().count(),
         thread_id
     );
 
@@ -1767,7 +1767,7 @@ async fn clear_preview_text(app: AppHandle) -> Result<(), String> {
 /// 录音结束时调用，确保后续流程使用正确的文本
 #[tauri::command]
 async fn update_preview_text(app: AppHandle, text: String) -> Result<(), String> {
-    let text_len = text.len();
+    let text_len = text.chars().count();  // 使用字符数，而非字节长度
     let state = app.state::<AppState>();
     let mut preview = state.preview_text.lock().map_err(|e| e.to_string())?;
     *preview = text;
@@ -1782,7 +1782,7 @@ async fn append_preview_text(app: AppHandle, text: String) -> Result<(), String>
     info!("[Preview] ===== append_preview_text called =====");
     info!(
         "[Preview] Appending preview text: {} chars, content: \"{}\"",
-        text.len(),
+        text.chars().count(),
         text
     );
     let state = app.state::<AppState>();
@@ -1798,7 +1798,7 @@ async fn append_preview_text(app: AppHandle, text: String) -> Result<(), String>
     let full_text = {
         let mut preview = state.preview_text.lock().map_err(|e| e.to_string())?;
         preview.push_str(&text);
-        info!("[Preview] Full text after append: {} chars", preview.len());
+        info!("[Preview] Full text after append: {} chars", preview.chars().count());
         preview.clone()
     };
 

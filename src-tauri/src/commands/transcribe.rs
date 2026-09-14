@@ -52,6 +52,16 @@ pub struct TranscribeSegment {
     pub end: f32,
 }
 
+/// 内部转录结果（包含性能数据）
+#[derive(Debug, Clone)]
+pub struct TranscribeResultInternal {
+    pub text: String,
+    pub model_id: String,
+    pub transcribe_time_ms: u64,
+    pub audio_duration_ms: u64,
+    pub device: String, // "GPU" 或 "CPU"
+}
+
 /// Lazy-initialized OpenCC converter for Traditional to Simplified Chinese
 static OPENCC_CONVERTER: Lazy<Option<OpenCC>> =
     Lazy::new(|| match OpenCC::from_config(BuiltinConfig::Tw2sp) {
@@ -383,7 +393,7 @@ pub async fn transcribe_audio(
         .transcribe(&audio_samples, &params)
         .map_err(|e| format!("Transcription failed: {}", e))?;
 
-    info!("Transcription complete: {} chars", result.text.len());
+    info!("Transcription complete: {} chars", result.text.chars().count());
 
     // 获取 backend 类型（用于判断是否需要后处理修正）
     let backend_type = loaded_model.backend.backend_type();
@@ -407,7 +417,7 @@ pub fn transcribe_samples_internal(
     samples: &[f32],
     scene_id: &str,
     app_handle: Option<&AppHandle>,
-) -> Result<String, String> {
+) -> Result<TranscribeResultInternal, String> {
     let total_start = std::time::Instant::now();
     let audio_duration_ms = (samples.len() / 16) as u64; // 16kHz
     debug!(
@@ -526,10 +536,14 @@ pub fn transcribe_samples_internal(
         .backend
         .transcribe(samples, &params)
         .map_err(|e| format!("Transcription failed: {}", e))?;
-    let transcribe_ms = transcribe_start.elapsed().as_millis();
+    let transcribe_ms = transcribe_start.elapsed().as_millis() as u64;
 
     // 转换结果（繁体转简体、词典修正）
     let response = convert_result(result, &dictionary, backend_type);
+
+    // 确定设备类型（简化方案：使用 Auto 表示自动检测）
+    // TODO: 未来可扩展为从 backend 获取实际使用的设备
+    let device = "Auto".to_string();
 
     let total_ms = total_start.elapsed().as_millis();
     debug!(
@@ -540,7 +554,13 @@ pub fn transcribe_samples_internal(
         total_ms as f64 / audio_duration_ms.max(1) as f64
     );
 
-    Ok(response.text)
+    Ok(TranscribeResultInternal {
+        text: response.text,
+        model_id: global_asr_model_id,
+        transcribe_time_ms: transcribe_ms,
+        audio_duration_ms,
+        device,
+    })
 }
 
 /// Initialize the model manager (called during app setup)

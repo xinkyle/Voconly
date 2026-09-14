@@ -622,7 +622,18 @@ fn run_consumer(
                     &scene_id,
                     Some(&app_handle),
                 ) {
-                    Ok(text) => text,
+                    Ok(result) => {
+                        // 记录性能数据
+                        if let Some(perf_state) = app_handle.try_state::<crate::commands::performance::PerformanceState>() {
+                            perf_state.0.record(
+                                &result.model_id,
+                                &result.device,
+                                result.audio_duration_ms as f64 / 1000.0,
+                                result.transcribe_time_ms as f64 / 1000.0,
+                            );
+                        }
+                        result.text
+                    }
                     Err(e) => {
                         log::error!("[Partial/Final] Recognition error: {}", e);
                         String::new()
@@ -945,7 +956,7 @@ fn run_consumer(
                                     preview.push(' ');
                                 }
                                 preview.push_str(&recognition.text);
-                                log::info!("[Partial/Final] Appended to preview_text, total {} chars", preview.len());
+                                log::info!("[Partial/Final] Appended to preview_text, total {} chars", preview.chars().count());
                             }
                         }
                     }
@@ -1130,7 +1141,7 @@ fn run_consumer(
                                         // 这里只需要更新后端的 preview_text 状态
                                         log::info!(
                                             "[Capture] Stream finalized with text: {} chars",
-                                            text.len()
+                                            text.chars().count()
                                         );
 
                                         // 更新后端的 preview_text 状态（用于 get_preview_text 命令）
@@ -1141,7 +1152,7 @@ fn run_consumer(
                                                 *preview = text.clone();
                                                 log::info!(
                                                     "[Capture] Updated preview_text to {} chars",
-                                                    text.len()
+                                                    text.chars().count()
                                                 );
                                             }
                                         }
