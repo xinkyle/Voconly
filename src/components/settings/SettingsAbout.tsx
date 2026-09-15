@@ -6,12 +6,12 @@ import type { RemoteVersionInfo } from '../../types/updater';
 
 const APP_NAME = 'Voconly';
 
-// Logo Component - grayscale version for clean integration
+// Logo Component
 const LogoIcon = ({ className = 'w-7 h-7' }: { className?: string }) => (
   <img
     src="/logo.png"
     alt="Voconly"
-    className={`${className} grayscale opacity-80`}
+    className={className}
     style={{ imageRendering: 'auto' }}
   />
 );
