@@ -51,12 +51,12 @@ export interface LlmStats {
  */
 export function createDefaultLlmStats(): LlmStats {
   return {
-    short: { samples: 0, avgTimeMs: 500, minTimeMs: 500, maxTimeMs: 500 },
-    medium: { samples: 0, avgTimeMs: 700, minTimeMs: 700, maxTimeMs: 700 },
-    long: { samples: 0, avgTimeMs: 1000, minTimeMs: 1000, maxTimeMs: 1000 },
-    longCharsPerSec: 160,
+    short: { samples: 0, avgTimeMs: 1000, minTimeMs: 1000, maxTimeMs: 1000 },
+    medium: { samples: 0, avgTimeMs: 1400, minTimeMs: 1400, maxTimeMs: 1400 },
+    long: { samples: 0, avgTimeMs: 1400, minTimeMs: 1400, maxTimeMs: 1400 },
+    longCharsPerSec: 80,
     longSamples: 0,
-    longAvgSpeed: 160,
+    longAvgSpeed: 80,
     lastUpdated: 0,
   };
 }
@@ -381,7 +381,7 @@ export async function recordPerformance(
 
   // 获取记录前的预估时间（用于对比）
   const prevEntry = memoryCache[key];
-  const prevAvgRtf = prevEntry && prevEntry.samples >= 3 ? prevEntry.avgRtf : (device === 'GPU' ? 0.4 : 2.5);
+  const prevAvgRtf = prevEntry && prevEntry.samples >= 3 ? prevEntry.avgRtf : (device === 'GPU' ? 0.8 : 5.0);
   const estimatedTime = audioDuration * prevAvgRtf;
 
   // 更新内存缓存
@@ -469,8 +469,8 @@ export function estimateTranscribeTime(
     return result;
   }
 
-  // 默认值
-  const defaultRtf = device === 'GPU' ? 0.4 : 2.5;
+  // 默认值（保守预估，约为实测值的 2 倍）
+  const defaultRtf = device === 'GPU' ? 0.8 : 5.0;
   const result = {
     estimatedTime: audioDuration * defaultRtf,
     hasSufficientData: false,
@@ -509,14 +509,14 @@ export function clearMemoryCache(): void {
   console.log('[Performance] Memory cache cleared');
 }
 
-// 默认 RTF 值
+// 默认 RTF 值（保守预估，约为实测值的 2 倍）
 export const DEFAULT_RTF = {
-  GPU: 0.4,
-  CPU: 2.5,
+  GPU: 0.8,
+  CPU: 5.0,
 } as const;
 
-// 默认每字符处理时间（秒）- 用于 recordLlmPerformance 的 fallback
-export const DEFAULT_TIME_PER_CHAR = 0.01; // 约 100 字符/秒
+// 默认每字符处理时间（秒）- 用于 recordLlmPerformance 的 fallback（保守预估）
+export const DEFAULT_TIME_PER_CHAR = 0.02; // 约 50 字符/秒
 
 /**
  * 记录 LLM 性能（打印日志对比）
@@ -566,10 +566,10 @@ export function estimateLlmTime(
   const SHORT_THRESHOLD = 100;
   const MEDIUM_THRESHOLD = 300;
   const MIN_SAMPLES = 3;
-  const DEFAULT_SHORT_TIME_MS = 500;
-  const DEFAULT_MEDIUM_TIME_MS = 700;
-  const BASE_TIME_MS = 700;
-  const DEFAULT_CHARS_PER_SEC = 160;
+  const DEFAULT_SHORT_TIME_MS = 1000;
+  const DEFAULT_MEDIUM_TIME_MS = 1400;
+  const BASE_TIME_MS = 1400;
+  const DEFAULT_CHARS_PER_SEC = 80;
 
   const cachedStats = llmMemoryCache[modelId];
 
