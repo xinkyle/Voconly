@@ -40,7 +40,7 @@
       "previewHeightMedium": "中",
       "previewHeightLow": "低",
       "defaultMic": "默认麦克风",
-      "defaultMicDesc": "选择录音时使用的麦克风设备",
+      "defaultMicDesc": "推荐使用第三方麦克风，加载更快、识别更准确",
       "autoMic": "自动（跟随系统）",
       "logDirectory": "日志目录",
       "openDirectory": "打开目录",
@@ -563,7 +563,7 @@
   },
   "microphone": {
     "title": "麦克风设置",
-    "subtitle": "选择录音时使用的麦克风设备",
+    "subtitle": "推荐使用第三方麦克风，加载更快、识别更准确",
     "loading": "正在加载麦克风列表...",
     "permissionRequired": "需要麦克风权限才能显示可用设备",
     "noDevice": "未检测到麦克风设备",

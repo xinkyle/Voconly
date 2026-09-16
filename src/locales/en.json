@@ -40,7 +40,7 @@
       "previewHeightMedium": "Medium",
       "previewHeightLow": "Low",
       "defaultMic": "Default microphone",
-      "defaultMicDesc": "Select the microphone device for recording",
+      "defaultMicDesc": "Third-party microphones recommended for faster loading and better accuracy",
       "autoMic": "Auto (Follow system)",
       "logDirectory": "Log directory",
       "openDirectory": "Open Directory",
@@ -563,7 +563,7 @@
   },
   "microphone": {
     "title": "Microphone Settings",
-    "subtitle": "Select the microphone device for recording",
+    "subtitle": "Third-party microphones recommended for faster loading and better accuracy",
     "loading": "Loading microphone list...",
     "permissionRequired": "Microphone permission required to show available devices",
     "noDevice": "No microphone detected",
