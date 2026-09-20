@@ -5,7 +5,7 @@ use crate::presets::{get_asr_presets, scan_available_asr_models, ModelPreset};
 use crate::utils::downloader::get_model_storage_dir;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Load model response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +146,7 @@ pub async fn unload_model(
 #[tauri::command]
 pub async fn switch_asr_model(
     services: tauri::State<'_, AppServices>,
+    app_handle: tauri::AppHandle,
     old_model_id: Option<String>,
     new_model_id: String,
 ) -> Result<SwitchAsrModelResponse, String> {
@@ -192,6 +193,11 @@ pub async fn switch_asr_model(
                     "[SwitchAsrModel] Failed to load new model: {:?}",
                     response.error
                 );
+                // 发送加载失败事件（用于前端显示内存不足对话框）
+                let _ = app_handle.emit("asr-model-load-failed", &serde_json::json!({
+                    "modelId": new_model_id,
+                    "error": &response.error
+                }));
                 Ok(SwitchAsrModelResponse {
                     success: false,
                     old_model_id,
@@ -202,6 +208,11 @@ pub async fn switch_asr_model(
         }
         Err(e) => {
             error!("[SwitchAsrModel] Error loading model: {}", e);
+            // 发送加载失败事件
+            let _ = app_handle.emit("asr-model-load-failed", &serde_json::json!({
+                "modelId": new_model_id,
+                "error": &e
+            }));
             Ok(SwitchAsrModelResponse {
                 success: false,
                 old_model_id,

@@ -133,6 +133,7 @@ export default function HomePanelV2({
   const [selectingSceneId, setSelectingSceneId] = useState<string | null>(null);
   const [asrLoading, setAsrLoading] = useState(false); // ASR 模型加载中状态
   const [asrModelLoaded, setAsrModelLoaded] = useState(false); // ASR 模型是否真正加载到内存
+  const [asrLoadError, setAsrLoadError] = useState<string | null>(null); // ASR 模型加载失败原因
   const [stats, setStats] = useState<FullStats>({
     totalDuration: 0,
     totalWords: 0,
@@ -408,6 +409,7 @@ export default function HomePanelV2({
         log.info(`[HomePanel] 当前模型 ${modelId} 已加载完成，显示绿点`);
         setAsrLoading(false);
         setAsrModelLoaded(true);
+        setAsrLoadError(null); // 清除错误信息
       }
     });
 
@@ -436,6 +438,7 @@ export default function HomePanelV2({
         log.info(`[HomePanel] 当前模型 ${modelId} 加载失败，显示灰点`);
         setAsrLoading(false);
         setAsrModelLoaded(false);
+        setAsrLoadError(event.payload.error || '加载失败'); // 存储错误信息
       }
     });
 
@@ -543,12 +546,18 @@ export default function HomePanelV2({
         // 更新模型缓存
         await invalidateAsrModelsCache();
 
-        // 显示提示：模型文件不存在
-        showToast({
-          type: 'warning',
-          title: t('modelConfig.modelFileNotFound'),
-          description: t('modelConfig.modelFileNotFoundDesc'),
-        });
+        // 检查是否是内存不足错误（如果是，不显示 Toast，由事件监听器弹出对话框）
+        if (result.error?.includes('MEMORY_INSUFFICIENT')) {
+          // 内存不足错误由 App.tsx 的 asr-model-load-failed 监听器处理
+          log.info(`Memory insufficient error, dialog will be shown by event listener`);
+        } else {
+          // 其他错误显示 Toast 提示
+          showToast({
+            type: 'warning',
+            title: t('modelConfig.modelFileNotFound'),
+            description: t('modelConfig.modelFileNotFoundDesc'),
+          });
+        }
       }
 
       if (onGlobalModelConfigChange) {
@@ -729,8 +738,13 @@ export default function HomePanelV2({
                 // 已加载：绿点
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               ) : (
-                // 未加载（被卸载）：灰点（表示"已配置但未加载"的状态）
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                // 未加载或加载失败：灰点 + 错误提示
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  {asrLoadError?.includes('MEMORY_INSUFFICIENT') && (
+                    <span className="text-red-500 text-xs ml-1">{t('models.memoryInsufficient')}</span>
+                  )}
+                </>
               )
             )}
           </button>

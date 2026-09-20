@@ -636,6 +636,8 @@ fn run_consumer(
                     }
                     Err(e) => {
                         log::error!("[Partial/Final] Recognition error: {}", e);
+                        // 发送错误事件到前端
+                        super::streaming::emit_streaming_error(&app_handle, &e);
                         String::new()
                     }
                 }

@@ -279,12 +279,13 @@ pub fn emit_streaming_error(app_handle: &AppHandle, error: &str) {
         saved_text: String::new(),
     };
 
-    match app_handle.emit_to("float-panel", "streaming-error", event) {
+    // 全局广播错误事件（主窗口和浮窗都能收到）
+    match app_handle.emit("streaming-error", event) {
         Ok(_) => {
-            info!("[StreamingWorker] Successfully emitted streaming-error to float-panel");
+            info!("[StreamingWorker] Successfully broadcast streaming-error event");
         }
         Err(e) => {
-            error!("[StreamingWorker] Failed to emit streaming-error: {}", e);
+            error!("[StreamingWorker] Failed to broadcast streaming-error: {}", e);
         }
     }
 }

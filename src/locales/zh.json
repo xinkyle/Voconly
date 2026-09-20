@@ -153,7 +153,8 @@
     "downloadModel": "下载模型",
     "willDownload": "将下载",
     "precision": "精度",
-    "size": "大小"
+    "size": "大小",
+    "memoryInsufficient": "内存不足"
   },
   "home": {
     "title": "场景配置",

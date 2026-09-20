@@ -509,6 +509,106 @@ function App() {
     };
   }, [hideFloatPanel]);
 
+  // Listen for streaming transcription errors (from backend)
+  useEffect(() => {
+    const unlistenRef = { current: null as (() => void) | null };
+    let mounted = true;
+
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (!mounted) return;
+      listen<{ error: string; savedText?: string }>('streaming-error', async (event) => {
+        log.error(`Received streaming-error: ${event.payload.error}`);
+
+        // 检查是否是内存不足错误
+        const errorMsg = event.payload.error;
+        if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
+          // 使用全局 ASR 模型配置
+          const asrModelId = config?.globalModelConfig?.asrModel?.modelId || '';
+          const model = config?.models?.find(m => m.id === asrModelId);
+          const modelName = model?.name || asrModelId;
+          const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
+          const requiredMemory = memoryMatch?.[1] || '未知';
+          const availableMemory = memoryMatch?.[2] || '未知';
+
+          // 隐藏浮窗
+          await hideFloatPanel('memory-error');
+          // 重置录音状态
+          if (recorderRef.current) {
+            recorderRef.current.cancel();
+          }
+          isProcessingShortcutRef.current = false;
+          isSegmentTranscribeActiveRef.current = false;
+          streamingTextRef.current = '';
+
+          // 显示内存错误对话框
+          setMemoryError({
+            visible: true,
+            modelName,
+            requiredMemory,
+            availableMemory,
+          });
+        }
+      }).then(fn => {
+        if (mounted) {
+          unlistenRef.current = fn;
+        } else {
+          fn(); // 如果已 unmount，立即取消监听
+        }
+      });
+    });
+
+    return () => {
+      mounted = false;
+      unlistenRef.current?.();
+    };
+  }, [config, hideFloatPanel]);
+
+  // Listen for ASR model load failed event (memory insufficient during startup or model switch)
+  useEffect(() => {
+    const unlistenRef = { current: null as (() => void) | null };
+    let mounted = true;
+
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (!mounted) return;
+      listen<{ modelId: string; error?: string }>('asr-model-load-failed', (event) => {
+        log.error(`Received asr-model-load-failed: ${event.payload.modelId}, error: ${event.payload.error}`);
+
+        // 检查是否是内存不足错误
+        const errorMsg = event.payload.error || '';
+        if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
+          // 获取模型名称
+          const modelId = event.payload.modelId;
+          const model = config?.models?.find(m => modelId.includes(m.id));
+          const modelName = model?.name || modelId;
+
+          // 提取内存信息
+          const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
+          const requiredMemory = memoryMatch?.[1] || '未知';
+          const availableMemory = memoryMatch?.[2] || '未知';
+
+          // 显示内存错误对话框
+          setMemoryError({
+            visible: true,
+            modelName,
+            requiredMemory,
+            availableMemory,
+          });
+        }
+      }).then(fn => {
+        if (mounted) {
+          unlistenRef.current = fn;
+        } else {
+          fn(); // 如果已 unmount，立即取消监听
+        }
+      });
+    });
+
+    return () => {
+      mounted = false;
+      unlistenRef.current?.();
+    };
+  }, [config]);
+
   // Reload config when switching to models page to refresh download status
   useEffect(() => {
     if (activeNav === 'models' || activeNav === 'home') {
