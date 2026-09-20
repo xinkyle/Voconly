@@ -442,21 +442,20 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     setIsLoading(false);
   }, [checkConflict]);
 
-  // 更新拦截规则：拦截所有已注册快捷键中的按键
+  // 更新拦截规则：传递完整快捷键配置给 Rust 端
   const updateBlockRule = useCallback(async () => {
     try {
-      // 收集所有需要拦截的按键
-      const keycodesToBlock = new Set<string>();
+      const shortcuts = registeredShortcutsRef.current;
 
-      for (const shortcut of registeredShortcutsRef.current) {
-        const keys = parseShortcutKeys(shortcut);
-        keys.forEach(key => keycodesToBlock.add(key));
-      }
-
-      if (keycodesToBlock.size > 0) {
+      if (shortcuts.length > 0) {
         const { commands } = await import('@tauri-keyhook');
-        await commands.setShortcutBlock(Array.from(keycodesToBlock));
-        log.info(`[updateBlockRule] 已设置拦截规则: ${Array.from(keycodesToBlock).join(', ')}`);
+        await commands.setShortcutBlock(shortcuts);
+        log.info(`[updateBlockRule] 已设置快捷键拦截: ${shortcuts.join(', ')}`);
+      } else {
+        // 如果没有快捷键，清空拦截规则
+        const { commands } = await import('@tauri-keyhook');
+        await commands.setShortcutBlock([]);
+        log.info(`[updateBlockRule] 已清空拦截规则`);
       }
     } catch (err) {
       log.error(`[updateBlockRule] 设置拦截规则失败: ${err}`);

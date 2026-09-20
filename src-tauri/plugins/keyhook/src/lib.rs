@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::plugin::{Builder, TauriPlugin};
@@ -23,31 +23,28 @@ pub struct KeyEventPayload {
     pub event_type: String,
 }
 
-/// 拦截规则
+/// 快捷键拦截规则
+/// 支持组合键：只有当指定修饰键被按下时才拦截目标键
 #[derive(Clone, Debug)]
-pub struct BlockRule {
-    /// 要拦截的按键名称列表
-    pub keycodes: HashSet<String>,
-    /// 是否拦截 keydown 事件
-    pub block_down: bool,
-    /// 是否拦截 keyup 事件
-    pub block_up: bool,
+pub struct ShortcutBlockRule {
+    /// 要拦截的键 -> 需要的修饰键集合
+    /// 例如：Digit1 -> {LeftCtrl} 表示只有 LeftCtrl 按下时才拦截 Digit1
+    /// 空集合表示单键快捷键，直接拦截
+    blocks: HashMap<String, HashSet<String>>,
 }
 
-impl Default for BlockRule {
+impl Default for ShortcutBlockRule {
     fn default() -> Self {
         Self {
-            keycodes: HashSet::new(),
-            block_down: false,
-            block_up: false,
+            blocks: HashMap::new(),
         }
     }
 }
 
 lazy_static! {
     pub(crate) static ref APP_HANDLE: Mutex<Option<tauri::AppHandle>> = Mutex::new(None);
-    /// 拦截规则
-    pub(crate) static ref BLOCK_RULE: Mutex<BlockRule> = Mutex::new(BlockRule::default());
+    /// 快捷键拦截规则
+    pub(crate) static ref SHORTCUT_BLOCK_RULE: Mutex<ShortcutBlockRule> = Mutex::new(ShortcutBlockRule::default());
 }
 
 pub(crate) static IS_LISTENING: AtomicBool = AtomicBool::new(false);
@@ -123,33 +120,101 @@ fn is_listening() -> bool {
     IS_LISTENING.load(Ordering::SeqCst)
 }
 
-/// 设置拦截规则
-#[tauri::command]
-fn set_block_rule(keycodes: Vec<String>, block_down: bool, block_up: bool) {
-    if let Ok(mut guard) = BLOCK_RULE.lock() {
-        guard.keycodes = keycodes.into_iter().collect();
-        guard.block_down = block_down;
-        guard.block_up = block_up;
-        tracing::debug!(
-            "Block rule updated: {:?} keys, down={}, up={}",
-            guard.keycodes.len(),
-            guard.block_down,
-            guard.block_up
-        );
+/// 规范化键名，将用户输入的键名转换为标准格式
+fn normalize_key_name(key: &str) -> String {
+    // 修饰键规范化
+    let modifier_map = [
+        ("ctrl", "Ctrl"),
+        ("leftctrl", "LeftCtrl"),
+        ("rightctrl", "RightCtrl"),
+        ("alt", "Alt"),
+        ("leftalt", "LeftAlt"),
+        ("rightalt", "RightAlt"),
+        ("shift", "Shift"),
+        ("leftshift", "LeftShift"),
+        ("rightshift", "RightShift"),
+        ("win", "Windows"),
+        ("leftwin", "LeftWindows"),
+        ("rightwin", "RightWindows"),
+    ];
+
+    let lower_key = key.to_lowercase();
+    for (alias, standard) in modifier_map {
+        if lower_key == alias {
+            return standard.to_string();
+        }
     }
+
+    // 符号键规范化
+    let symbol_map = [
+        (".", "Period"),
+        ("/", "Slash"),
+        (",", "Comma"),
+        (";", "Semicolon"),
+        ("=", "Equal"),
+        ("-", "Minus"),
+        ("`", "Backquote"),
+        ("[", "BracketLeft"),
+        ("]", "BracketRight"),
+        ("\\", "Backslash"),
+        ("'", "Quote"),
+    ];
+
+    for (symbol, standard) in symbol_map {
+        if key == symbol {
+            return standard.to_string();
+        }
+    }
+
+    // 数字键规范化：0-9 -> Digit0-Digit9
+    if key.len() == 1 && key.chars().next().unwrap().is_ascii_digit() {
+        return format!("Digit{}", key);
+    }
+
+    // 字母键规范化：a-z/A-Z -> KeyA-KeyZ
+    if key.len() == 1 && key.chars().next().unwrap().is_ascii_alphabetic() {
+        return format!("Key{}", key.to_uppercase());
+    }
+
+    // 功能键、其他键保持原样
+    key.to_string()
 }
 
-/// 设置快捷键拦截（拦截按键并阻止传递给其他应用）
+/// 设置快捷键拦截
+/// shortcuts: 快捷键配置列表，格式为 "Key1+Modifier1+Modifier2"
+/// 例如：["LeftCtrl+Digit1", "F1"]
 #[tauri::command]
-fn set_shortcut_block(keycodes: Vec<String>) {
-    if let Ok(mut guard) = BLOCK_RULE.lock() {
-        guard.keycodes = keycodes.into_iter().collect();
-        // 拦截 keydown 和 keyup
-        guard.block_down = true;
-        guard.block_up = true;
+fn set_shortcut_block(shortcuts: Vec<String>) {
+    if let Ok(mut guard) = SHORTCUT_BLOCK_RULE.lock() {
+        guard.blocks.clear();
+
+        for shortcut in shortcuts {
+            tracing::info!("[Keyhook] Processing shortcut: {}", shortcut);
+
+            let keys: Vec<String> = shortcut.split('+')
+                .map(|s| normalize_key_name(s.trim()))
+                .collect();
+
+            if keys.is_empty() {
+                continue;
+            }
+
+            if keys.len() == 1 {
+                // 单键快捷键：直接拦截
+                tracing::info!("[Keyhook] Single key: {} -> block directly", keys[0]);
+                guard.blocks.insert(keys[0].clone(), HashSet::new());
+            } else {
+                // 组合键：最后一个键是目标键，其他是修饰键
+                let target_key = keys.last().unwrap().clone();
+                let modifiers: HashSet<String> = keys[..keys.len() - 1].iter().cloned().collect();
+                tracing::info!("[Keyhook] Combo: {} + {:?} -> block {} when modifiers pressed", target_key, modifiers, target_key);
+                guard.blocks.insert(target_key, modifiers);
+            }
+        }
+
         tracing::info!(
-            "[Keyhook] Shortcut block set: {:?} keys",
-            guard.keycodes
+            "[Keyhook] Shortcut block updated: {} shortcuts registered",
+            guard.blocks.len()
         );
     }
 }
@@ -157,11 +222,9 @@ fn set_shortcut_block(keycodes: Vec<String>) {
 /// 清除拦截规则
 #[tauri::command]
 fn clear_block_rule() {
-    if let Ok(mut guard) = BLOCK_RULE.lock() {
-        guard.keycodes.clear();
-        guard.block_down = false;
-        guard.block_up = false;
-        tracing::debug!("Block rule cleared");
+    if let Ok(mut guard) = SHORTCUT_BLOCK_RULE.lock() {
+        guard.blocks.clear();
+        tracing::debug!("Shortcut block rule cleared");
     }
 }
 
@@ -172,7 +235,6 @@ pub fn init() -> TauriPlugin<tauri::Wry> {
             start_listen,
             stop_listen,
             is_listening,
-            set_block_rule,
             set_shortcut_block,
             clear_block_rule
         ])

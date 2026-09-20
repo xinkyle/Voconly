@@ -44,6 +44,10 @@ export default function SceneList({
   const [listeningShortcut, setListeningShortcut] = useState<string | null>(null); // scene id
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
 
+  // 组合键录制状态
+  const [pressedModifiers, setPressedModifiers] = useState<string[]>([]);
+  const pressedModifiersRef = useRef<string[]>([]);
+
   // For shortcut error modal
   const [shortcutError, setShortcutError] = useState<{
     shortcut: string;
@@ -112,17 +116,7 @@ export default function SceneList({
     };
   }, []);
 
-  // 监听 listeningShortcut 变化，暂停/恢复全局快捷键监听
-  useEffect(() => {
-    if (listeningShortcut) {
-      // 开始编辑快捷键，暂停全局监听
-      setPausedRef.current?.(true);
-    } else {
-      // 编辑结束，恢复全局监听
-      setPausedRef.current?.(false);
-    }
-  }, [listeningShortcut]);
-
+  
   const handleAdd = () => {
     setEditingScene(null);
     setShowForm(true);
@@ -195,7 +189,14 @@ export default function SceneList({
       return;
     }
 
+    log.debug(`[handleShortcutClick] 开始录制快捷键，sceneId=${scene.id}`);
+
     // 立即暂停全局快捷键监听（同步操作，避免 keyhook 在 useEffect 执行前捕获按键）
+    // 注意：必须在设置 listeningShortcut 之前暂停
+    if (setPaused) {
+      log.debug(`[handleShortcutClick] 调用 setPaused(true)`);
+      setPaused(true);
+    }
     setPausedRef.current?.(true);
 
     // Cancel any existing listening
@@ -203,24 +204,107 @@ export default function SceneList({
       clearTimeout(listeningTimeoutRef.current);
     }
 
+    // 重置修饰键状态
+    setPressedModifiers([]);
+    pressedModifiersRef.current = [];
+
     // Start listening for this scene
     setListeningShortcut(scene.id);
 
-    // Auto-cancel after 5 seconds
+    // Auto-cancel after 10 seconds（给用户更多时间来录制组合键）
     listeningTimeoutRef.current = setTimeout(() => {
+      log.debug(`[handleShortcutClick] 录制超时，自动取消`);
       setListeningShortcut(null);
-    }, 5000);
-  }, [isRecording]);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
+      if (setPaused) {
+        setPaused(false);
+      }
+      setPausedRef.current?.(false);
+    }, 10000);
+  }, [isRecording, setPaused]);
+
+  // 修饰键列表
+  const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
+
+  // 判断是否为修饰键
+  const isModifierKey = (key: string): boolean => {
+    return MODIFIER_KEYS.some(mod => key === mod || key.startsWith(mod));
+  };
+
+  // 规范化修饰键名称
+  const normalizeModifierName = (e: KeyboardEvent): string => {
+    // 根据 e.code 和 e.location 区分左右修饰键
+    if (e.key === 'Control') {
+      return e.location === 2 ? 'RightCtrl' : 'LeftCtrl';
+    }
+    if (e.key === 'Shift') {
+      return e.location === 2 ? 'RightShift' : 'LeftShift';
+    }
+    if (e.key === 'Alt') {
+      return e.location === 2 ? 'RightAlt' : 'LeftAlt';
+    }
+    if (e.key === 'Meta') {
+      return e.location === 2 ? 'RightWindows' : 'LeftWindows';
+    }
+    return e.key;
+  };
 
   // Keydown handler for shortcut capture
   const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
     if (!listeningShortcut) return;
 
+    log.debug(`[SceneList handleKeyDown] 按键事件: key=${e.key}, code=${e.code}, location=${e.location}`);
+
     e.preventDefault();
     e.stopPropagation();
 
-    const newShortcut = extractShortcutFromEvent(e);
-    if (!newShortcut) return;
+    // Escape 取消录制
+    if (e.key === 'Escape') {
+      log.debug(`[SceneList handleKeyDown] Escape 按下，取消录制`);
+      setListeningShortcut(null);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
+      // 恢复全局快捷键监听
+      if (setPaused) {
+        setPaused(false);
+      }
+      setPausedRef.current?.(false);
+      return;
+    }
+
+    // 检测修饰键按下 - 只记录，不触发完成
+    log.debug(`[SceneList handleKeyDown] 检查是否为修饰键: isModifierKey(${e.key}) = ${isModifierKey(e.key)}`);
+    if (isModifierKey(e.key)) {
+      const modKey = normalizeModifierName(e);
+      if (!pressedModifiersRef.current.includes(modKey)) {
+        pressedModifiersRef.current = [...pressedModifiersRef.current, modKey];
+        setPressedModifiers([...pressedModifiersRef.current]);
+        log.debug(`修饰键按下: ${modKey}, 当前修饰键列表: ${pressedModifiersRef.current.join('+')}`);
+      }
+      log.debug(`[SceneList handleKeyDown] 修饰键，继续监听`);
+      return; // 继续监听，等待非修饰键
+    }
+
+    // 非修饰键按下 - 生成快捷键
+    const mainKey = extractShortcutFromEvent(e);
+    log.debug(`[SceneList handleKeyDown] 非修饰键: mainKey=${mainKey}, 当前修饰键列表: ${pressedModifiersRef.current.join('+')}`);
+    if (!mainKey) {
+      log.debug(`无法识别的按键: ${e.key}`);
+      return;
+    }
+
+    // 组合快捷键：修饰键 + 主键
+    let newShortcut = mainKey;
+    if (pressedModifiersRef.current.length > 0) {
+      newShortcut = [...pressedModifiersRef.current, mainKey].join('+');
+      log.info(`组合键录制完成: ${newShortcut}`);
+    } else {
+      log.info(`单键录制完成: ${newShortcut}`);
+    }
 
     // Find the scene being edited
     const scene = localScenes.find(s => s.id === listeningShortcut);
@@ -230,11 +314,17 @@ export default function SceneList({
     if (checkConflict) {
       const conflict = checkConflict(newShortcut, scene.id);
       if (conflict) {
-        // Conflict detected, cancel listening
         setListeningShortcut(null);
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
         if (listeningTimeoutRef.current) {
           clearTimeout(listeningTimeoutRef.current);
         }
+        // 恢复全局快捷键监听
+        if (setPaused) {
+          setPaused(false);
+        }
+        setPausedRef.current?.(false);
         alert(conflict);
         return;
       }
@@ -244,50 +334,74 @@ export default function SceneList({
     if (tryRegisterShortcut) {
       const result = await tryRegisterShortcut(newShortcut, scene.id);
       if (!result.success) {
-        // Show error modal
         setShortcutError({
           shortcut: newShortcut,
           errorType: (result.errorType as 'unsupported' | 'occupied' | 'unknown') || 'unknown',
           errorMessage: result.error || '',
         });
         setListeningShortcut(null);
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
         if (listeningTimeoutRef.current) {
           clearTimeout(listeningTimeoutRef.current);
         }
-        return; // Don't save the new shortcut
+        // 恢复全局快捷键监听
+        if (setPaused) {
+          setPaused(false);
+        }
+        setPausedRef.current?.(false);
+        return;
       }
     }
 
     // Update the scene with new shortcut
     const updatedScene = { ...scene, shortcut: newShortcut };
 
-    // Calculate new scenes first (before state update to ensure correct value)
+    // Calculate new scenes first
     const newScenes = localScenes.map((s) => (s.id === updatedScene.id ? updatedScene : s));
 
-    // Update local state
     setLocalScenes(newScenes);
 
-    // Notify parent with the correct newScenes
     if (onSave) {
       onSave(newScenes);
     }
 
-    // Clear listening state
     setListeningShortcut(null);
+    setPressedModifiers([]);
+    pressedModifiersRef.current = [];
     if (listeningTimeoutRef.current) {
       clearTimeout(listeningTimeoutRef.current);
     }
-  }, [listeningShortcut, localScenes, checkConflict, onSave, tryRegisterShortcut]);
+    // 恢复全局快捷键监听
+    if (setPaused) {
+      setPaused(false);
+    }
+    setPausedRef.current?.(false);
+  }, [listeningShortcut, localScenes, checkConflict, onSave, tryRegisterShortcut, setPaused]);
 
-  // Attach global keydown listener when in listening mode
+  // Keyup handler - 清除修饰键状态
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    if (!listeningShortcut) return;
+
+    // 修饰键释放时，从列表中移除
+    if (isModifierKey(e.key)) {
+      const modKey = normalizeModifierName(e);
+      pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
+      setPressedModifiers([...pressedModifiersRef.current]);
+    }
+  }, [listeningShortcut]);
+
+  // Attach global keydown/keyup listener when in listening mode
   useEffect(() => {
     if (listeningShortcut) {
       window.addEventListener('keydown', handleKeyDown, true);
+      window.addEventListener('keyup', handleKeyUp, true);
       return () => {
         window.removeEventListener('keydown', handleKeyDown, true);
+        window.removeEventListener('keyup', handleKeyUp, true);
       };
     }
-  }, [listeningShortcut, handleKeyDown]);
+  }, [listeningShortcut, handleKeyDown, handleKeyUp]);
 
   // Render scene list
   const renderSceneList = () => (
@@ -316,6 +430,21 @@ export default function SceneList({
             const isShortcutDisabled = isRecording && !isListening;
             const { prefix, main } = parseShortcutForDisplay(scene.shortcut, t);
 
+            // 格式化当前按下的修饰键用于显示
+            const formatPressedModifiers = () => {
+              if (pressedModifiers.length === 0) return '';
+              return pressedModifiers.map(mod => {
+                // 简化显示：LeftCtrl -> Ctrl, RightShift -> Shift
+                if (mod.startsWith('Left') || mod.startsWith('Right')) {
+                  const base = mod.slice(4); // 去掉 Left/Right 前缀
+                  if (base === 'Windows') return 'Win';
+                  if (base === 'Alt') return 'Alt';
+                  return base;
+                }
+                return mod;
+              }).join(' + ') + ' + ';
+            };
+
             return (
               <div
                 key={scene.id}
@@ -340,7 +469,9 @@ export default function SceneList({
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
                         </svg>
-                        {t('sceneList.pressKey')}
+                        <span className="text-xs">
+                          {pressedModifiers.length > 0 ? formatPressedModifiers() : t('sceneList.pressKey')}
+                        </span>
                       </>
                     ) : prefix ? (
                       // 有前缀（左/右修饰键）：前缀小字，主键名大字

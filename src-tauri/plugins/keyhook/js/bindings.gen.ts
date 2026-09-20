@@ -28,8 +28,8 @@ export const commands = {
   },
 
   /** 设置快捷键拦截（拦截按键并阻止传递给其他应用） */
-  async setShortcutBlock(keycodes: string[]): Promise<void> {
-    await invoke("plugin:keyhook|set_shortcut_block", { keycodes });
+  async setShortcutBlock(shortcuts: string[]): Promise<void> {
+    await invoke("plugin:keyhook|set_shortcut_block", { shortcuts });
   },
 
   /** 清除拦截规则 */

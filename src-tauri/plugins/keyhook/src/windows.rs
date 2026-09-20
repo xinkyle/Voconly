@@ -1,4 +1,4 @@
-use crate::{emit_key_event, APP_HANDLE, IS_LISTENING, SHOULD_STOP, BLOCK_RULE};
+use crate::{emit_key_event, APP_HANDLE, IS_LISTENING, SHOULD_STOP, SHORTCUT_BLOCK_RULE};
 use lazy_static::lazy_static;
 use rdev::{grab, Event, EventType, Key};
 use std::sync::atomic::Ordering;
@@ -8,7 +8,19 @@ use std::thread::{self, JoinHandle};
 lazy_static! {
     /// 存储 grab 线程句柄，用于等待线程结束
     static ref GRAB_THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+    /// 当前按下的修饰键
+    static ref PRESSED_MODIFIERS: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
+
+use std::collections::HashSet;
+
+/// 修饰键列表
+const MODIFIER_KEYS: &[&str] = &[
+    "LeftCtrl", "RightCtrl",
+    "LeftShift", "RightShift",
+    "LeftAlt", "RightAlt",
+    "LeftWindows", "RightWindows",
+];
 
 /// 将 rdev::Key 映射到 keycode 名称和 Windows 虚拟键码
 fn key_to_code(key: Key) -> (&'static str, u32) {
@@ -140,22 +152,70 @@ fn key_to_code(key: Key) -> (&'static str, u32) {
 }
 
 /// 检查是否应该拦截此按键
-/// 根据 BLOCK_RULE 中的规则来决定
-fn should_block_key(keycode: &str, event_type: &str) -> bool {
-    if let Ok(guard) = BLOCK_RULE.lock() {
-        // 检查按键是否在拦截列表中
-        if guard.keycodes.contains(keycode) {
-            // 根据事件类型和规则决定是否拦截
-            match event_type {
-                "down" => guard.block_down,
-                "up" => guard.block_up,
-                _ => false,
-            }
-        } else {
-            false
+/// 根据 SHORTCUT_BLOCK_RULE 和当前修饰键状态判断
+fn should_block_key(keycode: &str) -> bool {
+    // 获取拦截规则
+    let block_rule = match SHORTCUT_BLOCK_RULE.lock() {
+        Ok(guard) => guard,
+        Err(_) => return false,
+    };
+
+    // 检查这个键是否在拦截规则中
+    let required_modifiers = match block_rule.blocks.get(keycode) {
+        Some(modifiers) => modifiers,
+        None => {
+            tracing::debug!("[Keyhook] ✅ Key {} not in block list", keycode);
+            return false;
         }
-    } else {
-        false
+    };
+
+    // 如果没有需要的修饰键（单键快捷键），直接拦截
+    if required_modifiers.is_empty() {
+        tracing::info!("[Keyhook] 🚫 Blocking single-key shortcut: {}", keycode);
+        return true;
+    }
+
+    // 检查所有需要的修饰键是否都被按下
+    let pressed_modifiers = match PRESSED_MODIFIERS.lock() {
+        Ok(guard) => guard,
+        Err(_) => return false,
+    };
+
+    tracing::debug!(
+        "[Keyhook] Checking {} - required: {:?}, pressed: {:?}",
+        keycode, required_modifiers, *pressed_modifiers
+    );
+
+    for required in required_modifiers {
+        if !pressed_modifiers.contains(required) {
+            tracing::info!(
+                "[Keyhook] ✅ Key {} not blocked: modifier {} not pressed",
+                keycode, required
+            );
+            return false;
+        }
+    }
+
+    // 所有需要的修饰键都被按下，拦截此键
+    tracing::info!(
+        "[Keyhook] 🚫 Blocking combo key: {} (modifiers: {:?})",
+        keycode, required_modifiers
+    );
+    true
+}
+
+/// 更新修饰键状态
+fn update_modifier_state(keycode: &str, pressed: bool) {
+    if !MODIFIER_KEYS.contains(&keycode) {
+        return;
+    }
+
+    if let Ok(mut guard) = PRESSED_MODIFIERS.lock() {
+        if pressed {
+            guard.insert(keycode.to_string());
+        } else {
+            guard.remove(keycode);
+        }
     }
 }
 
@@ -186,19 +246,19 @@ pub fn start_hook_thread() {
             match &event.event_type {
                 EventType::KeyPress(key) | EventType::KeyRelease(key) => {
                     let (keycode, raw_code) = key_to_code(*key);
-                    let event_type = match event.event_type {
-                        EventType::KeyPress(_) => "down",
-                        EventType::KeyRelease(_) => "up",
-                        _ => return Some(event),
-                    };
+                    let is_press = matches!(event.event_type, EventType::KeyPress(_));
+                    let event_type = if is_press { "down" } else { "up" };
 
                     // 使用 debug 级别避免日志过多影响性能
                     tracing::debug!("[Keyhook] ⌨️ Key event: {} ({})", keycode, event_type);
 
+                    // 更新修饰键状态
+                    update_modifier_state(keycode, is_press);
+
                     // 发送事件到前端
                     if let Ok(guard) = APP_HANDLE.lock() {
                         if let Some(app) = guard.as_ref() {
-                            tracing::info!("[Keyhook] 📤 Emitting event to frontend: {} ({})", keycode, event_type);
+                            tracing::debug!("[Keyhook] 📤 Emitting event to frontend: {} ({})", keycode, event_type);
                             emit_key_event(app, crate::KeyEventPayload {
                                 keycode: keycode.to_string(),
                                 raw_code,
@@ -211,9 +271,8 @@ pub fn start_hook_thread() {
                         tracing::error!("[Keyhook] 🔒 Failed to lock APP_HANDLE");
                     }
 
-                    // 检查是否应该拦截此按键
-                    if should_block_key(keycode, event_type) {
-                        tracing::info!("[Keyhook] 🚫 Blocking key: {} ({})", keycode, event_type);
+                    // 只在按下时检查拦截（按下和释放都要拦截）
+                    if is_press && should_block_key(keycode) {
                         return None; // 拦截事件
                     }
 

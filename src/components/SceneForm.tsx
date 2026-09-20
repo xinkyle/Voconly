@@ -25,6 +25,31 @@ const BUILTIN_PROMPT_TYPES = [
   { id: 'meetingSecretary', labelKey: 'llmConfig.promptTypes.meetingSecretary' },
 ];
 
+// 修饰键列表
+const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
+
+// 判断是否为修饰键
+function isModifierKey(key: string): boolean {
+  return MODIFIER_KEYS.some(mod => key === mod || key.startsWith(mod));
+}
+
+// 规范化修饰键名称（区分左右）
+function normalizeModifierName(e: KeyboardEvent): string {
+  if (e.key === 'Control') {
+    return e.location === 2 ? 'RightCtrl' : 'LeftCtrl';
+  }
+  if (e.key === 'Shift') {
+    return e.location === 2 ? 'RightShift' : 'LeftShift';
+  }
+  if (e.key === 'Alt') {
+    return e.location === 2 ? 'RightAlt' : 'LeftAlt';
+  }
+  if (e.key === 'Meta') {
+    return e.location === 2 ? 'RightWindows' : 'LeftWindows';
+  }
+  return e.key;
+}
+
 export default function SceneForm({
   scene,
   onSave,
@@ -43,6 +68,10 @@ export default function SceneForm({
   const [isListening, setIsListening] = useState(false);
   const inputRef = useRef<HTMLButtonElement>(null);
   const setPausedRef = useRef(setPaused);
+
+  // 组合键录制状态
+  const [pressedModifiers, setPressedModifiers] = useState<string[]>([]);
+  const pressedModifiersRef = useRef<string[]>([]);
 
   // Update setPaused ref
   useEffect(() => {
@@ -105,6 +134,9 @@ export default function SceneForm({
     setPausedRef.current?.(true);
     setIsListening(true);
     setErrors(prev => ({ ...prev, shortcut: undefined }));
+    // 重置修饰键状态
+    setPressedModifiers([]);
+    pressedModifiersRef.current = [];
   }, []);
 
   // 监听 isListening 变化，恢复全局监听
@@ -130,11 +162,38 @@ export default function SceneForm({
       e.preventDefault();
       e.stopPropagation();
 
-      const newShortcut = extractShortcutFromEvent(e);
-      if (!newShortcut) return;
+      // Escape 取消录制
+      if (e.key === 'Escape') {
+        setIsListening(false);
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
+        return;
+      }
+
+      // 检测修饰键按下 - 只记录，不触发完成
+      if (isModifierKey(e.key)) {
+        const modKey = normalizeModifierName(e);
+        if (!pressedModifiersRef.current.includes(modKey)) {
+          pressedModifiersRef.current = [...pressedModifiersRef.current, modKey];
+          setPressedModifiers([...pressedModifiersRef.current]);
+        }
+        return; // 继续监听，等待非修饰键
+      }
+
+      // 非修饰键按下 - 生成快捷键
+      const mainKey = extractShortcutFromEvent(e);
+      if (!mainKey) return;
+
+      // 组合快捷键：修饰键 + 主键
+      let newShortcut = mainKey;
+      if (pressedModifiersRef.current.length > 0) {
+        newShortcut = [...pressedModifiersRef.current, mainKey].join('+');
+      }
 
       setShortcut(newShortcut);
       setIsListening(false);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
       setConflictWarning(null);
 
       // Check for conflict
@@ -146,15 +205,28 @@ export default function SceneForm({
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // 修饰键释放时，从列表中移除
+      if (isModifierKey(e.key)) {
+        const modKey = normalizeModifierName(e);
+        pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
+        setPressedModifiers([...pressedModifiersRef.current]);
+      }
+    };
+
     const handleBlur = () => {
       setIsListening(false);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
     window.addEventListener('blur', handleBlur);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('blur', handleBlur);
     };
   }, [isListening, checkConflict, scene?.id]);
@@ -206,7 +278,19 @@ export default function SceneForm({
               } ${isListening ? 'ring-2 ring-amber-400' : ''}`}
             >
               {isListening ? (
-                <span className="text-gray-400 animate-pulse">{t('sceneForm.pressKey')}</span>
+                <span className="text-gray-400 animate-pulse">
+                  {pressedModifiers.length > 0
+                    ? pressedModifiers.map(mod => {
+                        // 简化显示：LeftCtrl -> Ctrl, RightShift -> Shift
+                        if (mod.startsWith('Left') || mod.startsWith('Right')) {
+                          const base = mod.slice(4);
+                          if (base === 'Windows') return 'Win';
+                          return base;
+                        }
+                        return mod;
+                      }).join(' + ') + ' + ...'
+                    : t('sceneForm.pressKey')}
+                </span>
               ) : shortcut ? (
                 (() => {
                   const { prefix, main } = parseShortcutForDisplay(shortcut, t);

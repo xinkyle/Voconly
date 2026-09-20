@@ -156,10 +156,18 @@ export default function HomePanelV2({
   const onScenesSaveRef = useRef(onScenesSave);
   const setPausedRef = useRef(setPaused);
 
+  // 组合键录制状态
+  const [pressedModifiers, setPressedModifiers] = useState<string[]>([]);
+  const pressedModifiersRef = useRef<string[]>([]);
+
   // 更新 refs
   useEffect(() => {
     setPausedRef.current = setPaused;
   }, [setPaused]);
+
+  useEffect(() => {
+    listeningSceneIdRef.current = listeningSceneId;
+  }, [listeningSceneId]);
 
   // 监听 listeningSceneId 变化，暂停/恢复全局快捷键监听
   useEffect(() => {
@@ -167,7 +175,9 @@ export default function HomePanelV2({
       // 开始编辑快捷键，暂停全局监听
       setPausedRef.current?.(true);
     } else {
-      // 编辑结束，恢复全局监听
+      // 编辑结束，恢复全局监听并重置修饰键状态
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
       setPausedRef.current?.(false);
     }
   }, [listeningSceneId]);
@@ -589,12 +599,19 @@ export default function HomePanelV2({
       clearTimeout(listeningTimeoutRef.current);
     }
 
+    // 重置修饰键状态
+    setPressedModifiers([]);
+    pressedModifiersRef.current = [];
+
     setListeningSceneId(sceneId);
 
-    // 5秒后自动取消
+    // 10秒后自动取消（给用户更多时间录制组合键）
     listeningTimeoutRef.current = setTimeout(() => {
       setListeningSceneId(null);
-    }, 5000);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
+      setPausedRef.current?.(false);
+    }, 10000);
   }, []);
 
   // 打开场景编辑对话框
@@ -621,7 +638,33 @@ export default function HomePanelV2({
     setEditingScene(null);
   }, []);
 
-  // 键盘事件监听 - 用于捕获快捷键
+  // 修饰键列表
+  const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
+
+  // 判断是否为修饰键
+  const isModifierKey = (key: string): boolean => {
+    return MODIFIER_KEYS.some(mod => key === mod || key.startsWith(mod));
+  };
+
+  // 规范化修饰键名称
+  const normalizeModifierName = (e: KeyboardEvent): string => {
+    // 根据 e.code 和 e.location 区分左右修饰键
+    if (e.key === 'Control') {
+      return e.location === 2 ? 'RightCtrl' : 'LeftCtrl';
+    }
+    if (e.key === 'Shift') {
+      return e.location === 2 ? 'RightShift' : 'LeftShift';
+    }
+    if (e.key === 'Alt') {
+      return e.location === 2 ? 'RightAlt' : 'LeftAlt';
+    }
+    if (e.key === 'Meta') {
+      return e.location === 2 ? 'RightWindows' : 'LeftWindows';
+    }
+    return e.key;
+  };
+
+  // 键盘事件监听 - 用于捕获快捷键（支持组合键）
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       const currentListeningId = listeningSceneIdRef.current;
@@ -630,13 +673,50 @@ export default function HomePanelV2({
       e.preventDefault();
       e.stopPropagation();
 
-      const newShortcut = extractShortcutFromEvent(e);
-      if (!newShortcut) return;
+      // Escape 取消录制
+      if (e.key === 'Escape') {
+        setListeningSceneId(null);
+        listeningSceneIdRef.current = null;
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
+        if (listeningTimeoutRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+        }
+        setPausedRef.current?.(false);
+        return;
+      }
+
+      // 检测修饰键按下 - 只记录，不触发完成
+      if (isModifierKey(e.key)) {
+        const modKey = normalizeModifierName(e);
+        if (!pressedModifiersRef.current.includes(modKey)) {
+          pressedModifiersRef.current = [...pressedModifiersRef.current, modKey];
+          setPressedModifiers([...pressedModifiersRef.current]);
+        }
+        return; // 继续监听，等待非修饰键
+      }
+
+      // 非修饰键按下 - 生成快捷键
+      const mainKey = extractShortcutFromEvent(e);
+      if (!mainKey) return;
+
+      // 组合快捷键：修饰键 + 主键
+      let newShortcut = mainKey;
+      if (pressedModifiersRef.current.length > 0) {
+        newShortcut = [...pressedModifiersRef.current, mainKey].join('+');
+      }
 
       const currentScenes = localScenesRef.current;
       const scene = currentScenes.find(s => s.id === currentListeningId);
       if (!scene || scene.shortcut === newShortcut) {
         setListeningSceneId(null);
+        listeningSceneIdRef.current = null;
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
+        if (listeningTimeoutRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+        }
+        setPausedRef.current?.(false);
         return;
       }
 
@@ -652,9 +732,12 @@ export default function HomePanelV2({
           });
           setListeningSceneId(null);
           listeningSceneIdRef.current = null;
+          setPressedModifiers([]);
+          pressedModifiersRef.current = [];
           if (listeningTimeoutRef.current) {
             clearTimeout(listeningTimeoutRef.current);
           }
+          setPausedRef.current?.(false);
           return;
         }
       }
@@ -665,6 +748,8 @@ export default function HomePanelV2({
       localScenesRef.current = newScenes;
       setListeningSceneId(null);
       listeningSceneIdRef.current = null;
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
 
       if (listeningTimeoutRef.current) {
         clearTimeout(listeningTimeoutRef.current);
@@ -673,11 +758,86 @@ export default function HomePanelV2({
       if (onScenesSaveRef.current) {
         onScenesSaveRef.current(newScenes);
       }
+
+      setPausedRef.current?.(false);
+    };
+
+    const handleKeyUp = async (e: KeyboardEvent) => {
+      const currentListeningId = listeningSceneIdRef.current;
+      if (!currentListeningId) return;
+
+      // 修饰键释放时，从列表中移除
+      if (isModifierKey(e.key)) {
+        const modKey = normalizeModifierName(e);
+
+        // 保存松开前的修饰键列表（用于生成快捷键）
+        const modifiersBeforeRelease = [...pressedModifiersRef.current];
+
+        // 从列表中移除当前松开的键
+        pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
+        setPressedModifiers([...pressedModifiersRef.current]);
+
+        // 如果所有修饰键都松开了，且之前有修饰键被按下，就设置快捷键
+        // 例如：只按了右 Alt 松开 → 设置 "RightAlt"
+        //       按了 Ctrl+Shift 松开 → 设置组合
+        if (modifiersBeforeRelease.length > 0 && pressedModifiersRef.current.length === 0) {
+          // 取消超时
+          if (listeningTimeoutRef.current) {
+            clearTimeout(listeningTimeoutRef.current);
+          }
+
+          // 生成快捷键：使用松开前的修饰键列表
+          const shortcutToSet = modifiersBeforeRelease.length === 1
+            ? modifiersBeforeRelease[0]
+            : modifiersBeforeRelease.join('+');
+
+          const currentScenes = localScenesRef.current;
+          const scene = currentScenes.find(s => s.id === currentListeningId);
+
+          if (scene && scene.shortcut !== shortcutToSet) {
+            // 尝试注册
+            const tryRegister = tryRegisterShortcutRef.current;
+            if (tryRegister) {
+              const result = await tryRegister(shortcutToSet, scene.id);
+              if (!result.success) {
+                setShortcutError({
+                  shortcut: shortcutToSet,
+                  errorType: (result.errorType as 'unsupported' | 'occupied' | 'unknown') || 'unknown',
+                  errorMessage: result.error || '',
+                });
+                setListeningSceneId(null);
+                listeningSceneIdRef.current = null;
+                setPressedModifiers([]);
+                pressedModifiersRef.current = [];
+                setPausedRef.current?.(false);
+                return;
+              }
+            }
+
+            const updatedScene = { ...scene, shortcut: shortcutToSet };
+            const newScenes = currentScenes.map(s => (s.id === currentListeningId ? updatedScene : s));
+            setLocalScenes(newScenes);
+            localScenesRef.current = newScenes;
+
+            if (onScenesSaveRef.current) {
+              onScenesSaveRef.current(newScenes);
+            }
+          }
+
+          setListeningSceneId(null);
+          listeningSceneIdRef.current = null;
+          setPressedModifiers([]);
+          pressedModifiersRef.current = [];
+          setPausedRef.current?.(false);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
     };
   }, []);
 
@@ -776,7 +936,73 @@ export default function HomePanelV2({
                 const promptType = scene.promptType || 'lightPolish';
                 const hasLlm = hasLlmConfig && (scene.promptType || scene.customPrompt);
                 const isListening = listeningSceneId === scene.id;
-                const { prefix, main } = parseShortcutForDisplay(scene.shortcut, t);
+
+                // 解析快捷键用于层次化显示
+                // 返回：topKey（上方内容）、bottomKey（下方内容）
+                // 单键修饰键：topKey=前缀(右)，bottomKey=键名(Alt)
+                // 组合键：topKey=主键(A)，bottomKey=修饰键(右 Alt)
+                const parseShortcutForKeypad = (shortcut: string): {
+                  topKey: string;
+                  bottomKey: string;
+                  isCombo: boolean;      // 是否为组合键
+                  isModifierOnly: boolean; // 是否为单修饰键
+                } => {
+                  if (!shortcut) return { topKey: '', bottomKey: '', isCombo: false, isModifierOnly: false };
+
+                  // 组合键（如 RightCtrl+A）
+                  if (shortcut.includes('+')) {
+                    const keys = shortcut.split('+');
+                    const modifierKey = keys[0];
+                    const mainKey = keys[1];
+
+                    // 格式化修饰键（右 Ctrl）
+                    let modDisplay = '';
+                    if (modifierKey === 'LeftCtrl') modDisplay = t('keyboard.left') + ' Ctrl';
+                    else if (modifierKey === 'RightCtrl') modDisplay = t('keyboard.right') + ' Ctrl';
+                    else if (modifierKey === 'LeftShift') modDisplay = t('keyboard.left') + ' Shift';
+                    else if (modifierKey === 'RightShift') modDisplay = t('keyboard.right') + ' Shift';
+                    else if (modifierKey === 'LeftAlt') modDisplay = t('keyboard.left') + ' Alt';
+                    else if (modifierKey === 'RightAlt') modDisplay = t('keyboard.right') + ' Alt';
+                    else if (modifierKey === 'LeftWindows') modDisplay = t('keyboard.left') + ' Win';
+                    else if (modifierKey === 'RightWindows') modDisplay = t('keyboard.right') + ' Win';
+                    else modDisplay = modifierKey;
+
+                    // 格式化主键
+                    let mainDisplay = mainKey;
+                    if (mainKey.startsWith('Key')) mainDisplay = mainKey.slice(3);
+                    else if (mainKey.startsWith('Digit')) mainDisplay = mainKey.slice(5);
+                    else if (mainKey === 'Space') mainDisplay = '␣';
+                    else if (mainKey.startsWith('Arrow')) {
+                      const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+                      mainDisplay = arrowMap[mainKey] || mainKey;
+                    }
+
+                    return { topKey: mainDisplay, bottomKey: modDisplay, isCombo: true, isModifierOnly: false };
+                  }
+
+                  // 单键修饰键（如 RightCtrl）- 显示反过来
+                  if (shortcut === 'LeftCtrl') return { topKey: t('keyboard.left'), bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'RightCtrl') return { topKey: t('keyboard.right'), bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'LeftShift') return { topKey: t('keyboard.left'), bottomKey: 'Shift', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'RightShift') return { topKey: t('keyboard.right'), bottomKey: 'Shift', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'LeftAlt') return { topKey: t('keyboard.left'), bottomKey: 'Alt', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'RightAlt') return { topKey: t('keyboard.right'), bottomKey: 'Alt', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'LeftWindows') return { topKey: t('keyboard.left'), bottomKey: 'Win', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'RightWindows') return { topKey: t('keyboard.right'), bottomKey: 'Win', isCombo: false, isModifierOnly: true };
+
+                  // 普通单键
+                  let display = shortcut;
+                  if (shortcut.startsWith('Key')) display = shortcut.slice(3);
+                  else if (shortcut.startsWith('Digit')) display = shortcut.slice(5);
+                  else if (shortcut === 'Space') display = '␣';
+                  else if (shortcut.startsWith('Arrow')) {
+                    const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+                    display = arrowMap[shortcut] || shortcut;
+                  }
+                  return { topKey: display, bottomKey: '', isCombo: false, isModifierOnly: false };
+                };
+
+                const { topKey, bottomKey, isCombo, isModifierOnly } = parseShortcutForKeypad(scene.shortcut);
 
                 return (
                   <div
@@ -810,16 +1036,46 @@ export default function HomePanelV2({
                         }}
                       >
                         {isListening ? (
-                          <span className="text-base">...</span>
-                        ) : prefix ? (
-                          // 有前缀（左/右修饰键）：前缀小字，主键名大字
                           <div className="flex flex-col items-center leading-tight">
-                            <span className="text-sm font-medium opacity-70">{prefix}</span>
-                            <span className="text-xl font-bold">{main}</span>
+                            <span className="text-base">
+                              {pressedModifiers.length > 0 ? (
+                                // 显示按下的修饰键 + ...
+                                pressedModifiers.map(mod => {
+                                  // 简化显示：LeftCtrl -> Ctrl, RightShift -> Shift
+                                  if (mod.startsWith('Left') || mod.startsWith('Right')) {
+                                    const base = mod.slice(4);
+                                    if (base === 'Windows') return 'Win';
+                                    if (base === 'Alt') return 'Alt';
+                                    return base;
+                                  }
+                                  return mod;
+                                }).join(' + ') + ' + '
+                              ) : (
+                                '...'
+                              )}
+                            </span>
+                            {pressedModifiers.length > 0 && (
+                              <span className="text-xs opacity-70 mt-0.5">等待按键...</span>
+                            )}
+                          </div>
+                        ) : isCombo ? (
+                          // 组合键：上方主键（中等），下方修饰键（"右"小 + 键名中等）
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-base font-bold">{topKey}</span>
+                            <div className="flex items-baseline gap-0.5">
+                              <span className="text-xs opacity-60">{bottomKey.split(' ')[0]}</span>
+                              <span className="text-base font-medium">{bottomKey.split(' ')[1]}</span>
+                            </div>
+                          </div>
+                        ) : isModifierOnly ? (
+                          // 单修饰键：上方前缀（小字），下方键名（大字）
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-sm font-medium opacity-70">{topKey}</span>
+                            <span className="text-xl font-bold">{bottomKey}</span>
                           </div>
                         ) : (
-                          // 普通键：直接显示
-                          main
+                          // 普通单键：直接显示
+                          <span className="text-xl font-bold">{topKey}</span>
                         )}
                       </div>
                     </div>

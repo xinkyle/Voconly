@@ -420,7 +420,7 @@ export function formatShortcut(shortcut: string): string {
 /**
  * Parse shortcut for split display (prefix + main)
  * Used for keycap styling: prefix (smaller) + main (normal)
- * @param shortcut - The shortcut string (e.g., "RightAlt", "LeftCtrl")
+ * @param shortcut - The shortcut string (e.g., "RightAlt", "LeftCtrl", "Ctrl+Shift+A")
  * @param t - Optional translation function (i18next t function)
  * @returns { prefix: string, main: string } - prefix is "左"/"右" or translated text for modifier keys, main is the key name
  */
@@ -432,6 +432,39 @@ export function parseShortcutForDisplay(
   const leftText = t ? t('keyboard.left') : '左';
   const rightText = t ? t('keyboard.right') : '右';
 
+  // 检查是否为组合键（包含 + 分隔符）
+  if (shortcut.includes('+')) {
+    const keys = shortcut.split('+');
+    // 格式化每个键
+    const formattedKeys = keys.map((key, index) => {
+      // 最后一个键可能是主键，其他是修饰键
+      const isModifier = index < keys.length - 1;
+
+      // 修饰键显示（保留左右信息）
+      if (isModifier) {
+        if (key === 'LeftCtrl') return leftText + ' Ctrl';
+        if (key === 'RightCtrl') return rightText + ' Ctrl';
+        if (key === 'Ctrl') return 'Ctrl';
+        if (key === 'LeftShift') return leftText + ' Shift';
+        if (key === 'RightShift') return rightText + ' Shift';
+        if (key === 'Shift') return 'Shift';
+        if (key === 'LeftAlt') return leftText + ' Alt';
+        if (key === 'RightAlt') return rightText + ' Alt';
+        if (key === 'Alt') return 'Alt';
+        if (key === 'LeftWindows') return leftText + ' Win';
+        if (key === 'RightWindows') return rightText + ' Win';
+        if (key === 'Win') return 'Win';
+        return key;
+      }
+
+      // 主键保留完整显示
+      return formatSingleKey(key, leftText, rightText);
+    });
+
+    return { prefix: '', main: formattedKeys.join(' + ') };
+  }
+
+  // 单键处理
   // 左修饰键
   if (shortcut === 'AltLeft' || shortcut === 'LeftAlt') return { prefix: leftText, main: 'Alt' };
   if (shortcut === 'ControlLeft' || shortcut === 'LeftCtrl') return { prefix: leftText, main: 'Ctrl' };
@@ -446,4 +479,24 @@ export function parseShortcutForDisplay(
 
   // 其他键没有前缀
   return { prefix: '', main: formatShortcut(shortcut) };
+}
+
+/**
+ * 格式化单个键用于显示
+ */
+function formatSingleKey(key: string, leftText: string, rightText: string): string {
+  // 左修饰键
+  if (key === 'AltLeft' || key === 'LeftAlt') return `${leftText} Alt`;
+  if (key === 'ControlLeft' || key === 'LeftCtrl') return `${leftText} Ctrl`;
+  if (key === 'ShiftLeft' || key === 'LeftShift') return `${leftText} Shift`;
+  if (key === 'MetaLeft' || key === 'LeftWindows') return `${leftText} Win`;
+
+  // 右修饰键
+  if (key === 'AltRight' || key === 'RightAlt') return `${rightText} Alt`;
+  if (key === 'ControlRight' || key === 'RightCtrl') return `${rightText} Ctrl`;
+  if (key === 'ShiftRight' || key === 'RightShift') return `${rightText} Shift`;
+  if (key === 'MetaRight' || key === 'RightWindows') return `${rightText} Win`;
+
+  // 其他键
+  return formatShortcut(key);
 }
