@@ -7,6 +7,7 @@
   "nav": {
     "home": "主页",
     "memory": "历史记录",
+    "file": "文件",
     "models": "语音模型",
     "provider": "AI 服务",
     "dictionary": "词典",
@@ -256,6 +257,49 @@
     "statsToday": "今日记录",
     "daysCount": "共{{count}}天",
     "avgDaily": "日均{{count}}"
+  },
+  "file": {
+    "title": "文件转录",
+    "tabs": {
+      "pending": "待转录",
+      "history": "历史记录"
+    },
+    "dropzone": {
+      "title": "拖拽音频文件到此处",
+      "or": "或",
+      "select": "点击选择文件",
+      "hint": "支持格式：WAV, MP3, M4A, FLAC, OGG, WEBM",
+      "sizeLimit": "最大文件：100MB 或 30 分钟"
+    },
+    "selected": {
+      "title": "已选择文件：",
+      "size": "大小",
+      "duration": "时长",
+      "model": "使用模型",
+      "start": "开始转录"
+    },
+    "progress": {
+      "title": "正在转录...",
+      "remaining": "预计剩余时间",
+      "cancel": "取消"
+    },
+    "history": {
+      "title": "文件转录历史",
+      "clear": "清空",
+      "noRecords": "暂无转录记录",
+      "noRecordsHint": "上传音频文件开始转录"
+    },
+    "toast": {
+      "complete": "转录完成",
+      "view": "查看",
+      "copy": "复制"
+    },
+    "error": {
+      "format": "不支持该音频格式",
+      "size": "文件大小超过限制（100MB）",
+      "duration": "音频时长超过限制（30分钟）",
+      "failed": "转录失败"
+    }
   },
   "modelConfig": {
     "title": "语音模型配置",

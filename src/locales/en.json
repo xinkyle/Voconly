@@ -7,6 +7,7 @@
   "nav": {
     "home": "Home",
     "memory": "History Records",
+    "file": "File",
     "models": "Voice Models",
     "provider": "AI Services",
     "dictionary": "Dictionary",
@@ -256,6 +257,49 @@
     "statsToday": "Today",
     "daysCount": "{{count}} days",
     "avgDaily": "Avg {{count}}"
+  },
+  "file": {
+    "title": "File Transcription",
+    "tabs": {
+      "pending": "Pending",
+      "history": "History"
+    },
+    "dropzone": {
+      "title": "Drag and drop audio file here",
+      "or": "or",
+      "select": "Click to select file",
+      "hint": "Supported formats: WAV, MP3, M4A, FLAC, OGG, WEBM",
+      "sizeLimit": "Max file: 100MB or 30 minutes"
+    },
+    "selected": {
+      "title": "Selected file:",
+      "size": "Size",
+      "duration": "Duration",
+      "model": "Using model",
+      "start": "Start Transcription"
+    },
+    "progress": {
+      "title": "Transcribing...",
+      "remaining": "Estimated remaining time",
+      "cancel": "Cancel"
+    },
+    "history": {
+      "title": "File Transcription History",
+      "clear": "Clear",
+      "noRecords": "No transcription records",
+      "noRecordsHint": "Upload an audio file to start transcription"
+    },
+    "toast": {
+      "complete": "Transcription Complete",
+      "view": "View",
+      "copy": "Copy"
+    },
+    "error": {
+      "format": "Unsupported audio format",
+      "size": "File size exceeds limit (100MB)",
+      "duration": "Audio duration exceeds limit (30 minutes)",
+      "failed": "Transcription failed"
+    }
   },
   "modelConfig": {
     "title": "Voice Model Configuration",
