@@ -2223,6 +2223,11 @@ fn main() {
             voconly::file_ops::list_dir,
             voconly::file_ops::get_full_path,
             voconly::file_ops::get_app_root,
+            // File transcription commands
+            voconly::file_transcription::load_file_transcription_history,
+            voconly::file_transcription::save_file_transcription,
+            voconly::file_transcription::delete_file_transcription,
+            voconly::file_transcription::clear_file_transcription_history,
         ])
         .setup(|app| {
             let setup_start = Instant::now();
