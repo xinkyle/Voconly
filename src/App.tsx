@@ -9,6 +9,7 @@ import ModelConfigPanel from './components/ModelConfigPanel';
 import MemoryPanel from './components/MemoryPanel';
 import HomePanelV2 from './components/HomePanelV2';
 import ProviderPanel from './components/ProviderPanel';
+import FileTranscriptionPanel from './components/FileTranscriptionPanel';
 import { SettingsShortcut, SettingsSystem, SettingsPrompt, SettingsAbout, SettingsDictionary } from './components/settings';
 import AboutMenu from './components/AboutMenu';
 import { useToast } from './components/ui/Toast';
@@ -87,6 +88,12 @@ const MemoryIcon = () => (
   </svg>
 );
 
+const FileIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
 const ModelIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -121,6 +128,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { id: 'home', labelKey: 'nav.home', icon: <HomeIcon /> },
   { id: 'memory', labelKey: 'nav.memory', icon: <MemoryIcon /> },
+  { id: 'file', labelKey: 'nav.file', icon: <FileIcon /> },
   { id: 'models', labelKey: 'nav.models', icon: <ModelIcon /> },
   { id: 'provider', labelKey: 'nav.provider', icon: <ProviderIcon /> },
   { id: 'dictionary', labelKey: 'nav.dictionary', icon: <DictionaryIcon /> },
@@ -1916,6 +1924,9 @@ function App() {
                   setHistory([]);
                 }}
               />
+            )}
+            {activeNav === 'file' && (
+              <FileTranscriptionPanel />
             )}
           </div>
         </main>
