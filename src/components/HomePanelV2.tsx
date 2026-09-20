@@ -715,7 +715,7 @@ export default function HomePanelV2({
       {/* 头部区域：品牌 + 模型状态 */}
       <header className="mb-2">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900">Voconly</h1>
-        <p className="text-sm text-gray-500 mt-1">{t('app.tagline')}</p>
+        <p className="text-sm text-gray-600 mt-1">{t('app.tagline')}</p>
 
         {/* 模型状态栏 */}
         <div className="flex items-center gap-2 mt-4">
@@ -766,8 +766,8 @@ export default function HomePanelV2({
       <section className="flex-1 flex flex-col justify-center">
         <div className="-mx-4 px-4 py-10" style={{ background: 'radial-gradient(ellipse at center, rgba(243, 244, 246, 0.7) 0%, rgba(243, 244, 246, 0.4) 50%, transparent 90%)' }}>
           <div className="text-center mb-8">
-            <h2 className="text-base font-medium text-gray-500 mb-2">{t('home.shortcutTitle')}</h2>
-            <p className="text-xs text-gray-400">{t('home.shortcutHint')}</p>
+            <h2 className="text-base font-medium text-gray-700 mb-2">{t('home.shortcutTitle')}</h2>
+            <p className="text-xs text-gray-500">{t('home.shortcutHint')}</p>
           </div>
 
           {enabledScenes.length > 0 ? (
@@ -831,7 +831,7 @@ export default function HomePanelV2({
 
                     {/* 场景描述 */}
                     {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
-                      <div className="text-xs text-gray-400 mt-1.5 line-clamp-1">
+                      <div className="text-xs text-gray-500 mt-1.5 line-clamp-1">
                         {t(`llmConfig.promptTypeDescs.${promptType}`)}
                       </div>
                     )}
@@ -841,8 +841,8 @@ export default function HomePanelV2({
             </div>
           ) : (
             <div className="bg-white/60 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center py-12">
-              <div className="text-sm font-medium text-gray-400 mb-1">{t('home.noEnabledScenes')}</div>
-              <div className="text-xs text-gray-400">{t('home.addSceneHint')}</div>
+              <div className="text-sm font-medium text-gray-500 mb-1">{t('home.noEnabledScenes')}</div>
+              <div className="text-xs text-gray-500">{t('home.addSceneHint')}</div>
             </div>
           )}
         </div>
@@ -856,7 +856,7 @@ export default function HomePanelV2({
             <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {formatDuration(stats.totalDuration)}
             </div>
-            <div className="text-xs text-gray-400 mt-1.5">
+            <div className="text-xs text-gray-600 mt-1.5">
               {t('memory.statsDuration')}{stats.activeDays > 0 && ` / ${t('memory.daysCount', { count: stats.activeDays })}`}
             </div>
           </div>
@@ -869,7 +869,7 @@ export default function HomePanelV2({
             <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {(stats.totalWords ?? 0).toLocaleString()}
             </div>
-            <div className="text-xs text-gray-400 mt-1.5">
+            <div className="text-xs text-gray-600 mt-1.5">
               {t('memory.statsWords')}{stats.activeDays > 0 && ` / ${t('memory.avgDaily', { count: avgStats.avgWordsPerDay.toLocaleString() })}`}
             </div>
           </div>
@@ -882,7 +882,7 @@ export default function HomePanelV2({
             <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {stats.totalCount}
             </div>
-            <div className="text-xs text-gray-400 mt-1.5">
+            <div className="text-xs text-gray-600 mt-1.5">
               {t('memory.statsRecords')}{stats.activeDays > 0 && ` / ${t('memory.avgDaily', { count: avgStats.avgRecordsPerDay })}`}
             </div>
           </div>
@@ -895,7 +895,7 @@ export default function HomePanelV2({
             <div className="text-lg font-semibold text-gray-800 tabular-nums">
               {stats.todayCount}
             </div>
-            <div className="text-xs text-gray-400 mt-1.5">{t('memory.statsToday')}</div>
+            <div className="text-xs text-gray-600 mt-1.5">{t('memory.statsToday')}</div>
           </div>
         </div>
       </section>
