@@ -592,7 +592,9 @@
     "autoFollowSystemDesc": "使用系统设置的默认输入设备",
     "unknownDevice": "未知设备",
     "selected": "已选择",
-    "tip": "提示：选择\"自动\"将使用 Windows 设置中的默认麦克风"
+    "tip": "提示：选择\"自动\"将使用 Windows 设置中的默认麦克风",
+    "deviceRemoved": "设备已移除",
+    "deviceRemovedDesc": "选择的麦克风已断开，已切换为跟随系统"
   },
   "transcribe": {
     "recognizing": "识别中",

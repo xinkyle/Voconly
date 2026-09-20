@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getMicrophones, requestMicrophonePermission } from '../../services/audio';
 import type { MicrophoneDevice, AppConfig } from '../../types';
 import { createLogger } from '../../services/log';
+import { useToast } from '../ui/Toast';
 
 // 创建日志记录器
 const log = createLogger('SettingsMic');
@@ -14,6 +15,7 @@ interface SettingsMicrophoneProps {
 
 export default function SettingsMicrophone({ config, onSave }: SettingsMicrophoneProps) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [microphones, setMicrophones] = useState<MicrophoneDevice[]>([]);
   const [selectedMic, setSelectedMic] = useState<string>(config.defaultMicrophone || '');
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,19 @@ export default function SettingsMicrophone({ config, onSave }: SettingsMicrophon
   useEffect(() => {
     setSelectedMic(config.defaultMicrophone || '');
   }, [config.defaultMicrophone]);
+
+  // 监听设备变化
+  useEffect(() => {
+    const handleDeviceChange = () => {
+      loadMicrophones();
+    };
+
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+    };
+  }, []);
 
   const loadMicrophones = async () => {
     setLoading(true);
@@ -49,6 +64,19 @@ export default function SettingsMicrophone({ config, onSave }: SettingsMicrophon
 
       if (devices.length === 0) {
         setError(t('microphone.noDevice'));
+      }
+
+      // 检查当前选择的设备是否还存在
+      if (selectedMic && !devices.find(d => d.deviceId === selectedMic)) {
+        // 设备被移除，切换到默认
+        setSelectedMic('');
+        const newConfig = { ...config, defaultMicrophone: '' };
+        onSave(newConfig);
+        showToast({
+          type: 'warning',
+          title: t('microphone.deviceRemoved'),
+          description: t('microphone.deviceRemovedDesc'),
+        });
       }
     } catch (err) {
       log.error(`Failed to load microphones: ${err}`);

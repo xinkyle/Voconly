@@ -576,7 +576,9 @@
     "autoFollowSystemDesc": "Use the default input device in system settings",
     "unknownDevice": "Unknown device",
     "selected": "Selected",
-    "tip": "Tip: Select \"Auto\" to use the default microphone in Windows settings"
+    "tip": "Tip: Select \"Auto\" to use the default microphone in Windows settings",
+    "deviceRemoved": "Device Removed",
+    "deviceRemovedDesc": "Selected microphone has been disconnected, switched to follow system"
   },
   "transcribe": {
     "recognizing": "Recognizing",
