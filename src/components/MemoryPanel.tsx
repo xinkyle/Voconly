@@ -146,7 +146,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
           <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('memory.title')}</h1>
           <button
             onClick={() => records.length > 0 && setShowClearConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
             disabled={records.length === 0}
           >
             <TrashIcon />
@@ -161,19 +161,19 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
         {Object.entries(groupedRecords).length === 0 ? (
           <div className="text-center py-16 bg-gray-50 rounded-xl">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <p className="text-gray-500">{t('memory.noRecords')}</p>
-            <p className="text-sm text-gray-400 mt-1">{t('memory.noRecordsHint')}</p>
+            <p className="text-gray-600">{t('memory.noRecords')}</p>
+            <p className="text-sm text-gray-500 mt-1">{t('memory.noRecordsHint')}</p>
           </div>
         ) : (
           <>
             {Object.entries(groupedRecords).map(([date, dateRecords]) => (
               <div key={date} className="space-y-2">
                 {/* Date Header */}
-                <h3 className="text-sm font-semibold text-gray-500 px-1">{date}</h3>
+                <h3 className="text-sm font-semibold text-gray-600 px-1">{date}</h3>
 
                 {/* Records for this date */}
                 <div className="space-y-2">
@@ -185,19 +185,19 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                     >
                       <div className="flex items-start gap-3">
                         {/* Time */}
-                        <div className="flex-shrink-0 w-12 text-sm font-medium text-gray-400 pt-0.5">
+                        <div className="flex-shrink-0 w-12 text-sm font-medium text-gray-500 pt-0.5">
                           {formatTime(record.timestamp)}
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">
+                          <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
                             {record.content}
                           </p>
 
                           {/* Meta info */}
                           <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center gap-4 text-xs text-gray-400">
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
                               <span className="flex items-center gap-1">
                                 <ClockIcon />
                                 {formatDuration(record.duration)}
@@ -212,7 +212,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                                 e.stopPropagation();
                                 handleCopy(record.content);
                               }}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                               title={t('memory.copied')}
                             >
                               <CopyIcon />
@@ -263,7 +263,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                   <ChevronRightIcon />
                 </button>
 
-                <span className="ml-4 text-sm text-gray-400">
+                <span className="ml-4 text-sm text-gray-500">
                   {t('memory.totalRecords', { count: records.length })}
                 </span>
               </div>
@@ -281,7 +281,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                 <TrashIcon />
               </div>
               <h3 className="text-base font-semibold text-gray-900 mb-2">{t('memory.confirmClear')}</h3>
-              <p className="text-sm text-gray-500 mb-6">
+              <p className="text-sm text-gray-600 mb-6">
                 {t('memory.confirmClearDesc')}
               </p>
               <div className="flex gap-3">

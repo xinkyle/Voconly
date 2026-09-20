@@ -404,7 +404,23 @@
       "always": "永久保持"
     },
     "keepAliveDescription": "模型在内存中的保持时间。更长的保持时间可减少切换模型时的等待，但会占用更多内存。",
-    "contextLimitDescription": "模型可处理的最大 token 数。较大的值可处理更长的文本，但需要更多显存。"
+    "contextLimitDescription": "模型可处理的最大 token 数。较大的值可处理更长的文本，但需要更多显存。",
+    "descriptions": {
+      "ollama": "本地大模型，无需 API Key，支持多种开源模型",
+      "openai": "GPT-4、GPT-3.5 等云端模型",
+      "deepseek": "高性能模型，中文能力出色",
+      "gemini": "谷歌多模态大模型",
+      "glm": "智谱 AI GLM 系列模型",
+      "minimax": "海螺 AI 大语言模型",
+      "kimi": "月之暗面，超长上下文窗口",
+      "qwen": "阿里云通义千问系列模型",
+      "claude": "Anthropic Claude 系列模型",
+      "groq": "高速推理平台",
+      "openrouter": "多模型聚合平台",
+      "cerebras": "超快推理速度",
+      "yi": "零一万物 Yi 系列模型",
+      "custom": "自定义 API 端点"
+    }
   },
   "dictionary": {
     "title": "用户词典",
