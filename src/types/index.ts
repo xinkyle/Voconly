@@ -373,3 +373,40 @@ export interface ArchiveStats {
   fileCount: number;
   totalRecords: number;
 }
+
+// ============== 文件转录 ==============
+
+/**
+ * 文件转录记录
+ */
+export interface FileTranscriptionRecord {
+  id: string;
+  filename: string;
+  filePath?: string;
+  fileSize: number;
+  duration: number;
+  transcriptText: string;
+  wordCount: number;
+  timestamp: number;
+  asrModelId: string;
+}
+
+/**
+ * 文件转录状态
+ */
+export type FileTranscriptionStatus =
+  | 'idle'           // 空闲
+  | 'selected'       // 已选择文件
+  | 'transcribing'   // 正在转录
+  | 'completed'      // 已完成
+  | 'error';         // 错误
+
+/**
+ * 文件转录进度
+ */
+export interface FileTranscriptionProgress {
+  filename: string;
+  progress: number;      // 0-100
+  elapsedSeconds: number;
+  estimatedRemainingSeconds: number;
+}
