@@ -232,18 +232,15 @@ export default function FileTranscriptionPanel() {
           ) : (
             <div className="space-y-2">
               {records.map(record => (
-                <div key={record.id} className="bg-white rounded-xl p-3 border border-gray-200 group relative">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">{record.filename}</p>
-                      <p className="text-sm text-gray-500 mt-1 break-words">{record.transcriptText.substring(0, 100)}...</p>
-                    </div>
+                <div key={record.id} className="bg-white rounded-xl p-3 border border-gray-200">
+                  <p className="font-medium text-gray-900">{record.filename}</p>
+                  <p className="text-sm text-gray-500 mt-1 break-words">{record.transcriptText.substring(0, 100)}...</p>
+                  <div className="flex justify-end mt-2">
                     <button
-                      className="ml-2 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                       onClick={async () => {
                         try {
                           await navigator.clipboard.writeText(record.transcriptText);
-                          // 可以添加一个临时的成功提示
                         } catch (err) {
                           console.error('Failed to copy:', err);
                         }
