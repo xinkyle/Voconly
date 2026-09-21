@@ -9,7 +9,7 @@ const FileIcon = () => (
 );
 
 interface FileUploadAreaProps {
-  onFileSelected: (filePath: string, fileName: string) => void;
+  onFileSelected: (filePath: string, fileName: string, fileSize: number) => void;
   disabled?: boolean;
 }
 
@@ -31,7 +31,17 @@ export default function FileUploadArea({ onFileSelected, disabled }: FileUploadA
 
       if (selected && typeof selected === 'string') {
         const fileName = selected.split(/[/\\]/).pop() || selected;
-        onFileSelected(selected, fileName);
+
+        // 获取文件大小
+        let fileSize = 0;
+        try {
+          const stat = await import('@tauri-apps/plugin-fs').then(fs => fs.stat(selected));
+          fileSize = stat.size;
+        } catch (e) {
+          console.warn('Failed to get file size:', e);
+        }
+
+        onFileSelected(selected, fileName, fileSize);
       }
     } catch (error) {
       console.error('Failed to select file:', error);
@@ -61,7 +71,8 @@ export default function FileUploadArea({ onFileSelected, disabled }: FileUploadA
       const file = files[0];
       // Note: Tauri 拖拽返回的是文件路径
       const path = (file as any).path || file.name;
-      onFileSelected(path, file.name);
+      const fileSize = file.size || 0;
+      onFileSelected(path, file.name, fileSize);
     }
   }, [disabled, onFileSelected]);
 

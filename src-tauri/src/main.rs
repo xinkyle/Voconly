@@ -2145,6 +2145,8 @@ fn main() {
             commands::transcribe::transcribe_audio,
             commands::transcribe::cleanup_all_resources,
             commands::transcribe::convert_audio_to_wav,
+            commands::transcribe::split_audio_file,
+            commands::transcribe::transcribe_audio_chunks,
             commands::model::load_model_by_id,
             commands::model::unload_model,
             commands::model::switch_asr_model,

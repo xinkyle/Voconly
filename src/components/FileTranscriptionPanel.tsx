@@ -12,10 +12,18 @@ export default function FileTranscriptionPanel() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [records, setRecords] = useState<FileTranscriptionRecord[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
   const [status, setStatus] = useState<TranscriptionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
+
+  // 进度状态
+  const [progress, setProgress] = useState<{
+    phase: 'idle' | 'splitting' | 'transcribing';
+    current: number;
+    total: number;
+    percent: number;
+  }>({ phase: 'idle', current: 0, total: 0, percent: 0 });
 
   // 加载配置和历史记录
   useEffect(() => {
@@ -30,10 +38,11 @@ export default function FileTranscriptionPanel() {
       .catch(err => console.error('Failed to load history:', err));
   }, []);
 
-  const handleFileSelected = (filePath: string, fileName: string) => {
-    setSelectedFile({ path: filePath, name: fileName });
+  const handleFileSelected = (filePath: string, fileName: string, fileSize: number) => {
+    setSelectedFile({ path: filePath, name: fileName, size: fileSize });
     setStatus('idle');
     setError(null);
+    setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
   };
 
   const handleStartTranscription = async () => {
@@ -43,6 +52,7 @@ export default function FileTranscriptionPanel() {
 
     setStatus('transcribing');
     setError(null);
+    setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
 
     try {
       // 使用第一个启用的场景ID，或默认场景
@@ -50,8 +60,21 @@ export default function FileTranscriptionPanel() {
 
       console.log('[FileTranscription] Calling transcribeAudioFile...', { filePath: selectedFile.path, sceneId });
 
-      // 调用转录（会自动转换非 WAV 格式）
-      const result = await transcribeAudioFile(selectedFile.path, sceneId);
+      // 调用转录（会自动转换非 WAV 格式，并判断是否需要分割）
+      const result = await transcribeAudioFile(
+        selectedFile.path,
+        sceneId,
+        undefined,
+        {
+          fileSize: selectedFile.size,
+          onSplitProgress: (current, total, percent) => {
+            setProgress({ phase: 'splitting', current, total, percent });
+          },
+          onTranscribeProgress: (current, total, percent) => {
+            setProgress({ phase: 'transcribing', current, total, percent });
+          },
+        }
+      );
 
       console.log('[FileTranscription] Transcription complete:', { textLength: result.text.length, duration: result.duration });
 
@@ -62,7 +85,7 @@ export default function FileTranscriptionPanel() {
       const record = await createFileTranscriptionRecord(
         selectedFile.path,
         selectedFile.name,
-        0, // 文件大小暂时为0
+        selectedFile.size,
         result.text,
         result.duration,
         asrModelId
@@ -74,6 +97,7 @@ export default function FileTranscriptionPanel() {
       // 重置状态
       setStatus('completed');
       setSelectedFile(null);
+      setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
 
     } catch (err) {
       console.error('Transcription failed:', err);
@@ -92,6 +116,7 @@ export default function FileTranscriptionPanel() {
 
       setError(errorMessage);
       setStatus('error');
+      setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
     }
   };
 
@@ -151,6 +176,24 @@ export default function FileTranscriptionPanel() {
                 </div>
               )}
 
+              {/* 进度显示 */}
+              {status === 'transcribing' && progress.phase !== 'idle' && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-700">
+                      {progress.phase === 'splitting' ? '正在分割音频...' : '正在转录...'}
+                    </span>
+                    <span className="text-sm text-blue-700">{progress.current}/{progress.total}</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleStartTranscription}
@@ -162,7 +205,7 @@ export default function FileTranscriptionPanel() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    {t('file.selected.transcribing') || '正在转录...'}
+                    {progress.phase === 'splitting' ? '分割中...' : '转录中...'}
                   </span>
                 ) : (
                   t('file.selected.start')

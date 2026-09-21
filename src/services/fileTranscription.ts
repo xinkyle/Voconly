@@ -1,11 +1,115 @@
 import type { FileTranscriptionRecord } from '../types';
 import { invoke } from '../utils/tauri';
 import { createLogger } from './log';
+import { listen } from '@tauri-apps/api/event';
 
 const log = createLogger('FileTranscription');
 
 // 内存缓存
 let historyCache: FileTranscriptionRecord[] | null = null;
+
+// 大文件阈值（字节）- 10MB
+const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
+
+// 分片时长（秒）
+const CHUNK_DURATION = 30;
+
+// 片段重叠时长（秒）
+const CHUNK_OVERLAP = 2;
+
+/**
+ * 获取音频时长
+ */
+export async function getAudioDuration(filePath: string): Promise<number> {
+  try {
+    const duration = await invoke<number>('get_audio_duration', { audioPath: filePath });
+    return duration;
+  } catch (error) {
+    log.error(`Failed to get audio duration: ${error}`);
+    return 0;
+  }
+}
+
+/**
+ * 分割音频文件
+ */
+export async function splitAudioFile(
+  audioPath: string,
+  chunkDuration: number = CHUNK_DURATION,
+  overlap: number = CHUNK_OVERLAP,
+  onProgress?: (current: number, total: number, percent: number) => void
+): Promise<string[]> {
+  log.info(`Splitting audio file: ${audioPath}`);
+
+  // 监听分割进度
+  const unlisten = await listen<{ current: number; total: number; percent: number }>(
+    'audio-split-progress',
+    (event) => {
+      if (onProgress) {
+        onProgress(event.payload.current, event.payload.total, event.payload.percent);
+      }
+    }
+  );
+
+  try {
+    const chunkPaths = await invoke<string[]>('split_audio_file', {
+      audioPath,
+      chunkDuration,
+      overlap,
+    });
+
+    log.info(`Audio split into ${chunkPaths.length} chunks`);
+    return chunkPaths;
+  } finally {
+    unlisten();
+  }
+}
+
+/**
+ * 分片转录音频
+ */
+export async function transcribeAudioChunks(
+  chunkPaths: string[],
+  sceneId: string,
+  language?: string,
+  onProgress?: (current: number, total: number, percent: number) => void
+): Promise<{ text: string; duration: number }> {
+  log.info(`Transcribing ${chunkPaths.length} chunks`);
+
+  // 监听转录进度
+  const unlisten = await listen<{ current: number; total: number; percent: number }>(
+    'transcribe-chunk-progress',
+    (event) => {
+      if (onProgress) {
+        onProgress(event.payload.current, event.payload.total, event.payload.percent);
+      }
+    }
+  );
+
+  try {
+    const result = await invoke<{ text: string; language?: string; segments: Array<{ text: string; start: number; end: number }> }>(
+      'transcribe_audio_chunks',
+      {
+        chunkPaths,
+        sceneId,
+        language: language || null,
+      }
+    );
+
+    const duration = result.segments.length > 0
+      ? Math.ceil(result.segments[result.segments.length - 1].end)
+      : 0;
+
+    log.info(`Chunk transcription complete: ${result.text.length} chars, ${duration}s`);
+
+    return {
+      text: result.text,
+      duration,
+    };
+  } finally {
+    unlisten();
+  }
+}
 
 /**
  * 转换音频文件为 WAV 格式
@@ -27,11 +131,17 @@ export async function convertAudioToWav(filePath: string): Promise<string> {
 
 /**
  * 转录音频文件
+ * 自动判断是否需要分割大文件
  */
 export async function transcribeAudioFile(
   filePath: string,
   sceneId: string,
-  language?: string
+  language?: string,
+  options?: {
+    fileSize?: number;
+    onSplitProgress?: (current: number, total: number, percent: number) => void;
+    onTranscribeProgress?: (current: number, total: number, percent: number) => void;
+  }
 ): Promise<{ text: string; duration: number }> {
   console.log('[FileTranscriptionService] transcribeAudioFile called', { filePath, sceneId, language });
 
@@ -50,30 +160,56 @@ export async function transcribeAudioFile(
       log.info(`Converted to WAV: ${wavPath}`);
     }
 
-    console.log('[FileTranscriptionService] Calling invoke transcribe_audio...');
+    // 判断是否需要分割
+    const fileSize = options?.fileSize || 0;
+    const needSplit = fileSize > LARGE_FILE_THRESHOLD;
 
-    const result = await invoke<{ text: string; language?: string; segments: Array<{ text: string; start: number; end: number }> }>(
-      'transcribe_audio',
-      {
-        request: {
-          sceneId,
-          audioPath: wavPath,
-          language: language || null,
+    if (needSplit) {
+      log.info(`Large file detected (${(fileSize / 1024 / 1024).toFixed(2)}MB), will split`);
+      console.log('[FileTranscriptionService] Large file, splitting...');
+
+      // 分割音频
+      const chunkPaths = await splitAudioFile(
+        wavPath,
+        CHUNK_DURATION,
+        CHUNK_OVERLAP,
+        options?.onSplitProgress
+      );
+
+      // 分片转录
+      return await transcribeAudioChunks(
+        chunkPaths,
+        sceneId,
+        language,
+        options?.onTranscribeProgress
+      );
+    } else {
+      // 小文件，直接转录
+      console.log('[FileTranscriptionService] Calling invoke transcribe_audio...');
+
+      const result = await invoke<{ text: string; language?: string; segments: Array<{ text: string; start: number; end: number }> }>(
+        'transcribe_audio',
+        {
+          request: {
+            sceneId,
+            audioPath: wavPath,
+            language: language || null,
+          }
         }
-      }
-    );
+      );
 
-    // 获取音频时长（从 segments 中计算）
-    const duration = result.segments.length > 0
-      ? Math.ceil(result.segments[result.segments.length - 1].end)
-      : 0;
+      // 获取音频时长（从 segments 中计算）
+      const duration = result.segments.length > 0
+        ? Math.ceil(result.segments[result.segments.length - 1].end)
+        : 0;
 
-    log.info(`Transcription complete: ${result.text.length} chars, ${duration}s`);
+      log.info(`Transcription complete: ${result.text.length} chars, ${duration}s`);
 
-    return {
-      text: result.text,
-      duration,
-    };
+      return {
+        text: result.text,
+        duration,
+      };
+    }
   } catch (error) {
     log.error(`Failed to transcribe file: ${error}`);
     throw error;
