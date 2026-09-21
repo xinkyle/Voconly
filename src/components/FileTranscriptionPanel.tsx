@@ -1,19 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import FileUploadArea from './FileUploadArea';
-import type { FileTranscriptionRecord } from '../types';
-import { loadFileTranscriptionHistory } from '../services/fileTranscription';
+import type { FileTranscriptionRecord, AppConfig } from '../types';
+import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord } from '../services/fileTranscription';
+import { loadConfig } from '../services/config';
 
 type TabType = 'pending' | 'history';
+type TranscriptionStatus = 'idle' | 'transcribing' | 'completed' | 'error';
 
 export default function FileTranscriptionPanel() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [records, setRecords] = useState<FileTranscriptionRecord[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string } | null>(null);
+  const [status, setStatus] = useState<TranscriptionStatus>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
 
-  // 加载历史记录
+  // 加载配置和历史记录
   useEffect(() => {
+    loadConfig()
+      .then(cfg => {
+        setConfig(cfg);
+      })
+      .catch(err => console.error('Failed to load config:', err));
+
     loadFileTranscriptionHistory()
       .then(setRecords)
       .catch(err => console.error('Failed to load history:', err));
@@ -21,6 +32,67 @@ export default function FileTranscriptionPanel() {
 
   const handleFileSelected = (filePath: string, fileName: string) => {
     setSelectedFile({ path: filePath, name: fileName });
+    setStatus('idle');
+    setError(null);
+  };
+
+  const handleStartTranscription = async () => {
+    if (!selectedFile || status === 'transcribing') return;
+
+    console.log('[FileTranscription] Button clicked, starting transcription...');
+
+    setStatus('transcribing');
+    setError(null);
+
+    try {
+      // 使用第一个启用的场景ID，或默认场景
+      const sceneId = config?.scenes?.find(s => s.enabled)?.id || config?.scenes?.[0]?.id || 'default';
+
+      console.log('[FileTranscription] Calling transcribeAudioFile...', { filePath: selectedFile.path, sceneId });
+
+      // 调用转录（会自动转换非 WAV 格式）
+      const result = await transcribeAudioFile(selectedFile.path, sceneId);
+
+      console.log('[FileTranscription] Transcription complete:', { textLength: result.text.length, duration: result.duration });
+
+      // 获取ASR模型ID
+      const asrModelId = config?.globalModelConfig?.asrModel?.modelId || 'unknown';
+
+      // 创建并保存记录
+      const record = await createFileTranscriptionRecord(
+        selectedFile.path,
+        selectedFile.name,
+        0, // 文件大小暂时为0
+        result.text,
+        result.duration,
+        asrModelId
+      );
+
+      // 更新记录列表
+      setRecords([record, ...records]);
+
+      // 重置状态
+      setStatus('completed');
+      setSelectedFile(null);
+
+    } catch (err) {
+      console.error('Transcription failed:', err);
+
+      // 提供更友好的错误信息
+      let errorMessage = '转录失败';
+      if (err instanceof Error) {
+        if (err.message.includes('ffmpeg not found')) {
+          errorMessage = '未找到 ffmpeg，无法转换音频格式。请安装 ffmpeg 后重试。';
+        } else if (err.message.includes('Failed to convert audio')) {
+          errorMessage = `音频格式转换失败：${err.message}`;
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
+      setStatus('error');
+    }
   };
 
   return (
@@ -71,11 +143,30 @@ export default function FileTranscriptionPanel() {
                   <p className="text-sm text-gray-500">{selectedFile.path}</p>
                 </div>
               </div>
+
+              {/* 错误提示 */}
+              {error && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
               <button
-                className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
-                onClick={() => {/* TODO: 开始转录 */}}
+                className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleStartTranscription}
+                disabled={status === 'transcribing'}
               >
-                {t('file.selected.start')}
+                {status === 'transcribing' ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    {t('file.selected.transcribing') || '正在转录...'}
+                  </span>
+                ) : (
+                  t('file.selected.start')
+                )}
               </button>
             </div>
           ) : (

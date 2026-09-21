@@ -622,3 +622,69 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
     info!("[Cleanup] 所有资源清理完成");
     Ok(())
 }
+
+/// 将音频文件转换为 WAV 格式
+/// 使用 ffmpeg 进行转换，支持多种输入格式（mp3, m4a, ogg, webm 等）
+#[tauri::command]
+pub async fn convert_audio_to_wav(
+    audio_path: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    use std::process::Command;
+
+    info!("Converting audio to WAV: {}", audio_path);
+
+    let input_path = Path::new(&audio_path);
+    if !input_path.exists() {
+        return Err(format!("Audio file not found: {}", audio_path));
+    }
+
+    // 生成输出文件路径（临时目录）
+    let temp_dir = std::env::temp_dir();
+    let output_filename = format!(
+        "voconly_{}.wav",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S_%f")
+    );
+    let output_path = temp_dir.join(&output_filename);
+    let output_path_str = output_path.to_string_lossy().to_string();
+
+    // 使用 ffmpeg 转换
+    // 参数：-y 覆盖已存在的文件, -i 输入文件, -ar 16000 设置采样率, -ac 1 单声道, -f wav 输出格式
+    let result = Command::new("ffmpeg")
+        .args([
+            "-y",
+            "-i",
+            &audio_path,
+            "-ar", "16000",  // 16kHz 采样率（ASR 模型常用）
+            "-ac", "1",       // 单声道
+            "-f", "wav",
+            &output_path_str,
+        ])
+        .output();
+
+    match result {
+        Ok(output) => {
+            if output.status.success() {
+                info!("Audio converted successfully: {}", output_path_str);
+
+                // 发送事件通知前端
+                let _ = app_handle.emit("audio-converted", &serde_json::json!({
+                    "originalPath": &audio_path,
+                    "convertedPath": &output_path_str
+                }));
+
+                Ok(output_path_str)
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                Err(format!("Failed to convert audio: {}", stderr))
+            }
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Err("ffmpeg not found. Please install ffmpeg to convert audio files.".to_string())
+            } else {
+                Err(format!("Failed to run ffmpeg: {}", e))
+            }
+        }
+    }
+}

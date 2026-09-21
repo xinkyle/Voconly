@@ -2144,6 +2144,7 @@ fn main() {
             // New commands for local model management
             commands::transcribe::transcribe_audio,
             commands::transcribe::cleanup_all_resources,
+            commands::transcribe::convert_audio_to_wav,
             commands::model::load_model_by_id,
             commands::model::unload_model,
             commands::model::switch_asr_model,

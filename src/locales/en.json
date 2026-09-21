@@ -268,7 +268,7 @@
       "title": "Drag and drop audio file here",
       "or": "or",
       "select": "Click to select file",
-      "hint": "Supported formats: WAV, MP3, M4A, FLAC, OGG, WEBM",
+      "hint": "Supported formats: WAV, MP3, M4A, FLAC, OGG, WEBM (non-WAV formats will be converted automatically)",
       "sizeLimit": "Max file: 100MB or 30 minutes"
     },
     "selected": {
@@ -276,7 +276,8 @@
       "size": "Size",
       "duration": "Duration",
       "model": "Using model",
-      "start": "Start Transcription"
+      "start": "Start Transcription",
+      "transcribing": "Transcribing..."
     },
     "progress": {
       "title": "Transcribing...",

@@ -268,7 +268,7 @@
       "title": "拖拽音频文件到此处",
       "or": "或",
       "select": "点击选择文件",
-      "hint": "支持格式：WAV, MP3, M4A, FLAC, OGG, WEBM",
+      "hint": "支持格式：WAV, MP3, M4A, FLAC, OGG, WEBM（非 WAV 格式将自动转换）",
       "sizeLimit": "最大文件：100MB 或 30 分钟"
     },
     "selected": {
@@ -276,7 +276,8 @@
       "size": "大小",
       "duration": "时长",
       "model": "使用模型",
-      "start": "开始转录"
+      "start": "开始转录",
+      "transcribing": "正在转录..."
     },
     "progress": {
       "title": "正在转录...",
