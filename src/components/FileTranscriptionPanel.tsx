@@ -228,7 +228,7 @@ export default function FileTranscriptionPanel() {
           )}
 
           {/* 最近一条转录记录 */}
-          {records.length > 0 && !selectedFile && (
+          {records.length > 0 && (
             <div className="bg-white rounded-xl p-4 border border-gray-200">
               <div className="text-xs text-gray-500 mb-2">最近转录</div>
               <div className="flex items-start gap-3">
