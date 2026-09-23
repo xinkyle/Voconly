@@ -78,10 +78,10 @@ export default function FileUploadArea({ onFileSelected, disabled }: FileUploadA
 
   return (
     <div
-      className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 ${
+      className={`relative border bg-gray-100 rounded-2xl p-12 text-center transition-all duration-200 shadow-sm ${
         isDragging
-          ? 'border-gray-400 bg-gray-50'
-          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+          ? 'border-gray-400 bg-gray-200 shadow-lg'
+          : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
