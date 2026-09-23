@@ -27,6 +27,13 @@ const AsrIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   </svg>
 );
 
+// 闪电图标
+const BoltIcon = ({ className = 'w-3 h-3' }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25-.75 7.5 6.75.75-10.5 11.25.75-7.5-6.75-.75z" />
+  </svg>
+);
+
 // LLM 图标
 const LlmIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -867,6 +874,30 @@ export default function HomePanelV2({
   // 有 providerId 就算配置了
   const hasLlmConfig = !!llmConfig?.providerId;
 
+  // LLM 是否启用（默认 true）
+  const llmEnabled = llmConfig?.enabled !== false;
+
+  // 切换 LLM 启用状态
+  const handleToggleLlm = useCallback(() => {
+    if (!globalModelConfig || !onGlobalModelConfigChange) return;
+
+    const newEnabled = !llmEnabled;
+    const newConfig: GlobalModelConfig = {
+      ...globalModelConfig,
+      llm: {
+        ...globalModelConfig.llm,
+        enabled: newEnabled,
+      },
+    };
+    onGlobalModelConfigChange(newConfig);
+
+    // 显示 Toast 提示
+    showToast({
+      type: newEnabled ? 'success' : 'info',
+      title: newEnabled ? t('home.llmEnabledToast') : t('home.llmDisabledToast'),
+    });
+  }, [globalModelConfig, llmEnabled, onGlobalModelConfigChange, showToast, t]);
+
   // 只显示前两个启用的场景（首页展示限制）
   const enabledScenes = localScenes.filter(s => s.enabled).slice(0, 2);
 
@@ -911,14 +942,33 @@ export default function HomePanelV2({
           <button
             id="llm-config-button"
             onClick={onNavigateToLlmSettings}
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 text-xs rounded-lg"
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-lg transition-all duration-200 ${
+              llmEnabled
+                ? 'bg-gray-100 border border-gray-200 text-gray-600'
+                : 'bg-gray-50 border border-gray-100 text-gray-400'
+            }`}
           >
-            <LlmIcon className="w-3 h-3 text-gray-800" />
+            <LlmIcon className={`w-3 h-3 ${llmEnabled ? 'text-gray-800' : 'text-gray-400'}`} />
             <span>{llmModelName}</span>
-            {hasLlmConfig && (
+            {hasLlmConfig && llmEnabled && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             )}
           </button>
+          {/* AI 服务开关 */}
+          {hasLlmConfig && (
+            <button
+              id="llm-toggle-button"
+              onClick={handleToggleLlm}
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 ${
+                llmEnabled
+                  ? 'bg-emerald-100 border border-emerald-200 text-emerald-600 hover:bg-emerald-200'
+                  : 'bg-gray-100 border border-gray-200 text-gray-400 hover:bg-gray-200'
+              }`}
+              title={llmEnabled ? t('home.llmEnabled') : t('home.llmDisabled')}
+            >
+              <BoltIcon className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </header>
 

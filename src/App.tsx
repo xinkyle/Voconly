@@ -999,9 +999,10 @@ function App() {
       // 检查 LLM 配置（用于进度条预估）
       // 新架构：全局 LLM 配置 + 场景提示词
       const hasGlobalLlm = config?.globalModelConfig?.llm?.providerId && config?.globalModelConfig?.llm?.model;
+      const llmEnabled = config?.globalModelConfig?.llm?.enabled !== false; // 默认启用
       const currentScene = config?.scenes.find(s => s.id === scene.id);
       const hasPrompt = currentScene?.promptType || currentScene?.customPrompt;
-      const hasLlmProfile = !!(hasGlobalLlm && hasPrompt);
+      const hasLlmProfile = !!(hasGlobalLlm && llmEnabled && hasPrompt);
       const llmModelId = config?.globalModelConfig?.llm?.model || undefined;
 
       // 获取 skipLlm 标记（双击跳过 LLM）

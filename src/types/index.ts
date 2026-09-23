@@ -62,6 +62,8 @@ export interface GlobalLlmConfig {
   maxTokens: number;
   /** 温度参数 */
   temperature: number;
+  /** 是否启用 LLM 后处理 */
+  enabled?: boolean;
 }
 
 /**
