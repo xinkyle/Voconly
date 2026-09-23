@@ -166,7 +166,7 @@ export default function FileTranscriptionPanel() {
 
       {/* Content */}
       {activeTab === 'pending' ? (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
           {selectedFile ? (
             <div className="bg-white rounded-xl p-6 border border-gray-200">
               <p className="text-sm text-gray-600 mb-4">{t('file.selected.title')}</p>
@@ -227,8 +227,38 @@ export default function FileTranscriptionPanel() {
             <FileUploadArea onFileSelected={handleFileSelected} />
           )}
 
+          {/* 最近一条转录记录 */}
+          {records.length > 0 && !selectedFile && (
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
+              <div className="text-xs text-gray-500 mb-2">最近转录</div>
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-gray-900 truncate">{records[0].filename}</p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs text-gray-500">{Math.floor(records[0].duration / 60)}:{(records[0].duration % 60).toString().padStart(2, '0')}</span>
+                      <button
+                        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                        onClick={() => handleCopy(records[0].transcriptText)}
+                        title={t('common.copy') || '复制'}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{records[0].transcriptText.substring(0, 100)}...</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Hint */}
-          <div className="mt-6 text-center text-sm text-gray-500">
+          <div className="text-center text-sm text-gray-500">
             <p>{t('file.dropzone.hint')}</p>
             <p className="mt-1">{t('file.dropzone.sizeLimit')}</p>
           </div>
