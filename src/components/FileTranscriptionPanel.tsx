@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import FileUploadArea from './FileUploadArea';
 import type { FileTranscriptionRecord, AppConfig } from '../types';
-import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord } from '../services/fileTranscription';
+import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord, getAudioDuration } from '../services/fileTranscription';
 import { loadConfig } from '../services/config';
 import { useToast } from './ui/Toast';
 
@@ -14,7 +14,7 @@ export default function FileTranscriptionPanel() {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [records, setRecords] = useState<FileTranscriptionRecord[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number; duration?: number } | null>(null);
   const [status, setStatus] = useState<TranscriptionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -52,11 +52,19 @@ export default function FileTranscriptionPanel() {
     }
   };
 
-  const handleFileSelected = (filePath: string, fileName: string, fileSize: number) => {
+  const handleFileSelected = async (filePath: string, fileName: string, fileSize: number) => {
     setSelectedFile({ path: filePath, name: fileName, size: fileSize });
     setStatus('idle');
     setError(null);
     setProgress({ current: 0, total: 0, percent: 0 });
+
+    // 立即获取音频时长
+    try {
+      const duration = await getAudioDuration(filePath);
+      setSelectedFile({ path: filePath, name: fileName, size: fileSize, duration });
+    } catch (err) {
+      console.error('Failed to get audio duration:', err);
+    }
   };
 
   const handleStartTranscription = async () => {
@@ -81,6 +89,7 @@ export default function FileTranscriptionPanel() {
         undefined,
         {
           fileSize: selectedFile.size,
+          audioDuration: selectedFile.duration,
           onProgress: (current, total, percent) => {
             setProgress({ current, total, percent });
           },
@@ -131,6 +140,17 @@ export default function FileTranscriptionPanel() {
     }
   };
 
+  // 格式化时长显示
+  const formatDuration = (seconds: number): string => {
+    const rounded = Math.round(seconds);
+    if (rounded < 60) {
+      return `${rounded}秒`;
+    }
+    const minutes = Math.floor(rounded / 60);
+    const secs = rounded % 60;
+    return secs > 0 ? `${minutes}分${secs}秒` : `${minutes}分钟`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -175,7 +195,12 @@ export default function FileTranscriptionPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                  <p className="font-medium text-gray-900">
+                    {selectedFile.name}
+                    {selectedFile.duration !== undefined && (
+                      <span className="font-normal text-gray-500 ml-2">· {formatDuration(selectedFile.duration)}</span>
+                    )}
+                  </p>
                   <p className="text-sm text-gray-500">{selectedFile.path}</p>
                 </div>
               </div>
@@ -241,7 +266,7 @@ export default function FileTranscriptionPanel() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-gray-900 truncate">{records[0].filename}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-gray-500">{Math.floor(records[0].duration / 60)}:{(records[0].duration % 60).toString().padStart(2, '0')}</span>
+                      <span className="text-xs text-gray-500">{formatDuration(records[0].duration)}</span>
                       <button
                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         onClick={() => handleCopy(records[0].transcriptText)}
@@ -289,7 +314,7 @@ export default function FileTranscriptionPanel() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            {Math.floor(record.duration / 60)}:{(record.duration % 60).toString().padStart(2, '0')}
+                            {formatDuration(record.duration)}
                           </span>
                           <span className="flex items-center gap-1">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

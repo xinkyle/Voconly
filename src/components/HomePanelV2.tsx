@@ -943,66 +943,89 @@ export default function HomePanelV2({
                 // 组合键：topKey=主键(A)，bottomKey=修饰键(右 Alt)
                 const parseShortcutForKeypad = (shortcut: string): {
                   topKey: string;
+                  middleKey: string;    // 第三行（三键组合的第二个修饰键）
                   bottomKey: string;
                   isCombo: boolean;      // 是否为组合键
                   isModifierOnly: boolean; // 是否为单修饰键
+                  isThreeKey: boolean;   // 是否为三键组合
                 } => {
-                  if (!shortcut) return { topKey: '', bottomKey: '', isCombo: false, isModifierOnly: false };
+                  if (!shortcut) return { topKey: '', middleKey: '', bottomKey: '', isCombo: false, isModifierOnly: false, isThreeKey: false };
 
-                  // 组合键（如 RightCtrl+A）
+                  // 格式化修饰键（右 Ctrl）
+                  const formatModifierKey = (modifierKey: string): { prefix: string; keyName: string } => {
+                    if (modifierKey === 'LeftCtrl') return { prefix: t('keyboard.left'), keyName: 'Ctrl' };
+                    if (modifierKey === 'RightCtrl') return { prefix: t('keyboard.right'), keyName: 'Ctrl' };
+                    if (modifierKey === 'LeftShift') return { prefix: t('keyboard.left'), keyName: 'Shift' };
+                    if (modifierKey === 'RightShift') return { prefix: t('keyboard.right'), keyName: 'Shift' };
+                    if (modifierKey === 'LeftAlt') return { prefix: t('keyboard.left'), keyName: 'Alt' };
+                    if (modifierKey === 'RightAlt') return { prefix: t('keyboard.right'), keyName: 'Alt' };
+                    if (modifierKey === 'LeftWindows') return { prefix: t('keyboard.left'), keyName: 'Win' };
+                    if (modifierKey === 'RightWindows') return { prefix: t('keyboard.right'), keyName: 'Win' };
+                    return { prefix: '', keyName: modifierKey };
+                  };
+
+                  // 格式化主键
+                  const formatMainKey = (mainKey: string): string => {
+                    if (mainKey.startsWith('Key')) return mainKey.slice(3);
+                    if (mainKey.startsWith('Digit')) return mainKey.slice(5);
+                    if (mainKey === 'Space') return '␣';
+                    if (mainKey.startsWith('Arrow')) {
+                      const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+                      return arrowMap[mainKey] || mainKey;
+                    }
+                    return mainKey;
+                  };
+
+                  // 组合键（如 RightCtrl+A 或 LeftShift+Alt+A）
                   if (shortcut.includes('+')) {
                     const keys = shortcut.split('+');
+
+                    // 三键组合（如 LeftShift+Alt+A）
+                    if (keys.length >= 3) {
+                      const modifier1 = keys[0];
+                      const modifier2 = keys[1];
+                      const mainKey = keys[2];
+
+                      const mod1 = formatModifierKey(modifier1);
+                      const mod2 = formatModifierKey(modifier2);
+                      const mainDisplay = formatMainKey(mainKey);
+
+                      return {
+                        topKey: mainDisplay,
+                        middleKey: mod2.prefix + ' ' + mod2.keyName,
+                        bottomKey: mod1.prefix + ' ' + mod1.keyName,
+                        isCombo: true,
+                        isModifierOnly: false,
+                        isThreeKey: true
+                      };
+                    }
+
+                    // 两键组合（如 RightCtrl+A）
                     const modifierKey = keys[0];
                     const mainKey = keys[1];
 
-                    // 格式化修饰键（右 Ctrl）
-                    let modDisplay = '';
-                    if (modifierKey === 'LeftCtrl') modDisplay = t('keyboard.left') + ' Ctrl';
-                    else if (modifierKey === 'RightCtrl') modDisplay = t('keyboard.right') + ' Ctrl';
-                    else if (modifierKey === 'LeftShift') modDisplay = t('keyboard.left') + ' Shift';
-                    else if (modifierKey === 'RightShift') modDisplay = t('keyboard.right') + ' Shift';
-                    else if (modifierKey === 'LeftAlt') modDisplay = t('keyboard.left') + ' Alt';
-                    else if (modifierKey === 'RightAlt') modDisplay = t('keyboard.right') + ' Alt';
-                    else if (modifierKey === 'LeftWindows') modDisplay = t('keyboard.left') + ' Win';
-                    else if (modifierKey === 'RightWindows') modDisplay = t('keyboard.right') + ' Win';
-                    else modDisplay = modifierKey;
+                    const mod = formatModifierKey(modifierKey);
+                    const mainDisplay = formatMainKey(mainKey);
 
-                    // 格式化主键
-                    let mainDisplay = mainKey;
-                    if (mainKey.startsWith('Key')) mainDisplay = mainKey.slice(3);
-                    else if (mainKey.startsWith('Digit')) mainDisplay = mainKey.slice(5);
-                    else if (mainKey === 'Space') mainDisplay = '␣';
-                    else if (mainKey.startsWith('Arrow')) {
-                      const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
-                      mainDisplay = arrowMap[mainKey] || mainKey;
-                    }
-
-                    return { topKey: mainDisplay, bottomKey: modDisplay, isCombo: true, isModifierOnly: false };
+                    return { topKey: mainDisplay, middleKey: '', bottomKey: mod.prefix + ' ' + mod.keyName, isCombo: true, isModifierOnly: false, isThreeKey: false };
                   }
 
                   // 单键修饰键（如 RightCtrl）- 显示反过来
-                  if (shortcut === 'LeftCtrl') return { topKey: t('keyboard.left'), bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'RightCtrl') return { topKey: t('keyboard.right'), bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'LeftShift') return { topKey: t('keyboard.left'), bottomKey: 'Shift', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'RightShift') return { topKey: t('keyboard.right'), bottomKey: 'Shift', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'LeftAlt') return { topKey: t('keyboard.left'), bottomKey: 'Alt', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'RightAlt') return { topKey: t('keyboard.right'), bottomKey: 'Alt', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'LeftWindows') return { topKey: t('keyboard.left'), bottomKey: 'Win', isCombo: false, isModifierOnly: true };
-                  if (shortcut === 'RightWindows') return { topKey: t('keyboard.right'), bottomKey: 'Win', isCombo: false, isModifierOnly: true };
+                  if (shortcut === 'LeftCtrl') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightCtrl') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Ctrl', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'LeftShift') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Shift', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightShift') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Shift', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'LeftAlt') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Alt', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightAlt') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Alt', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'LeftWindows') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Win', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightWindows') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Win', isCombo: false, isModifierOnly: true, isThreeKey: false };
 
                   // 普通单键
-                  let display = shortcut;
-                  if (shortcut.startsWith('Key')) display = shortcut.slice(3);
-                  else if (shortcut.startsWith('Digit')) display = shortcut.slice(5);
-                  else if (shortcut === 'Space') display = '␣';
-                  else if (shortcut.startsWith('Arrow')) {
-                    const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
-                    display = arrowMap[shortcut] || shortcut;
-                  }
-                  return { topKey: display, bottomKey: '', isCombo: false, isModifierOnly: false };
+                  const display = formatMainKey(shortcut);
+                  return { topKey: display, middleKey: '', bottomKey: '', isCombo: false, isModifierOnly: false, isThreeKey: false };
                 };
 
-                const { topKey, bottomKey, isCombo, isModifierOnly } = parseShortcutForKeypad(scene.shortcut);
+                const { topKey, middleKey, bottomKey, isCombo, isModifierOnly, isThreeKey } = parseShortcutForKeypad(scene.shortcut);
 
                 return (
                   <div
@@ -1058,13 +1081,26 @@ export default function HomePanelV2({
                               <span className="text-xs opacity-70 mt-0.5">等待按键...</span>
                             )}
                           </div>
-                        ) : isCombo ? (
-                          // 组合键：上方主键（中等），下方修饰键（"右"小 + 键名中等）
+                        ) : isThreeKey ? (
+                          // 三键组合：第一行主键（小字），第二行第二个修饰键（中字），第三行第一个修饰键（中字）
                           <div className="flex flex-col items-center leading-tight">
-                            <span className="text-base font-bold">{topKey}</span>
+                            <span className="text-xs font-medium opacity-70">{topKey}</span>
+                            <div className="flex items-baseline gap-0.5 mt-0.5">
+                              <span className="text-xs opacity-60">{middleKey.split(' ')[0]}</span>
+                              <span className="text-base font-bold">{middleKey.split(' ')[1]}</span>
+                            </div>
                             <div className="flex items-baseline gap-0.5">
                               <span className="text-xs opacity-60">{bottomKey.split(' ')[0]}</span>
-                              <span className="text-base font-medium">{bottomKey.split(' ')[1]}</span>
+                              <span className="text-base font-bold">{bottomKey.split(' ')[1]}</span>
+                            </div>
+                          </div>
+                        ) : isCombo ? (
+                          // 两键组合：上方主键（小字），下方修饰键（大字）
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-sm font-medium opacity-70">{topKey}</span>
+                            <div className="flex items-baseline gap-0.5">
+                              <span className="text-sm opacity-60">{bottomKey.split(' ')[0]}</span>
+                              <span className="text-xl font-bold">{bottomKey.split(' ')[1]}</span>
                             </div>
                           </div>
                         ) : isModifierOnly ? (

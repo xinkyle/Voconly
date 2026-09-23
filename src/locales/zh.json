@@ -544,7 +544,7 @@
     "shortcutRequired": "请输入快捷键",
     "shortcutConflict": "快捷键 \"{{shortcut}}\" 已被 \"{{name}}\" 占用",
     "shortcutConflictTip": "提示：可以修改快捷键或编辑已存在的场景以解决冲突",
-    "shortcutSupport": "支持：数字(0-9)、字母(A-Z)、F1-F12、方向键、左右修饰键(Ctrl/Alt/Shift/Win)等",
+    "shortcutSupport": "支持：数字(0-9)、字母(A-Z)、F1-F12、方向键、修饰键(Ctrl/Alt/Shift/Win)。支持组合键，如 Ctrl+Shift+A、右Alt+/",
     "pressKey": "请按下快捷键...",
     "voiceModel": "语音模型",
     "downloaded": "已下载",
@@ -721,7 +721,7 @@
   },
   "about": {
     "title": "关于",
-    "author": "老幸.AI",
+    "author": "老幸.AI - 公众号同名",
     "email": "voconly@139.com",
     "project": "项目简介",
     "description": "本地语音转文字工具",

@@ -689,8 +689,14 @@ pub async fn convert_audio_to_wav(
     }
 }
 
-/// 获取音频文件的时长（秒）
-fn get_audio_duration(audio_path: &str) -> Result<f32, String> {
+/// 获取音频文件的时长（秒，向上取整）
+#[tauri::command]
+pub fn get_audio_duration(audio_path: String) -> Result<u32, String> {
+    get_audio_duration_internal(&audio_path)
+}
+
+/// 获取音频文件的时长（内部实现）
+fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
     use std::process::Command;
 
     let result = Command::new("ffprobe")
@@ -710,7 +716,8 @@ fn get_audio_duration(audio_path: &str) -> Result<f32, String> {
                     .trim()
                     .parse()
                     .map_err(|e| format!("Failed to parse duration: {}", e))?;
-                Ok(duration)
+                // 向上取整为整数秒
+                Ok(duration.ceil() as u32)
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 Err(format!("Failed to get audio duration: {}", stderr))
@@ -748,13 +755,13 @@ pub async fn split_audio_file(
     }
 
     // 获取音频总时长
-    let total_duration = get_audio_duration(&audio_path)?;
+    let total_duration = get_audio_duration_internal(&audio_path)?;
     info!("Total audio duration: {}s", total_duration);
 
     // 计算需要分割的片段数
     // 有效步长 = chunk_duration - overlap
     let step = chunk_duration - overlap;
-    let num_chunks = (total_duration / step).ceil() as usize;
+    let num_chunks = (total_duration as f32 / step).ceil() as usize;
     info!("Will split into {} chunks", num_chunks);
 
     // 创建临时目录

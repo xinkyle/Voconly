@@ -139,6 +139,7 @@ export async function transcribeAudioFile(
   language?: string,
   options?: {
     fileSize?: number;
+    audioDuration?: number;  // 音频时长（秒），优先使用
     onProgress?: (current: number, total: number, percent: number) => void;
   }
 ): Promise<{ text: string; duration: number }> {
@@ -207,10 +208,12 @@ export async function transcribeAudioFile(
         }
       );
 
-      // 获取音频时长（从 segments 中计算）
-      const duration = result.segments.length > 0
-        ? Math.ceil(result.segments[result.segments.length - 1].end)
-        : 0;
+      // 优先使用传入的音频时长，否则从 segments 计算
+      const duration = options?.audioDuration
+        ? options.audioDuration
+        : (result.segments.length > 0
+          ? Math.ceil(result.segments[result.segments.length - 1].end)
+          : 0);
 
       log.info(`Transcription complete: ${result.text.length} chars, ${duration}s`);
 

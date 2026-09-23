@@ -171,7 +171,7 @@ MIT License —— 版权所有 (c) 2026 Xing Yong
 
 ### 关于
 
-由 Xing Yong（老幸.AI）构建 —— 探索一个简单的问题：  
+由 Xing Yong（老幸.AI - 公众号同名）构建 —— 探索一个简单的问题：  
 今天一个人能用 AI 构建出什么？  
 Voconly 是这些实验中的一个。  
 📧 laoxingai@139.com

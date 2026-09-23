@@ -209,8 +209,37 @@ export default function SceneForm({
       // 修饰键释放时，从列表中移除
       if (isModifierKey(e.key)) {
         const modKey = normalizeModifierName(e);
+
+        // 保存松开前的修饰键列表（用于生成快捷键）
+        const modifiersBeforeRelease = [...pressedModifiersRef.current];
+
+        // 从列表中移除当前松开的键
         pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
         setPressedModifiers([...pressedModifiersRef.current]);
+
+        // 如果所有修饰键都松开了，且之前有修饰键被按下，就设置快捷键
+        // 例如：只按了右 Alt 松开 → 设置 "RightAlt"
+        //       按了 Ctrl+Shift 松开 → 设置组合
+        if (modifiersBeforeRelease.length > 0 && pressedModifiersRef.current.length === 0) {
+          // 生成快捷键：使用松开前的修饰键列表
+          const shortcutToSet = modifiersBeforeRelease.length === 1
+            ? modifiersBeforeRelease[0]
+            : modifiersBeforeRelease.join('+');
+
+          setShortcut(shortcutToSet);
+          setIsListening(false);
+          setPressedModifiers([]);
+          pressedModifiersRef.current = [];
+          setConflictWarning(null);
+
+          // Check for conflict
+          if (checkConflict) {
+            const conflict = checkConflict(shortcutToSet, scene?.id);
+            if (conflict) {
+              setConflictWarning(conflict);
+            }
+          }
+        }
       }
     };
 

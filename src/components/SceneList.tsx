@@ -325,7 +325,12 @@ export default function SceneList({
           setPaused(false);
         }
         setPausedRef.current?.(false);
-        alert(conflict);
+        // 使用产品风格的错误提示框
+        setShortcutError({
+          shortcut: newShortcut,
+          errorType: 'occupied',
+          errorMessage: conflict,
+        });
         return;
       }
     }
@@ -379,17 +384,107 @@ export default function SceneList({
     setPausedRef.current?.(false);
   }, [listeningShortcut, localScenes, checkConflict, onSave, tryRegisterShortcut, setPaused]);
 
-  // Keyup handler - 清除修饰键状态
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+  // Keyup handler - 清除修饰键状态，并在所有修饰键松开时保存快捷键
+  const handleKeyUp = useCallback(async (e: KeyboardEvent) => {
     if (!listeningShortcut) return;
 
     // 修饰键释放时，从列表中移除
     if (isModifierKey(e.key)) {
       const modKey = normalizeModifierName(e);
+
+      // 保存松开前的修饰键列表（用于生成快捷键）
+      const modifiersBeforeRelease = [...pressedModifiersRef.current];
+
+      // 从列表中移除当前松开的键
       pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
       setPressedModifiers([...pressedModifiersRef.current]);
+
+      // 如果所有修饰键都松开了，且之前有修饰键被按下，就设置快捷键
+      // 例如：只按了右 Alt 松开 → 设置 "RightAlt"
+      //       按了 Ctrl+Shift 松开 → 设置组合
+      if (modifiersBeforeRelease.length > 0 && pressedModifiersRef.current.length === 0) {
+        // 取消超时
+        if (listeningTimeoutRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+        }
+
+        // 生成快捷键：使用松开前的修饰键列表
+        const shortcutToSet = modifiersBeforeRelease.length === 1
+          ? modifiersBeforeRelease[0]
+          : modifiersBeforeRelease.join('+');
+
+        log.info(`[SceneList handleKeyUp] 修饰键松开，设置快捷键: ${shortcutToSet}`);
+
+        // Find the scene being edited
+        const scene = localScenes.find(s => s.id === listeningShortcut);
+        if (scene && scene.shortcut !== shortcutToSet) {
+          // Check conflict
+          if (checkConflict) {
+            const conflict = checkConflict(shortcutToSet, scene.id);
+            if (conflict) {
+              setListeningShortcut(null);
+              setPressedModifiers([]);
+              pressedModifiersRef.current = [];
+              // 恢复全局快捷键监听
+              if (setPaused) {
+                setPaused(false);
+              }
+              setPausedRef.current?.(false);
+              // 使用产品风格的错误提示框
+              setShortcutError({
+                shortcut: shortcutToSet,
+                errorType: 'occupied',
+                errorMessage: conflict,
+              });
+              return;
+            }
+          }
+
+          // Try register before saving
+          if (tryRegisterShortcut) {
+            const result = await tryRegisterShortcut(shortcutToSet, scene.id);
+            if (!result.success) {
+              setShortcutError({
+                shortcut: shortcutToSet,
+                errorType: (result.errorType as 'unsupported' | 'occupied' | 'unknown') || 'unknown',
+                errorMessage: result.error || '',
+              });
+              setListeningShortcut(null);
+              setPressedModifiers([]);
+              pressedModifiersRef.current = [];
+              // 恢复全局快捷键监听
+              if (setPaused) {
+                setPaused(false);
+              }
+              setPausedRef.current?.(false);
+              return;
+            }
+          }
+
+          // Update the scene with new shortcut
+          const updatedScene = { ...scene, shortcut: shortcutToSet };
+
+          // Calculate new scenes first
+          const newScenes = localScenes.map((s) => (s.id === updatedScene.id ? updatedScene : s));
+
+          setLocalScenes(newScenes);
+
+          if (onSave) {
+            onSave(newScenes);
+          }
+        }
+
+        setListeningShortcut(null);
+        setPressedModifiers([]);
+        pressedModifiersRef.current = [];
+        // 恢复全局快捷键监听
+        if (setPaused) {
+          setPaused(false);
+        }
+        setPausedRef.current?.(false);
+      }
     }
-  }, [listeningShortcut]);
+  }, [listeningShortcut, localScenes, checkConflict, onSave, tryRegisterShortcut, setPaused]);
 
   // Attach global keydown/keyup listener when in listening mode
   useEffect(() => {

@@ -528,7 +528,7 @@
     "shortcutRequired": "Please enter shortcut",
     "shortcutConflict": "Shortcut \"{{shortcut}}\" is already used by \"{{name}}\"",
     "shortcutConflictTip": "Tip: You can change the shortcut or edit existing scenes to resolve conflicts",
-    "shortcutSupport": "Supports: numbers (0-9), letters (A-Z), F1-F12, arrow keys, left/right modifier keys (Ctrl/Alt/Shift/Win), etc.",
+    "shortcutSupport": "Supports: digits (0-9), letters (A-Z), F1-F12, arrow keys, modifiers (Ctrl/Alt/Shift/Win). Supports combinations like Ctrl+Shift+A, RightAlt+/",
     "pressKey": "Press a key...",
     "voiceModel": "Voice Model",
     "downloaded": "Downloaded",
@@ -691,7 +691,7 @@
   },
   "about": {
     "title": "About",
-    "author": "老幸.AI",
+    "author": "老幸.AI - 公众号同名",
     "email": "voconly@139.com",
     "project": "Project",
     "description": "Local voice-to-text tool",

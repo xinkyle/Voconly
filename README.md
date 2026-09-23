@@ -169,7 +169,7 @@ MIT License — Copyright (c) 2026 Xing Yong
 
 ### About
 
-Built by Xing Yong (老幸.AI) — exploring a simple question:  
+Built by Xing Yong (老幸.AI - 公众号同名) — exploring a simple question:  
 What can one person build with AI today?  
 Voconly is one of those experiments.  
 📧 laoxingai@139.com
