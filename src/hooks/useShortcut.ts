@@ -234,13 +234,23 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   }, []);
 
   // 处理快捷键匹配
-  const handleShortcutMatch = useCallback((sceneId: string) => {
+  const handleShortcutMatch = useCallback((sceneId: string, shortcut: string) => {
     const now = Date.now();
+    const pressedKeys = pressedKeysRef.current;
+    const expectedKeys = parseShortcutKeys(shortcut);
 
     // 检查最近是否触发过（防止按键按住时重复触发）
     const recentlyTriggered = recentlyTriggeredRef.current.get(sceneId);
     if (recentlyTriggered && now - recentlyTriggered < 500) {
       log.debug(`快捷键最近触发过，忽略: sceneId=${sceneId}`);
+      return;
+    }
+
+    // 【修复】检查是否精确匹配快捷键（没有额外的键被按下）
+    // 如果当前还按下了其他键，说明这是组合键的一部分，不应触发双击检测
+    const extraKeys = Array.from(pressedKeys).filter(key => !expectedKeys.includes(key));
+    if (extraKeys.length > 0) {
+      log.debug(`组合键不精确匹配，有额外键按下: ${extraKeys.join('+')}，忽略此触发`);
       return;
     }
 
@@ -312,7 +322,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       if (isAllPressed) {
         // 匹配成功，触发快捷键
         log.debug(`快捷键匹配: ${shortcut} -> sceneId=${sceneId}`);
-        handleShortcutMatch(sceneId);
+        handleShortcutMatch(sceneId, shortcut);
         return true;
       }
     }
@@ -333,7 +343,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       if (isAllPressed) {
         // 匹配成功，触发快捷键
         log.debug(`快捷键匹配: ${shortcut} -> sceneId=${sceneId}`);
-        handleShortcutMatch(sceneId);
+        handleShortcutMatch(sceneId, shortcut);
         return;
       }
     }
