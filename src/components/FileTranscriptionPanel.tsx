@@ -168,7 +168,7 @@ export default function FileTranscriptionPanel() {
       {activeTab === 'pending' ? (
         <div className="max-w-2xl mx-auto space-y-6">
           {selectedFile ? (
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
+            <div className="bg-gray-100 rounded-2xl p-8 border border-gray-200 shadow-sm">
               <p className="text-sm text-gray-600 mb-4">{t('file.selected.title')}</p>
               <div className="flex items-center gap-3">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
