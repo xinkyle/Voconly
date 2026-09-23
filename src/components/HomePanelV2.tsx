@@ -987,8 +987,8 @@ export default function HomePanelV2({
           >
             <LlmIcon className={`w-3 h-3 ${llmEnabled ? 'text-gray-800' : 'text-gray-400'}`} />
             <span>{llmModelName}</span>
-            {hasLlmConfig && llmEnabled && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {hasLlmConfig && (
+              <span className={`w-1.5 h-1.5 rounded-full ${llmEnabled ? 'bg-emerald-500' : 'bg-gray-400'}`} />
             )}
           </button>
           {/* AI 服务开关 */}
@@ -996,14 +996,14 @@ export default function HomePanelV2({
             <button
               id="llm-toggle-button"
               onClick={handleToggleLlm}
-              className={`inline-flex items-center justify-center w-6 h-6 rounded-lg transition-all duration-200 ${
+              className={`inline-flex items-center justify-center px-1.5 py-0.5 text-xs rounded-lg transition-all duration-200 ${
                 llmEnabled
                   ? 'bg-emerald-100 border border-emerald-200 text-emerald-600 hover:bg-emerald-200'
                   : 'bg-gray-100 border border-gray-200 text-gray-400 hover:bg-gray-200'
               }`}
               title={llmEnabled ? t('home.llmEnabled') : t('home.llmDisabled')}
             >
-              <BoltIcon className="w-3 h-3" />
+              <BoltIcon className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
