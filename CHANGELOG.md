@@ -6,7 +6,7 @@
 1. **文件转录功能**，新增文件转录功能，支持大文件自动分割转录，支持多种音频格式自动转换，在待转录界面显示最近转录记录，支持一键复制转录结果。
 
 ### 体验优化
-2. **快捷键卡片支持多键组合**，首页快捷键卡片现在支持显示多键组合（如 Shift+Alt+A），显示更加清晰。
+2. **快捷键卡片支持多键组合**，首页快捷键卡片现在支持显示多键组合（如右Alt+/），显示更加清晰。
 
 3. **文件转录界面优化**，统一选择文件卡片与上传区域风格，视觉更加一致；优化进度条显示和配色，状态一目了然。
 
@@ -20,7 +20,7 @@
 1. **File transcription** - Added file transcription feature with auto-split for large files, auto-convert for various audio formats, recent transcription records display, and one-click copy support.
 
 ### Improvements
-2. **Shortcut card supports multi-key combinations** - Home shortcut card now displays multi-key combinations (e.g., Shift+Alt+A) more clearly.
+2. **Shortcut card supports multi-key combinations** - Home shortcut card now displays multi-key combinations (e.g., RightAlt+/) more clearly.
 
 3. **File transcription interface optimized** - Unified file selection card and upload area style for visual consistency; Improved progress bar display and colors for clear status indication.
 
