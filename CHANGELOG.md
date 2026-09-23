@@ -5,28 +5,32 @@
 ### 新功能
 1. **文件转录功能**，新增文件转录功能，支持大文件自动分割转录，支持多种音频格式自动转换，在待转录界面显示最近转录记录，支持一键复制转录结果。
 
+2. **AI 服务快捷开关**，首页顶部新增 AI 服务开关按钮（闪电图标），可快速启用/禁用 LLM 后处理功能，状态持久化保存。
+
 ### 体验优化
-2. **快捷键卡片支持多键组合**，首页快捷键卡片现在支持显示多键组合（如右Alt+/），显示更加清晰。
+3. **快捷键卡片支持多键组合**，首页快捷键卡片现在支持显示多键组合（如右Alt+/），显示更加清晰。
 
-3. **文件转录界面优化**，统一选择文件卡片与上传区域风格，视觉更加一致；优化进度条显示和配色，状态一目了然。
+4. **文件转录界面优化**，统一选择文件卡片与上传区域风格，视觉更加一致；优化进度条显示和配色，状态一目了然。
 
-4. **组合键交互优化**，修复组合键误触发双击检测的问题，避免意外跳过 LLM 处理。
+5. **组合键交互优化**，修复组合键误触发双击检测的问题，避免意外跳过 LLM 处理。
 
-5. **按钮样式统一**，统一开始转录按钮样式并居中显示，视觉更加协调。
+6. **按钮样式统一**，统一开始转录按钮样式并居中显示，视觉更加协调。
 
 ---
 
 ### New Features
 1. **File transcription** - Added file transcription feature with auto-split for large files, auto-convert for various audio formats, recent transcription records display, and one-click copy support.
 
+2. **AI service toggle** - Added AI service toggle button (lightning icon) on home page header to quickly enable/disable LLM post-processing, with persistent state storage.
+
 ### Improvements
-2. **Shortcut card supports multi-key combinations** - Home shortcut card now displays multi-key combinations (e.g., RightAlt+/) more clearly.
+3. **Shortcut card supports multi-key combinations** - Home shortcut card now displays multi-key combinations (e.g., RightAlt+/) more clearly.
 
-3. **File transcription interface optimized** - Unified file selection card and upload area style for visual consistency; Improved progress bar display and colors for clear status indication.
+4. **File transcription interface optimized** - Unified file selection card and upload area style for visual consistency; Improved progress bar display and colors for clear status indication.
 
-4. **Combo key interaction improved** - Fixed combo key mistakenly triggering double-click detection, preventing accidental LLM skip.
+5. **Combo key interaction improved** - Fixed combo key mistakenly triggering double-click detection, preventing accidental LLM skip.
 
-5. **Button style unified** - Unified start transcription button style and centered it for better visual harmony.
+6. **Button style unified** - Unified start transcription button style and centered it for better visual harmony.
 
 ---
 
