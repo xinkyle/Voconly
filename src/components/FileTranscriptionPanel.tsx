@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import FileUploadArea from './FileUploadArea';
 import type { FileTranscriptionRecord, AppConfig } from '../types';
@@ -9,6 +9,9 @@ import { useToast } from './ui/Toast';
 type TabType = 'pending' | 'history';
 type TranscriptionStatus = 'idle' | 'transcribing' | 'completed' | 'error';
 
+// 每页显示条数
+const PAGE_SIZE = 10;
+
 export default function FileTranscriptionPanel() {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -18,6 +21,7 @@ export default function FileTranscriptionPanel() {
   const [status, setStatus] = useState<TranscriptionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // 进度状态
   const [progress, setProgress] = useState<{
@@ -38,6 +42,21 @@ export default function FileTranscriptionPanel() {
       .then(setRecords)
       .catch(err => console.error('Failed to load history:', err));
   }, []);
+
+  // 分页逻辑
+  const totalPages = Math.ceil(records.length / PAGE_SIZE);
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return records.slice(start, end);
+  }, [records, currentPage]);
+
+  // 当总页数变化时，确保当前页码有效
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Copy text to clipboard
   const handleCopy = async (text: string) => {
@@ -118,6 +137,7 @@ export default function FileTranscriptionPanel() {
       setStatus('completed');
       setSelectedFile(null);
       setProgress({ current: 0, total: 0, percent: 0 });
+      setCurrentPage(1); // 重置到第一页显示最新记录
 
     } catch (err) {
       console.error('Transcription failed:', err);
@@ -298,49 +318,98 @@ export default function FileTranscriptionPanel() {
               <p className="text-sm text-gray-500 mt-1">{t('file.history.noRecordsHint')}</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {records.map(record => (
-                <div key={record.id} className="group bg-white rounded-xl p-3 border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200">
-                  <div className="flex items-start gap-3">
-                    {/* 文件名 */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{record.filename}</p>
-                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">{record.transcriptText.substring(0, 100)}...</p>
+            <>
+              <div className="space-y-2">
+                {paginatedRecords.map(record => (
+                  <div key={record.id} className="group bg-white rounded-xl p-3 border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200">
+                    <div className="flex items-start gap-3">
+                      {/* 文件名 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{record.filename}</p>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{record.transcriptText.substring(0, 100)}...</p>
 
-                      {/* Meta info */}
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
+                        {/* Meta info */}
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {formatDuration(record.duration)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              {record.wordCount} 字
+                            </span>
+                          </div>
+                          <button
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopy(record.transcriptText);
+                            }}
+                            title={t('common.copy') || '复制'}
+                          >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
-                            {formatDuration(record.duration)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            {record.wordCount} 字
-                          </span>
+                          </button>
                         </div>
-                        <button
-                          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopy(record.transcriptText);
-                          }}
-                          title={t('common.copy') || '复制'}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
                       </div>
                     </div>
                   </div>
+                ))}
+              </div>
+
+              {/* 分页 */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-4 pb-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                    title={t('memory.prevPage')}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                    title={t('memory.nextPage')}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  <span className="ml-4 text-sm text-gray-500">
+                    {t('memory.totalRecords', { count: records.length })}
+                  </span>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}

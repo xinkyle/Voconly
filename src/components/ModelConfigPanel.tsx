@@ -217,11 +217,12 @@ export default function ModelConfigPanel({
         modelId: baseId,
         quantization: quant,
       },
-      llm: globalModelConfig?.llm || {
-        providerId: '',
-        model: '',
-        maxTokens: 1024,
-        temperature: 0.3,
+      llm: {
+        providerId: globalModelConfig?.llm?.providerId || '',
+        model: globalModelConfig?.llm?.model || '',
+        maxTokens: globalModelConfig?.llm?.maxTokens || 1024,
+        temperature: globalModelConfig?.llm?.temperature || 0.3,
+        enabled: globalModelConfig?.llm?.enabled, // 保留 enabled 状态
       },
     };
 

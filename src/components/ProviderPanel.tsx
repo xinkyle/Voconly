@@ -75,7 +75,7 @@ function CloudProviderCard({ provider, isSelected, onSelect, onConfigure, onEdit
                 {provider.meta.label}
               </h3>
               <p className="text-xs text-gray-500 mt-0.5 truncate">
-                {t(`provider.descriptions.${provider.meta.id}`, provider.meta.description)}
+                {provider.meta.description}
               </p>
             </div>
           </div>

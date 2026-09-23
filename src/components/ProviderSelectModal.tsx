@@ -137,7 +137,6 @@ export default function ProviderSelectModal({
                         selected={isSelected}
                         onClick={() => handleProviderClick(provider)}
                         onEdit={() => setConfigProvider(provider)}
-                        t={t}
                       />
                     );
                   })}
@@ -158,7 +157,6 @@ export default function ProviderSelectModal({
                       provider={provider}
                       selected={false}
                       onClick={() => handleProviderClick(provider)}
-                      t={t}
                     />
                   ))}
                 </div>
@@ -203,10 +201,9 @@ interface ProviderCardProps {
   selected: boolean;
   onClick: () => void;
   onEdit?: () => void;
-  t: (key: string, fallback?: string) => string;
 }
 
-function ProviderCard({ provider, selected, onClick, onEdit, t }: ProviderCardProps) {
+function ProviderCard({ provider, selected, onClick, onEdit }: ProviderCardProps) {
   const configured = provider.instance && provider.instance.enabled;
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -264,7 +261,7 @@ function ProviderCard({ provider, selected, onClick, onEdit, t }: ProviderCardPr
       {/* Description - only for unconfigured providers */}
       {!configured && provider.meta.description && (
         <p className="text-xs text-gray-500 mt-0.5 truncate">
-          {t(`provider.descriptions.${provider.meta.id}`, provider.meta.description)}
+          {provider.meta.description}
         </p>
       )}
     </div>

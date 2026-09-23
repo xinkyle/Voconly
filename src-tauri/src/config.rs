@@ -97,6 +97,9 @@ pub struct GlobalLlmConfig {
     /// 温度参数
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+    /// 是否启用 LLM 后处理
+    #[serde(default = "default_enabled")]
+    pub enabled: Option<bool>,
 }
 
 fn default_global_llm_config() -> GlobalLlmConfig {
@@ -105,6 +108,7 @@ fn default_global_llm_config() -> GlobalLlmConfig {
         model: String::new(),
         max_tokens: 1024,
         temperature: 0.7,
+        enabled: None, // 默认 None 表示使用默认行为（启用）
     }
 }
 
@@ -114,6 +118,10 @@ fn default_max_tokens() -> u32 {
 
 fn default_temperature() -> f32 {
     0.7
+}
+
+fn default_enabled() -> Option<bool> {
+    None
 }
 
 impl Default for GlobalLlmConfig {

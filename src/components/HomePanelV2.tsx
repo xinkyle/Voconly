@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
-import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
+import { extractShortcutFromEvent } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
@@ -524,11 +524,12 @@ export default function HomePanelV2({
         modelId: baseId,
         quantization: quant,
       },
-      llm: globalModelConfig.llm || {
-        providerId: '',
-        model: '',
-        maxTokens: 1024,
-        temperature: 0.3,
+      llm: {
+        providerId: globalModelConfig.llm?.providerId || '',
+        model: globalModelConfig.llm?.model || '',
+        maxTokens: globalModelConfig.llm?.maxTokens || 1024,
+        temperature: globalModelConfig.llm?.temperature || 0.3,
+        enabled: globalModelConfig.llm?.enabled, // 保留 enabled 状态
       },
     };
 
@@ -878,10 +879,19 @@ export default function HomePanelV2({
   const llmEnabled = llmConfig?.enabled !== false;
 
   // 切换 LLM 启用状态
-  const handleToggleLlm = useCallback(() => {
-    if (!globalModelConfig || !onGlobalModelConfigChange) return;
+  const handleToggleLlm = useCallback(async () => {
+    log.info('[handleToggleLlm] 开始切换 LLM 状态');
+    log.info(`[handleToggleLlm] globalModelConfig: ${JSON.stringify(globalModelConfig)}`);
+    log.info(`[handleToggleLlm] llmEnabled 当前值: ${llmEnabled}`);
+
+    if (!globalModelConfig || !onGlobalModelConfigChange) {
+      log.warn('[handleToggleLlm] 缺少必要条件，返回');
+      return;
+    }
 
     const newEnabled = !llmEnabled;
+    log.info(`[handleToggleLlm] newEnabled: ${newEnabled}`);
+
     const newConfig: GlobalModelConfig = {
       ...globalModelConfig,
       llm: {
@@ -889,13 +899,40 @@ export default function HomePanelV2({
         enabled: newEnabled,
       },
     };
-    onGlobalModelConfigChange(newConfig);
 
-    // 显示 Toast 提示
-    showToast({
-      type: newEnabled ? 'success' : 'info',
-      title: newEnabled ? t('home.llmEnabledToast') : t('home.llmDisabledToast'),
-    });
+    log.info(`[handleToggleLlm] newConfig: ${JSON.stringify(newConfig)}`);
+
+    // 保存配置到持久化存储
+    try {
+      log.info('[handleToggleLlm] 开始加载配置...');
+      const config = await loadConfig();
+      log.info(`[handleToggleLlm] 加载的配置: ${JSON.stringify(config.globalModelConfig)}`);
+
+      const configToSave = {
+        ...config,
+        globalModelConfig: newConfig,
+      };
+      log.info(`[handleToggleLlm] 准备保存的配置: ${JSON.stringify(configToSave.globalModelConfig)}`);
+
+      await saveConfig(configToSave);
+      log.info('[handleToggleLlm] 配置保存成功');
+
+      // 通知父组件更新状态
+      onGlobalModelConfigChange(newConfig);
+
+      // 显示 Toast 提示
+      showToast({
+        type: newEnabled ? 'success' : 'info',
+        title: newEnabled ? t('home.llmEnabledToast') : t('home.llmDisabledToast'),
+      });
+    } catch (err) {
+      log.error(`[handleToggleLlm] 保存失败: ${err}`);
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: String(err),
+      });
+    }
   }, [globalModelConfig, llmEnabled, onGlobalModelConfigChange, showToast, t]);
 
   // 只显示前两个启用的场景（首页展示限制）
