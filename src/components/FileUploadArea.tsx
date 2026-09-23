@@ -97,7 +97,7 @@ export default function FileUploadArea({ onFileSelected, disabled }: FileUploadA
           {t('file.dropzone.or')}
         </p>
         <button
-          className="mt-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="mt-3 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             handleSelectFile();
