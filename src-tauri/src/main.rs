@@ -1,6 +1,6 @@
 // Windows: 隐藏 CMD 控制台窗口
 // macOS/Linux: 不需要此属性
-//#![cfg_attr(windows, windows_subsystem = "windows")]
+#![cfg_attr(windows, windows_subsystem = "windows")]
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
