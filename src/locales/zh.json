@@ -7,7 +7,7 @@
   "nav": {
     "home": "主页",
     "memory": "历史记录",
-    "file": "文件",
+    "file": "文件转录",
     "models": "语音模型",
     "provider": "AI 服务",
     "dictionary": "词典",
@@ -269,7 +269,7 @@
       "or": "或",
       "select": "点击选择文件",
       "hint": "支持格式：WAV, MP3, M4A, FLAC, OGG, WEBM（非 WAV 格式将自动转换）",
-      "sizeLimit": "最大文件：100MB 或 30 分钟"
+      "sizeLimit": "大文件（>10MB）将自动分段处理"
     },
     "selected": {
       "title": "已选择文件：",

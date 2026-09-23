@@ -7,7 +7,7 @@
   "nav": {
     "home": "Home",
     "memory": "History Records",
-    "file": "File",
+    "file": "File Transcription",
     "models": "Voice Models",
     "provider": "AI Services",
     "dictionary": "Dictionary",
@@ -269,7 +269,7 @@
       "or": "or",
       "select": "Click to select file",
       "hint": "Supported formats: WAV, MP3, M4A, FLAC, OGG, WEBM (non-WAV formats will be converted automatically)",
-      "sizeLimit": "Max file: 100MB or 30 minutes"
+      "sizeLimit": "Large files (>10MB) will be automatically chunked"
     },
     "selected": {
       "title": "Selected file:",
