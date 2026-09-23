@@ -139,8 +139,7 @@ export async function transcribeAudioFile(
   language?: string,
   options?: {
     fileSize?: number;
-    onSplitProgress?: (current: number, total: number, percent: number) => void;
-    onTranscribeProgress?: (current: number, total: number, percent: number) => void;
+    onProgress?: (current: number, total: number, percent: number) => void;
   }
 ): Promise<{ text: string; duration: number }> {
   console.log('[FileTranscriptionService] transcribeAudioFile called', { filePath, sceneId, language });
@@ -168,20 +167,30 @@ export async function transcribeAudioFile(
       log.info(`Large file detected (${(fileSize / 1024 / 1024).toFixed(2)}MB), will split`);
       console.log('[FileTranscriptionService] Large file, splitting...');
 
-      // 分割音频
+      // 分割音频（占前 20% 进度）
       const chunkPaths = await splitAudioFile(
         wavPath,
         CHUNK_DURATION,
         CHUNK_OVERLAP,
-        options?.onSplitProgress
+        (current, total, percent) => {
+          if (options?.onProgress) {
+            // 分割进度映射到 0% - 20%
+            options.onProgress(current, total, percent * 0.2);
+          }
+        }
       );
 
-      // 分片转录
+      // 分片转录（占后 80% 进度）
       return await transcribeAudioChunks(
         chunkPaths,
         sceneId,
         language,
-        options?.onTranscribeProgress
+        (current, total, percent) => {
+          if (options?.onProgress) {
+            // 转录进度映射到 20% - 100%
+            options.onProgress(current, total, 20 + percent * 0.8);
+          }
+        }
       );
     } else {
       // 小文件，直接转录

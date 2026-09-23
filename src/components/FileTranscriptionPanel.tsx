@@ -4,12 +4,14 @@ import FileUploadArea from './FileUploadArea';
 import type { FileTranscriptionRecord, AppConfig } from '../types';
 import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord } from '../services/fileTranscription';
 import { loadConfig } from '../services/config';
+import { useToast } from './ui/Toast';
 
 type TabType = 'pending' | 'history';
 type TranscriptionStatus = 'idle' | 'transcribing' | 'completed' | 'error';
 
 export default function FileTranscriptionPanel() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [records, setRecords] = useState<FileTranscriptionRecord[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
@@ -19,11 +21,10 @@ export default function FileTranscriptionPanel() {
 
   // 进度状态
   const [progress, setProgress] = useState<{
-    phase: 'idle' | 'splitting' | 'transcribing';
     current: number;
     total: number;
     percent: number;
-  }>({ phase: 'idle', current: 0, total: 0, percent: 0 });
+  }>({ current: 0, total: 0, percent: 0 });
 
   // 加载配置和历史记录
   useEffect(() => {
@@ -38,11 +39,24 @@ export default function FileTranscriptionPanel() {
       .catch(err => console.error('Failed to load history:', err));
   }, []);
 
+  // Copy text to clipboard
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast({
+        type: 'success',
+        title: t('memory.copied'),
+      });
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   const handleFileSelected = (filePath: string, fileName: string, fileSize: number) => {
     setSelectedFile({ path: filePath, name: fileName, size: fileSize });
     setStatus('idle');
     setError(null);
-    setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
+    setProgress({ current: 0, total: 0, percent: 0 });
   };
 
   const handleStartTranscription = async () => {
@@ -52,7 +66,7 @@ export default function FileTranscriptionPanel() {
 
     setStatus('transcribing');
     setError(null);
-    setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
+    setProgress({ current: 0, total: 0, percent: 0 });
 
     try {
       // 使用第一个启用的场景ID，或默认场景
@@ -67,11 +81,8 @@ export default function FileTranscriptionPanel() {
         undefined,
         {
           fileSize: selectedFile.size,
-          onSplitProgress: (current, total, percent) => {
-            setProgress({ phase: 'splitting', current, total, percent });
-          },
-          onTranscribeProgress: (current, total, percent) => {
-            setProgress({ phase: 'transcribing', current, total, percent });
+          onProgress: (current, total, percent) => {
+            setProgress({ current, total, percent });
           },
         }
       );
@@ -97,7 +108,7 @@ export default function FileTranscriptionPanel() {
       // 重置状态
       setStatus('completed');
       setSelectedFile(null);
-      setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
+      setProgress({ current: 0, total: 0, percent: 0 });
 
     } catch (err) {
       console.error('Transcription failed:', err);
@@ -116,7 +127,7 @@ export default function FileTranscriptionPanel() {
 
       setError(errorMessage);
       setStatus('error');
-      setProgress({ phase: 'idle', current: 0, total: 0, percent: 0 });
+      setProgress({ current: 0, total: 0, percent: 0 });
     }
   };
 
@@ -177,17 +188,17 @@ export default function FileTranscriptionPanel() {
               )}
 
               {/* 进度显示 */}
-              {status === 'transcribing' && progress.phase !== 'idle' && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              {status === 'transcribing' && progress.percent > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-700">
-                      {progress.phase === 'splitting' ? '正在分割音频...' : '正在转录...'}
+                    <span className="text-sm font-medium text-gray-700">
+                      正在转录...
                     </span>
-                    <span className="text-sm text-blue-700">{progress.current}/{progress.total}</span>
+                    <span className="text-sm text-gray-700">{Math.round(progress.percent)}%</span>
                   </div>
-                  <div className="w-full bg-blue-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-gray-700 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${progress.percent}%` }}
                     />
                   </div>
@@ -205,7 +216,7 @@ export default function FileTranscriptionPanel() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    {progress.phase === 'splitting' ? '分割中...' : '转录中...'}
+                    转录中...
                   </span>
                 ) : (
                   t('file.selected.start')
@@ -257,12 +268,9 @@ export default function FileTranscriptionPanel() {
                         </div>
                         <button
                           className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(record.transcriptText);
-                            } catch (err) {
-                              console.error('Failed to copy:', err);
-                            }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(record.transcriptText);
                           }}
                           title={t('common.copy') || '复制'}
                         >
