@@ -194,6 +194,14 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   // 最近触发的场景（防止双击后定时器再次触发）
   const recentlyTriggeredRef = useRef<Map<string, number>>(new Map());
 
+  // 【组合键优先】待定的单键触发队列
+  // 当单键快捷键可能是组合键前缀时，等待 100ms 确认
+  const pendingSingleKeyRef = useRef<{
+    sceneId: string;
+    shortcut: string;
+    timerId: number;
+  } | null>(null);
+
   // 平台检测
   const isMacRef = useRef<boolean>(false);
 
@@ -224,6 +232,36 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     log.debug(`触发快捷键回调: sceneId=${sceneId}, skipLlm=${skipLlm}`);
     if (onShortcutTriggeredRef.current) {
       onShortcutTriggeredRef.current(sceneId, skipLlm);
+    }
+  }, []);
+
+  // 【组合键优先】检查一个快捷键是否是其他组合键的前缀
+  // 例如: "RightAlt" 是 "RightAlt+." 和 "RightAlt+/" 的前缀
+  const isPrefixOfOtherShortcut = useCallback((shortcut: string): boolean => {
+    const keys = parseShortcutKeys(shortcut);
+    // 只有单键才需要检查
+    if (keys.length !== 1) return false;
+
+    const singleKey = keys[0];
+    // 遍历所有已注册的快捷键
+    for (const [registeredShortcut] of shortcutToSceneRef.current.entries()) {
+      if (registeredShortcut === shortcut) continue; // 跳过自己
+      const registeredKeys = parseShortcutKeys(registeredShortcut);
+      // 如果其他快捷键的第一个键是这个单键，说明它是前缀
+      if (registeredKeys.length > 1 && registeredKeys[0] === singleKey) {
+        log.debug(`[组合键优先] ${shortcut} 是 ${registeredShortcut} 的前缀`);
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  // 【组合键优先】取消待定的单键触发
+  const cancelPendingSingleKey = useCallback(() => {
+    if (pendingSingleKeyRef.current) {
+      clearTimeout(pendingSingleKeyRef.current.timerId);
+      log.debug(`[组合键优先] 取消待定的单键: ${pendingSingleKeyRef.current.shortcut}`);
+      pendingSingleKeyRef.current = null;
     }
   }, []);
 
@@ -311,6 +349,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   // 检查是否匹配已注册的快捷键，并返回是否匹配
   const checkShortcutMatchAndBlock = useCallback((): boolean => {
     const pressedKeys = pressedKeysRef.current;
+    const pressedCount = pressedKeys.size;
 
     // 遍历所有已注册的快捷键
     for (const [shortcut, sceneId] of shortcutToSceneRef.current.entries()) {
@@ -319,19 +358,50 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 检查是否所有键都被按下
       const isAllPressed = keys.every(key => pressedKeys.has(key));
 
-      if (isAllPressed) {
-        // 匹配成功，触发快捷键
-        log.debug(`快捷键匹配: ${shortcut} -> sceneId=${sceneId}`);
-        handleShortcutMatch(sceneId, shortcut);
-        return true;
+      if (!isAllPressed) {
+        continue; // 不匹配，跳过
       }
+
+      // 【关键修复】精确匹配：当前按下的键数量必须等于快捷键的键数量
+      // 这样可以区分 RightAlt 和 RightAlt+. 等组合键
+      if (pressedCount !== keys.length) {
+        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键，快捷键需要 ${keys.length} 个`);
+        continue;
+      }
+
+      // 精确匹配成功
+      log.debug(`快捷键精确匹配: ${shortcut} -> sceneId=${sceneId}`);
+
+      // 【组合键优先】检查是否是单键且是组合键的前缀
+      if (keys.length === 1 && isPrefixOfOtherShortcut(shortcut)) {
+        // 取消之前的待定触发
+        cancelPendingSingleKey();
+
+        // 放入待定队列，等待 100ms
+        log.debug(`[组合键优先] 单键 ${shortcut} 可能是组合键前缀，等待 100ms 确认`);
+        const timerId = window.setTimeout(() => {
+          if (pendingSingleKeyRef.current?.shortcut === shortcut) {
+            log.debug(`[组合键优先] 100ms 超时，确认触发单键: ${shortcut}`);
+            pendingSingleKeyRef.current = null;
+            handleShortcutMatch(sceneId, shortcut);
+          }
+        }, 100);
+
+        pendingSingleKeyRef.current = { sceneId, shortcut, timerId };
+        return false; // 待定中，不阻塞
+      }
+
+      // 不是组合键前缀，或组合键已完整按下，立即触发
+      handleShortcutMatch(sceneId, shortcut);
+      return true;
     }
     return false;
-  }, [handleShortcutMatch]);
+  }, [handleShortcutMatch, isPrefixOfOtherShortcut, cancelPendingSingleKey]);
 
   // 检查是否匹配已注册的快捷键
   const checkShortcutMatch = useCallback(() => {
     const pressedKeys = pressedKeysRef.current;
+    const pressedCount = pressedKeys.size;
 
     // 遍历所有已注册的快捷键
     for (const [shortcut, sceneId] of shortcutToSceneRef.current.entries()) {
@@ -340,14 +410,44 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 检查是否所有键都被按下
       const isAllPressed = keys.every(key => pressedKeys.has(key));
 
-      if (isAllPressed) {
-        // 匹配成功，触发快捷键
-        log.debug(`快捷键匹配: ${shortcut} -> sceneId=${sceneId}`);
-        handleShortcutMatch(sceneId, shortcut);
+      if (!isAllPressed) {
+        continue; // 不匹配，跳过
+      }
+
+      // 【关键修复】精确匹配：当前按下的键数量必须等于快捷键的键数量
+      // 这样可以区分 RightAlt 和 RightAlt+. 等组合键
+      if (pressedCount !== keys.length) {
+        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键，快捷键需要 ${keys.length} 个`);
+        continue;
+      }
+
+      // 精确匹配成功
+      log.debug(`快捷键精确匹配: ${shortcut} -> sceneId=${sceneId}`);
+
+      // 【组合键优先】检查是否是单键且是组合键的前缀
+      if (keys.length === 1 && isPrefixOfOtherShortcut(shortcut)) {
+        // 取消之前的待定触发
+        cancelPendingSingleKey();
+
+        // 放入待定队列，等待 100ms
+        log.debug(`[组合键优先] 单键 ${shortcut} 可能是组合键前缀，等待 100ms 确认`);
+        const timerId = window.setTimeout(() => {
+          if (pendingSingleKeyRef.current?.shortcut === shortcut) {
+            log.debug(`[组合键优先] 100ms 超时，确认触发单键: ${shortcut}`);
+            pendingSingleKeyRef.current = null;
+            handleShortcutMatch(sceneId, shortcut);
+          }
+        }, 100);
+
+        pendingSingleKeyRef.current = { sceneId, shortcut, timerId };
         return;
       }
+
+      // 不是组合键前缀，或组合键已完整按下，立即触发
+      handleShortcutMatch(sceneId, shortcut);
+      return;
     }
-  }, [handleShortcutMatch]);
+  }, [handleShortcutMatch, isPrefixOfOtherShortcut, cancelPendingSingleKey]);
 
   // 处理键盘事件
   const handleKeyEvent = useCallback((payload: KeyEventPayload) => {
@@ -377,6 +477,13 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       const wasPressed = pressedKeysRef.current.has(keyName);
       pressedKeysRef.current.add(keyName);
 
+      // 【组合键优先】新键按下时，取消待定的单键触发
+      // 这样 ALT+. 中的 ALT 待定会被取消，让 ALT+. 能正常匹配
+      if (!wasPressed && pendingSingleKeyRef.current) {
+        log.debug(`[组合键优先] 新键 ${keyName} 按下，取消待定单键: ${pendingSingleKeyRef.current.shortcut}`);
+        cancelPendingSingleKey();
+      }
+
       // 只有新按下的键才检查快捷键匹配
       if (!wasPressed) {
         log.debug(`[handleKeyEvent] 🔍 检查快捷键匹配, 当前按下: ${Array.from(pressedKeysRef.current).join('+')}`);
@@ -386,7 +493,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 按键释放
       pressedKeysRef.current.delete(keyName);
     }
-  }, [checkShortcutMatch]);
+  }, [checkShortcutMatch, cancelPendingSingleKey]);
 
   // 初始化 keyhook 监听
   const initializeKeyhook = useCallback(async () => {
