@@ -73,10 +73,22 @@ export default function SceneForm({
   const [pressedModifiers, setPressedModifiers] = useState<string[]>([]);
   const pressedModifiersRef = useRef<string[]>([]);
 
+  // Ref for the listening timeout
+  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Update setPaused ref
   useEffect(() => {
     setPausedRef.current = setPaused;
   }, [setPaused]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 加载自定义预设
   useEffect(() => {
@@ -131,13 +143,34 @@ export default function SceneForm({
   // 点击输入框开始监听快捷键
   const handleInputClick = useCallback(() => {
     // 立即暂停全局快捷键监听（同步操作，避免 keyhook 在 useEffect 执行前捕获按键）
+    // 注意：必须在设置 isListening 之前暂停
+    if (setPaused) {
+      setPaused(true);
+    }
     setPausedRef.current?.(true);
+
+    // Cancel any existing listening
+    if (listeningTimeoutRef.current) {
+      clearTimeout(listeningTimeoutRef.current);
+    }
+
     setIsListening(true);
     setErrors(prev => ({ ...prev, shortcut: undefined }));
     // 重置修饰键状态
     setPressedModifiers([]);
     pressedModifiersRef.current = [];
-  }, []);
+
+    // Auto-cancel after 10 seconds（给用户更多时间来录制组合键）
+    listeningTimeoutRef.current = setTimeout(() => {
+      setIsListening(false);
+      setPressedModifiers([]);
+      pressedModifiersRef.current = [];
+      if (setPaused) {
+        setPaused(false);
+      }
+      setPausedRef.current?.(false);
+    }, 10000);
+  }, [setPaused]);
 
   // 监听 isListening 变化，恢复全局监听
   useEffect(() => {
@@ -150,6 +183,9 @@ export default function SceneForm({
   // 组件卸载时恢复全局监听
   useEffect(() => {
     return () => {
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
       setPausedRef.current?.(false);
     };
   }, []);
@@ -164,9 +200,17 @@ export default function SceneForm({
 
       // Escape 取消录制
       if (e.key === 'Escape') {
+        if (listeningTimeoutRef.current) {
+          clearTimeout(listeningTimeoutRef.current);
+        }
         setIsListening(false);
         setPressedModifiers([]);
         pressedModifiersRef.current = [];
+        // 恢复全局快捷键监听
+        if (setPaused) {
+          setPaused(false);
+        }
+        setPausedRef.current?.(false);
         return;
       }
 
@@ -190,11 +234,19 @@ export default function SceneForm({
         newShortcut = [...pressedModifiersRef.current, mainKey].join('+');
       }
 
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
       setShortcut(newShortcut);
       setIsListening(false);
       setPressedModifiers([]);
       pressedModifiersRef.current = [];
       setConflictWarning(null);
+      // 恢复全局快捷键监听
+      if (setPaused) {
+        setPaused(false);
+      }
+      setPausedRef.current?.(false);
 
       // Check for conflict
       if (checkConflict) {
@@ -221,6 +273,10 @@ export default function SceneForm({
         // 例如：只按了右 Alt 松开 → 设置 "RightAlt"
         //       按了 Ctrl+Shift 松开 → 设置组合
         if (modifiersBeforeRelease.length > 0 && pressedModifiersRef.current.length === 0) {
+          if (listeningTimeoutRef.current) {
+            clearTimeout(listeningTimeoutRef.current);
+          }
+
           // 生成快捷键：使用松开前的修饰键列表
           const shortcutToSet = modifiersBeforeRelease.length === 1
             ? modifiersBeforeRelease[0]
@@ -231,6 +287,11 @@ export default function SceneForm({
           setPressedModifiers([]);
           pressedModifiersRef.current = [];
           setConflictWarning(null);
+          // 恢复全局快捷键监听
+          if (setPaused) {
+            setPaused(false);
+          }
+          setPausedRef.current?.(false);
 
           // Check for conflict
           if (checkConflict) {
@@ -244,9 +305,17 @@ export default function SceneForm({
     };
 
     const handleBlur = () => {
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
       setIsListening(false);
       setPressedModifiers([]);
       pressedModifiersRef.current = [];
+      // 恢复全局快捷键监听
+      if (setPaused) {
+        setPaused(false);
+      }
+      setPausedRef.current?.(false);
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
@@ -258,7 +327,7 @@ export default function SceneForm({
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [isListening, checkConflict, scene?.id]);
+  }, [isListening, checkConflict, scene?.id, setPaused]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
