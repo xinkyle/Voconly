@@ -13,9 +13,18 @@ const FileIcon = () => (
 interface FileUploadAreaProps {
   onFileSelected: (filePath: string, fileName: string, fileSize: number) => void;
   disabled?: boolean;
+  selectedFile?: { path: string; name: string; size: number } | null;
+  onStartTranscription?: () => void;
+  isTranscribing?: boolean;
 }
 
-export default function FileUploadArea({ onFileSelected, disabled }: FileUploadAreaProps) {
+export default function FileUploadArea({
+  onFileSelected,
+  disabled,
+  selectedFile,
+  onStartTranscription,
+  isTranscribing
+}: FileUploadAreaProps) {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const unlistenRef = useRef<UnlistenFn | null>(null);
@@ -101,32 +110,81 @@ export default function FileUploadArea({ onFileSelected, disabled }: FileUploadA
     }
   }, [disabled, onFileSelected]);
 
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
   return (
     <div
-      className={`relative border bg-gray-100 rounded-2xl p-12 text-center transition-all duration-200 shadow-sm ${
+      className={`relative border bg-gray-100 rounded-2xl p-12 text-center transition-all duration-200 shadow-sm min-h-[280px] flex items-center justify-center ${
         isDragging
           ? 'border-gray-400 bg-gray-200 shadow-lg'
           : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-      onClick={handleSelectFile}
+      onClick={selectedFile ? undefined : handleSelectFile}
     >
-      <div className="flex flex-col items-center">
-        <FileIcon />
-        <p className="mt-4 text-base font-medium text-gray-700">
-          {t('file.dropzone.title')}
-        </p>
-        <p className="mt-2 text-sm text-gray-500">
-          {t('file.dropzone.or')}
-        </p>
+      <div className="flex flex-col items-center w-full">
+        {/* Icon - 固定高度区域 */}
+        <div className="h-12 flex items-center justify-center">
+          {selectedFile ? (
+            <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          ) : (
+            <FileIcon />
+          )}
+        </div>
+
+        {/* 标题/文件名 - 固定高度区域 */}
+        <div className="mt-4 h-6 flex items-center justify-center">
+          <p className="text-base font-medium text-gray-900">
+            {selectedFile ? selectedFile.name : t('file.dropzone.title')}
+          </p>
+        </div>
+
+        {/* 副标题/文件大小 - 固定高度区域 */}
+        <div className="mt-2 h-5 flex items-center justify-center">
+          <p className="text-sm text-gray-500">
+            {selectedFile ? formatFileSize(selectedFile.size) : t('file.dropzone.or')}
+          </p>
+        </div>
+
+        {/* 路径/空占位 - 固定高度区域，始终保持高度 */}
+        <div className="mt-1 h-4 flex items-center justify-center max-w-full">
+          <p className="text-xs text-gray-400 truncate">
+            {selectedFile ? selectedFile.path : ' '}
+          </p>
+        </div>
+
+        {/* 按钮 */}
         <button
-          className="mt-3 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+          className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={(e) => {
             e.stopPropagation();
-            handleSelectFile();
+            if (selectedFile && onStartTranscription) {
+              onStartTranscription();
+            } else {
+              handleSelectFile();
+            }
           }}
-          disabled={disabled}
+          disabled={disabled || isTranscribing}
         >
-          {t('file.dropzone.select')}
+          {isTranscribing ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              {t('file.selected.transcribing')}
+            </span>
+          ) : selectedFile ? (
+            t('file.selected.start')
+          ) : (
+            t('file.dropzone.select')
+          )}
         </button>
       </div>
     </div>

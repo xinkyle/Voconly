@@ -12,6 +12,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
+// Windows 平台：导入 CommandExt trait 以使用 creation_flags 方法
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 /// Transcribe request parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -650,17 +654,25 @@ pub async fn convert_audio_to_wav(
 
     // 使用 ffmpeg 转换
     // 参数：-y 覆盖已存在的文件, -i 输入文件, -ar 16000 设置采样率, -ac 1 单声道, -f wav 输出格式
-    let result = Command::new("ffmpeg")
-        .args([
-            "-y",
-            "-i",
-            &audio_path,
-            "-ar", "16000",  // 16kHz 采样率（ASR 模型常用）
-            "-ac", "1",       // 单声道
-            "-f", "wav",
-            &output_path_str,
-        ])
-        .output();
+    let mut cmd = Command::new("ffmpeg");
+    cmd.args([
+        "-y",
+        "-i",
+        &audio_path,
+        "-ar", "16000",  // 16kHz 采样率（ASR 模型常用）
+        "-ac", "1",       // 单声道
+        "-f", "wav",
+        &output_path_str,
+    ]);
+
+    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let result = cmd.output();
 
     match result {
         Ok(output) => {
@@ -699,14 +711,22 @@ pub fn get_audio_duration(audio_path: String) -> Result<u32, String> {
 fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
     use std::process::Command;
 
-    let result = Command::new("ffprobe")
-        .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            audio_path,
-        ])
-        .output();
+    let mut cmd = Command::new("ffprobe");
+    cmd.args([
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        audio_path,
+    ]);
+
+    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let result = cmd.output();
 
     match result {
         Ok(output) => {
@@ -779,18 +799,26 @@ pub async fn split_audio_file(
         let chunk_path_str = chunk_path.to_string_lossy().to_string();
 
         // 使用 ffmpeg 分割
-        let result = Command::new("ffmpeg")
-            .args([
-                "-y",
-                "-ss", &start_time.to_string(),
-                "-i", &audio_path,
-                "-t", &chunk_duration.to_string(),
-                "-ar", "16000",
-                "-ac", "1",
-                "-f", "wav",
-                &chunk_path_str,
-            ])
-            .output();
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args([
+            "-y",
+            "-ss", &start_time.to_string(),
+            "-i", &audio_path,
+            "-t", &chunk_duration.to_string(),
+            "-ar", "16000",
+            "-ac", "1",
+            "-f", "wav",
+            &chunk_path_str,
+        ]);
+
+        // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let result = cmd.output();
 
         match result {
             Ok(output) => {
