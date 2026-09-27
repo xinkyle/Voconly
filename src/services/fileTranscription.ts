@@ -182,7 +182,7 @@ export async function transcribeAudioFile(
       );
 
       // 分片转录（占后 80% 进度）
-      return await transcribeAudioChunks(
+      const result = await transcribeAudioChunks(
         chunkPaths,
         sceneId,
         language,
@@ -193,6 +193,14 @@ export async function transcribeAudioFile(
           }
         }
       );
+
+      // 优先使用传入的音频时长
+      const duration = options?.audioDuration || result.duration;
+
+      return {
+        text: result.text,
+        duration,
+      };
     } else {
       // 小文件，直接转录
       console.log('[FileTranscriptionService] Calling invoke transcribe_audio...');

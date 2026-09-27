@@ -17,7 +17,7 @@ export default function FileTranscriptionPanel() {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [records, setRecords] = useState<FileTranscriptionRecord[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number; duration: number } | null>(null);
   const [status, setStatus] = useState<TranscriptionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -71,8 +71,8 @@ export default function FileTranscriptionPanel() {
     }
   };
 
-  const handleFileSelected = (filePath: string, fileName: string, fileSize: number) => {
-    setSelectedFile({ path: filePath, name: fileName, size: fileSize });
+  const handleFileSelected = (filePath: string, fileName: string, fileSize: number, duration: number) => {
+    setSelectedFile({ path: filePath, name: fileName, size: fileSize, duration });
     setStatus('idle');
     setError(null);
     setProgress({ current: 0, total: 0, percent: 0 });
@@ -100,6 +100,7 @@ export default function FileTranscriptionPanel() {
         undefined,
         {
           fileSize: selectedFile.size,
+          audioDuration: selectedFile.duration,
           onProgress: (current, total, percent) => {
             setProgress({ current, total, percent });
           },
@@ -123,6 +124,13 @@ export default function FileTranscriptionPanel() {
 
       // 更新记录列表
       setRecords([record, ...records]);
+
+      // 显示成功提示
+      showToast({
+        type: 'success',
+        title: '转录完成',
+        description: `${selectedFile.name} (${formatDuration(result.duration)})`,
+      });
 
       // 重置状态
       setStatus('completed');

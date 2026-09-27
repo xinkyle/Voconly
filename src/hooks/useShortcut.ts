@@ -719,6 +719,26 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
       log.debug(`[DOM Keydown] 📥 收到键盘事件: ${keyName}`);
 
+      // 检查是否是修饰键
+      const isModifierKey = ['LeftAlt', 'RightAlt', 'LeftCtrl', 'RightCtrl', 'LeftShift', 'RightShift', 'LeftWindows', 'RightWindows'].includes(keyName);
+
+      // 【改进】对于修饰键，只有配置了单独快捷键时才阻止默认行为
+      // 与 keyhook 层保持一致：组合键前缀不阻塞，让系统正常处理
+      if (isModifierKey) {
+        // 检查是否配置了单独的这个修饰键作为快捷键
+        const hasStandaloneShortcut = registeredShortcutsRef.current.some(s => {
+          const keys = parseShortcutKeys(s);
+          return keys.length === 1 && keys[0] === keyName;
+        });
+
+        if (hasStandaloneShortcut) {
+          e.preventDefault();
+          log.debug(`[DOM Keydown] 🚫 修饰键已配置为单独快捷键，阻止系统行为: ${keyName}`);
+        } else {
+          log.debug(`[DOM Keydown] ✅ 修饰键未单独配置，放行系统行为: ${keyName}`);
+        }
+      }
+
       // 更新按键状态
       const wasPressed = pressedKeysRef.current.has(keyName);
       pressedKeysRef.current.add(keyName);
@@ -729,9 +749,12 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
         const matched = checkShortcutMatchAndBlock();
         if (matched) {
           // 匹配到快捷键，阻止默认行为（防止输入字符）
-          e.preventDefault();
-          e.stopPropagation();
-          log.debug(`[DOM Keydown] 🚫 已阻止按键默认行为: ${keyName}`);
+          // 注意：修饰键已经在上面根据配置决定是否阻止，这里主要是针对非修饰键
+          if (!isModifierKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            log.debug(`[DOM Keydown] 🚫 已阻止按键默认行为: ${keyName}`);
+          }
         }
       }
     };

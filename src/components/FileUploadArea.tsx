@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+import { getAudioDuration } from '../services/fileTranscription';
 
 const FileIcon = () => (
   <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -11,9 +12,9 @@ const FileIcon = () => (
 );
 
 interface FileUploadAreaProps {
-  onFileSelected: (filePath: string, fileName: string, fileSize: number) => void;
+  onFileSelected: (filePath: string, fileName: string, fileSize: number, duration: number) => void;
   disabled?: boolean;
-  selectedFile?: { path: string; name: string; size: number } | null;
+  selectedFile?: { path: string; name: string; size: number; duration?: number } | null;
   onStartTranscription?: () => void;
   isTranscribing?: boolean;
 }
@@ -57,9 +58,9 @@ export default function FileUploadArea({
             if (paths && paths.length > 0) {
               const filePath = paths[0];
               const fileName = filePath.split(/[/\\]/).pop() || filePath;
-              // 获取文件大小
-              getFileInfo(filePath).then(({ size }) => {
-                onFileSelectedRef.current(filePath, fileName, size);
+              // 获取文件大小和时长
+              getFileInfo(filePath).then(({ size, duration }) => {
+                onFileSelectedRef.current(filePath, fileName, size, duration);
               });
             }
             break;
@@ -77,14 +78,16 @@ export default function FileUploadArea({
   }, [disabled]);
 
   // 获取文件信息
-  const getFileInfo = async (filePath: string): Promise<{ size: number }> => {
+  const getFileInfo = async (filePath: string): Promise<{ size: number; duration: number }> => {
     try {
       const fs = await import('@tauri-apps/plugin-fs');
       const stat = await fs.stat(filePath);
-      return { size: stat.size };
+      // 获取音频时长
+      const duration = await getAudioDuration(filePath);
+      return { size: stat.size, duration };
     } catch (e) {
-      console.warn('Failed to get file size:', e);
-      return { size: 0 };
+      console.warn('Failed to get file info:', e);
+      return { size: 0, duration: 0 };
     }
   };
 
@@ -102,8 +105,8 @@ export default function FileUploadArea({
 
       if (selected && typeof selected === 'string') {
         const fileName = selected.split(/[/\\]/).pop() || selected;
-        const { size } = await getFileInfo(selected);
-        onFileSelected(selected, fileName, size);
+        const { size, duration } = await getFileInfo(selected);
+        onFileSelected(selected, fileName, size, duration);
       }
     } catch (error) {
       console.error('Failed to select file:', error);
@@ -115,6 +118,17 @@ export default function FileUploadArea({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  // 格式化时长显示
+  const formatDuration = (seconds: number): string => {
+    const rounded = Math.round(seconds);
+    if (rounded < 60) {
+      return `${rounded}秒`;
+    }
+    const minutes = Math.floor(rounded / 60);
+    const secs = rounded % 60;
+    return secs > 0 ? `${minutes}分${secs}秒` : `${minutes}分钟`;
   };
 
   return (
@@ -145,11 +159,21 @@ export default function FileUploadArea({
           </p>
         </div>
 
-        {/* 副标题/文件大小 - 固定高度区域 */}
-        <div className="mt-2 h-5 flex items-center justify-center">
-          <p className="text-sm text-gray-500">
-            {selectedFile ? formatFileSize(selectedFile.size) : t('file.dropzone.or')}
-          </p>
+        {/* 副标题/文件信息 - 固定高度区域 */}
+        <div className="mt-2 h-5 flex items-center justify-center gap-2">
+          {selectedFile ? (
+            <>
+              <span className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</span>
+              {selectedFile.duration !== undefined && selectedFile.duration > 0 && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-sm text-gray-500">{formatDuration(selectedFile.duration)}</span>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">{t('file.dropzone.or')}</p>
+          )}
         </div>
 
         {/* 路径/空占位 - 固定高度区域，始终保持高度 */}

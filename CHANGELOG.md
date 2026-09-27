@@ -32,7 +32,7 @@
 
 6. **Button style unified** - Unified start transcription button style and centered it for better visual harmony.
 
----
+===
 
 ## [0.5.11] - 2026-09-16
 
