@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.13] - 2026-09-27
+
+### 体验优化
+1. **文件转录体验优化**，禁止 Windows 控制台窗口闪烁，优化文件上传和进度显示交互，转录过程更加流畅。
+
+2. **组合键优先机制**，实现组合键优先匹配，精确区分单独按键与组合键（如 ALT 与 ALT+.），避免误触发。
+
+3. **修饰键处理优化**，DOM 层修饰键处理与 keyhook 层保持一致，只有配置了单独修饰键快捷键时才阻止系统行为，组合键前缀不再阻塞系统功能键。
+
+---
+
+### Improvements
+1. **File transcription optimized** - Disabled Windows console window flashing, improved file upload and progress display interactions for smoother transcription process.
+
+2. **Combo key priority mechanism** - Implemented combo key priority matching to precisely distinguish between single keys and combos (e.g., ALT vs ALT+.), preventing accidental triggers.
+
+3. **Modifier key handling improved** - DOM layer modifier key handling now aligns with keyhook layer, only blocking system behavior when a standalone modifier shortcut is configured, allowing combo key prefixes to pass through to system.
+
+===
+
 ## [0.5.12] - 2026-09-23
 
 ### 新功能
