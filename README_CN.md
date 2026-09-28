@@ -1,6 +1,6 @@
 # Voconly — 语音进，文字出，搞定。
 
-**开源、本地优先的 Wispr Flow 替代方案 —— 为 Windows 而生。**
+**开源、本地优先的 Wispr Flow 替代方案 —— 支持 Windows 和 macOS。**
 
 **自然地说话，Voconly 在本地完成转录、用 AI 润色，并把成品文字直接送到你的光标处——在任何应用中。**
 
@@ -119,7 +119,7 @@ Voconly 把语音变成**成品文字**。
 | 平台 | 状态 |
 | --- | --- |
 | Windows 10 / 11 | ✅ 可用 |
-| macOS | 🚧 即将推出 |
+| macOS (Apple Silicon) | ✅ 可用 |
 | Linux | — 暂无计划 |
 
 ## 路线图
@@ -127,21 +127,23 @@ Voconly 把语音变成**成品文字**。
 ### 已完成
 
 -   本地 ASR：Whisper / SenseVoice / Parakeet / Qwen-ASR
-    
+
 -   所有模型的实时转写
-    
+
 -   长时转写无漂移
-    
+
 -   LLM 后处理：快速笔记 / 专业 / 翻译 / 会议 / 自定义
-    
+
 -   单键快捷键模式，可选 AI 处理
-    
+
 -   Windows 应用
-    
+
+-   macOS 应用（Apple Silicon）
+
 
 ### 即将推出
 
--   macOS
+-   更多 ASR 模型和 LLM 服务商
     
 
 ### 为何开源？

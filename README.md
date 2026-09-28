@@ -117,7 +117,7 @@ Platforms
 | Platform | Status |
 |----------|--------|
 | Windows 10 / 11 | ✅ Available |
-| macOS | 🚧 Coming soon |
+| macOS (Apple Silicon) | ✅ Available |
 | Linux | — Not planned |
 
 ## Roadmap
@@ -125,21 +125,23 @@ Platforms
 ### Done
 
 -   Local ASR: Whisper / SenseVoice / Parakeet / Qwen-ASR
-    
+
 -   Real-time transcription for every model
-    
+
 -   Long-session transcription without drift
-    
+
 -   LLM post-processing: quick note / professional / translation / meeting / custom
-    
+
 -   Single-key hotkey modes with optional AI pass
-    
+
 -   Windows app
-    
+
+-   macOS app (Apple Silicon)
+
 
 ### Coming soon
 
--   macOS
+-   More ASR models and LLM providers
     
 
 ### Why Open Source?
