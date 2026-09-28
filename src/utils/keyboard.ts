@@ -413,6 +413,12 @@ export function formatShortcut(shortcut: string): string {
   if (shortcut === 'ShiftLeft' || shortcut === 'LeftShift') return '左 Shift';
   if (shortcut === 'MetaRight' || shortcut === 'RightWindows') return '右 Win';
   if (shortcut === 'MetaLeft' || shortcut === 'LeftWindows') return '左 Win';
+  if (shortcut === 'RightOption' || shortcut === 'LeftOption') {
+    return shortcut === 'RightOption' ? '右 Option' : '左 Option';
+  }
+  if (shortcut === 'RightCmd' || shortcut === 'LeftCmd') {
+    return shortcut === 'RightCmd' ? '右 Cmd' : '左 Cmd';
+  }
   if (/^F\d+$/.test(shortcut)) return shortcut;
   return shortcut.toUpperCase();
 }
@@ -454,6 +460,12 @@ export function parseShortcutForDisplay(
         if (key === 'LeftWindows') return leftText + ' Win';
         if (key === 'RightWindows') return rightText + ' Win';
         if (key === 'Win') return 'Win';
+        if (key === 'LeftOption') return leftText + ' Option';
+        if (key === 'RightOption') return rightText + ' Option';
+        if (key === 'Option') return 'Option';
+        if (key === 'LeftCmd') return leftText + ' Cmd';
+        if (key === 'RightCmd') return rightText + ' Cmd';
+        if (key === 'Cmd') return 'Cmd';
         return key;
       }
 
@@ -470,12 +482,16 @@ export function parseShortcutForDisplay(
   if (shortcut === 'ControlLeft' || shortcut === 'LeftCtrl') return { prefix: leftText, main: 'Ctrl' };
   if (shortcut === 'ShiftLeft' || shortcut === 'LeftShift') return { prefix: leftText, main: 'Shift' };
   if (shortcut === 'MetaLeft' || shortcut === 'LeftWindows') return { prefix: leftText, main: 'Win' };
+  if (shortcut === 'LeftOption') return { prefix: leftText, main: 'Option' };
+  if (shortcut === 'LeftCmd') return { prefix: leftText, main: 'Cmd' };
 
   // 右修饰键
   if (shortcut === 'AltRight' || shortcut === 'RightAlt') return { prefix: rightText, main: 'Alt' };
   if (shortcut === 'ControlRight' || shortcut === 'RightCtrl') return { prefix: rightText, main: 'Ctrl' };
   if (shortcut === 'ShiftRight' || shortcut === 'RightShift') return { prefix: rightText, main: 'Shift' };
   if (shortcut === 'MetaRight' || shortcut === 'RightWindows') return { prefix: rightText, main: 'Win' };
+  if (shortcut === 'RightOption') return { prefix: rightText, main: 'Option' };
+  if (shortcut === 'RightCmd') return { prefix: rightText, main: 'Cmd' };
 
   // 其他键没有前缀
   return { prefix: '', main: formatShortcut(shortcut) };
@@ -490,12 +506,16 @@ function formatSingleKey(key: string, leftText: string, rightText: string): stri
   if (key === 'ControlLeft' || key === 'LeftCtrl') return `${leftText} Ctrl`;
   if (key === 'ShiftLeft' || key === 'LeftShift') return `${leftText} Shift`;
   if (key === 'MetaLeft' || key === 'LeftWindows') return `${leftText} Win`;
+  if (key === 'LeftOption') return `${leftText} Option`;
+  if (key === 'LeftCmd') return `${leftText} Cmd`;
 
   // 右修饰键
   if (key === 'AltRight' || key === 'RightAlt') return `${rightText} Alt`;
   if (key === 'ControlRight' || key === 'RightCtrl') return `${rightText} Ctrl`;
   if (key === 'ShiftRight' || key === 'RightShift') return `${rightText} Shift`;
   if (key === 'MetaRight' || key === 'RightWindows') return `${rightText} Win`;
+  if (key === 'RightOption') return `${rightText} Option`;
+  if (key === 'RightCmd') return `${rightText} Cmd`;
 
   // 其他键
   return formatShortcut(key);

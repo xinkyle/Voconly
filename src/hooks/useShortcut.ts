@@ -58,27 +58,30 @@ function parseShortcutKeys(shortcut: string): string[] {
 
 // 规范化键名（统一格式）
 // 将用户输入的快捷键转换为 keyhook 返回的标准格式
+// macOS 使用 Option/Cmd，Windows 使用 Alt/Windows，保持平台一致性
 function normalizeKeyName(key: string): string {
   // 处理修饰键的不同写法 -> keyhook 标准格式
   const modifierMap: Record<string, string> = {
     'ctrl': 'Ctrl',
     'leftctrl': 'LeftCtrl',
     'rightctrl': 'RightCtrl',
+    // Windows 平台
     'alt': 'Alt',
     'leftalt': 'LeftAlt',
     'rightalt': 'RightAlt',
-    'shift': 'Shift',
-    'leftshift': 'LeftShift',
-    'rightshift': 'RightShift',
     'win': 'Windows',
     'leftwin': 'LeftWindows',
     'rightwin': 'RightWindows',
-    'cmd': 'Cmd',
-    'leftcmd': 'LeftCmd',
-    'rightcmd': 'RightCmd',
+    // macOS 平台
     'option': 'Option',
     'leftoption': 'LeftOption',
     'rightoption': 'RightOption',
+    'cmd': 'Cmd',
+    'leftcmd': 'LeftCmd',
+    'rightcmd': 'RightCmd',
+    'shift': 'Shift',
+    'leftshift': 'LeftShift',
+    'rightshift': 'RightShift',
   };
 
   const lowerKey = key.toLowerCase();
@@ -123,17 +126,30 @@ function normalizeKeyName(key: string): string {
   return key;
 }
 
-// 将 DOM 键盘事件转换为 keyhook 格式的键名
-function convertDomEventToKeyName(e: KeyboardEvent): string | null {
-  // 处理修饰键
+// 将 DOM 键盘事件转换为 keyhook 格式的键名（平台相关）
+function convertDomEventToKeyName(e: KeyboardEvent, isMac: boolean): string | null {
+  // 处理修饰键（根据平台映射）
   if (e.code === 'ControlLeft') return 'LeftCtrl';
   if (e.code === 'ControlRight') return 'RightCtrl';
-  if (e.code === 'AltLeft') return 'LeftAlt';
-  if (e.code === 'AltRight') return 'RightAlt';
+
+  // Alt 键：macOS 上对应 Option
+  if (e.code === 'AltLeft') {
+    return isMac ? 'LeftOption' : 'LeftAlt';
+  }
+  if (e.code === 'AltRight') {
+    return isMac ? 'RightOption' : 'RightAlt';
+  }
+
   if (e.code === 'ShiftLeft') return 'LeftShift';
   if (e.code === 'ShiftRight') return 'RightShift';
-  if (e.code === 'MetaLeft') return 'LeftWindows';
-  if (e.code === 'MetaRight') return 'RightWindows';
+
+  // Meta 键：macOS 上对应 Cmd
+  if (e.code === 'MetaLeft') {
+    return isMac ? 'LeftCmd' : 'LeftWindows';
+  }
+  if (e.code === 'MetaRight') {
+    return isMac ? 'RightCmd' : 'RightWindows';
+  }
 
   // 功能键
   if (/^F\d+$/.test(e.code)) {
@@ -182,6 +198,10 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   // 按键状态机
   const pressedKeysRef = useRef<Set<string>>(new Set());
 
+  // 【修复】相关键集合：只记录出现在用户配置的快捷键中的键
+  // 这样可以避免记录无关的按键（如 Win+D 中的 Win 和 D），防止系统快捷键干扰
+  const relevantKeysRef = useRef<Set<string>>(new Set());
+
   // 暂停状态（编辑快捷键时暂停全局快捷键监听）
   const isPausedRef = useRef<boolean>(false);
 
@@ -225,6 +245,18 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
         : `快捷键 "${shortcut}" 已被使用`;
     }
     return null;
+  }, []);
+
+  // 【修复】更新相关键集合
+  // 从所有已注册的快捷键中提取出所有相关键
+  const updateRelevantKeys = useCallback(() => {
+    const relevantKeys = new Set<string>();
+    for (const shortcut of shortcutToSceneRef.current.keys()) {
+      const keys = parseShortcutKeys(shortcut);
+      keys.forEach(key => relevantKeys.add(key));
+    }
+    relevantKeysRef.current = relevantKeys;
+    log.debug(`[updateRelevantKeys] 更新相关键集合: ${Array.from(relevantKeys).join(', ') || '(空)'}`);
   }, []);
 
   // 触发快捷键回调
@@ -473,6 +505,13 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     log.debug(`键盘事件: ${keyName} (${eventType})`);
 
     if (eventType === 'down') {
+      // 【修复】只记录相关键：出现在用户配置的快捷键中的键
+      // 这样可以避免记录无关的按键（如 Win+D 中的 Win 和 D），防止系统快捷键干扰
+      if (!relevantKeysRef.current.has(keyName)) {
+        log.debug(`[handleKeyEvent] ⏭️ 忽略无关键: ${keyName}`);
+        return; // 不是相关键，忽略
+      }
+
       // 按键按下
       const wasPressed = pressedKeysRef.current.has(keyName);
       pressedKeysRef.current.add(keyName);
@@ -552,12 +591,15 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     sceneToShortcutRef.current.set(sceneId, shortcut);
     setRegisteredShortcuts(prev => [...prev, shortcut]);
 
+    // 【修复】更新相关键集合
+    updateRelevantKeys();
+
     // 更新拦截规则：拦截所有已注册快捷键中的按键
     await updateBlockRule();
 
     log.debug(`快捷键已注册: ${shortcut} -> ${sceneId}`);
     setIsLoading(false);
-  }, [checkConflict]);
+  }, [checkConflict, updateRelevantKeys]);
 
   // 更新拦截规则：传递完整快捷键配置给 Rust 端
   const updateBlockRule = useCallback(async () => {
@@ -601,13 +643,16 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     sceneToShortcutRef.current.set(sceneId, shortcut);
     setRegisteredShortcuts(prev => [...prev, shortcut]);
 
+    // 【修复】更新相关键集合
+    updateRelevantKeys();
+
     // 更新拦截规则
     await updateBlockRule();
 
     log.debug(`快捷键已注册: ${shortcut} -> ${sceneId}`);
     setIsLoading(false);
     return { success: true };
-  }, [checkConflict, updateBlockRule]);
+  }, [checkConflict, updateBlockRule, updateRelevantKeys]);
 
   // 注销快捷键
   const unregisterShortcut = useCallback(async (shortcut: string) => {
@@ -624,12 +669,15 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     }
     setRegisteredShortcuts(prev => prev.filter(s => s !== shortcut));
 
+    // 【修复】更新相关键集合
+    updateRelevantKeys();
+
     // 更新拦截规则
     await updateBlockRule();
 
     log.debug(`快捷键已注销: ${shortcut}`);
     setIsLoading(false);
-  }, [updateBlockRule]);
+  }, [updateBlockRule, updateRelevantKeys]);
 
   // 注销所有快捷键
   const unregisterAllShortcuts = useCallback(async () => {
@@ -640,6 +688,9 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     shortcutToSceneRef.current.clear();
     sceneToShortcutRef.current.clear();
     setRegisteredShortcuts([]);
+
+    // 【修复】清空相关键集合
+    relevantKeysRef.current.clear();
 
     // 清除拦截规则
     try {
@@ -711,16 +762,16 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
         return;
       }
 
-      // 将 DOM 键盘事件转换为 keyhook 格式
-      const keyName = convertDomEventToKeyName(e);
+      // 将 DOM 键盘事件转换为 keyhook 格式（平台相关）
+      const keyName = convertDomEventToKeyName(e, isMacRef.current);
       if (!keyName) {
         return;
       }
 
       log.debug(`[DOM Keydown] 📥 收到键盘事件: ${keyName}`);
 
-      // 检查是否是修饰键
-      const isModifierKey = ['LeftAlt', 'RightAlt', 'LeftCtrl', 'RightCtrl', 'LeftShift', 'RightShift', 'LeftWindows', 'RightWindows'].includes(keyName);
+      // 检查是否是修饰键（包含 macOS 的 Option 和 Cmd）
+      const isModifierKey = ['LeftAlt', 'RightAlt', 'LeftCtrl', 'RightCtrl', 'LeftShift', 'RightShift', 'LeftWindows', 'RightWindows', 'LeftOption', 'RightOption', 'LeftCmd', 'RightCmd'].includes(keyName);
 
       // 【改进】对于修饰键，只有配置了单独快捷键时才阻止默认行为
       // 与 keyhook 层保持一致：组合键前缀不阻塞，让系统正常处理
@@ -765,7 +816,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
         return;
       }
 
-      const keyName = convertDomEventToKeyName(e);
+      const keyName = convertDomEventToKeyName(e, isMacRef.current);
       if (!keyName) {
         return;
       }

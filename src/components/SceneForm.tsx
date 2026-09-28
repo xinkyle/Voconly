@@ -25,7 +25,7 @@ const BUILTIN_PROMPT_TYPES = [
   { id: 'meetingSecretary', labelKey: 'llmConfig.promptTypes.meetingSecretary' },
 ];
 
-// 修饰键列表
+// 修饰键列表（DOM 事件中 e.key 的可能值）
 const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
 
 // 判断是否为修饰键
@@ -33,8 +33,8 @@ function isModifierKey(key: string): boolean {
   return MODIFIER_KEYS.some(mod => key === mod || key.startsWith(mod));
 }
 
-// 规范化修饰键名称（区分左右）
-function normalizeModifierName(e: KeyboardEvent): string {
+// 规范化修饰键名称（区分左右，平台相关）
+function normalizeModifierName(e: KeyboardEvent, isMac: boolean): string {
   if (e.key === 'Control') {
     return e.location === 2 ? 'RightCtrl' : 'LeftCtrl';
   }
@@ -42,9 +42,17 @@ function normalizeModifierName(e: KeyboardEvent): string {
     return e.location === 2 ? 'RightShift' : 'LeftShift';
   }
   if (e.key === 'Alt') {
+    // macOS 上 Alt 对应 Option 键
+    if (isMac) {
+      return e.location === 2 ? 'RightOption' : 'LeftOption';
+    }
     return e.location === 2 ? 'RightAlt' : 'LeftAlt';
   }
   if (e.key === 'Meta') {
+    // macOS 上 Meta 对应 Cmd 键
+    if (isMac) {
+      return e.location === 2 ? 'RightCmd' : 'LeftCmd';
+    }
     return e.location === 2 ? 'RightWindows' : 'LeftWindows';
   }
   return e.key;
@@ -69,12 +77,20 @@ export default function SceneForm({
   const inputRef = useRef<HTMLButtonElement>(null);
   const setPausedRef = useRef(setPaused);
 
+  // 平台检测（用于修饰键映射）
+  const isMacRef = useRef<boolean>(false);
+
   // 组合键录制状态
   const [pressedModifiers, setPressedModifiers] = useState<string[]>([]);
   const pressedModifiersRef = useRef<string[]>([]);
 
   // Ref for the listening timeout
   const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 平台检测（初始化时执行一次）
+  useEffect(() => {
+    isMacRef.current = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+  }, []);
 
   // Update setPaused ref
   useEffect(() => {
@@ -216,7 +232,7 @@ export default function SceneForm({
 
       // 检测修饰键按下 - 只记录，不触发完成
       if (isModifierKey(e.key)) {
-        const modKey = normalizeModifierName(e);
+        const modKey = normalizeModifierName(e, isMacRef.current);
         if (!pressedModifiersRef.current.includes(modKey)) {
           pressedModifiersRef.current = [...pressedModifiersRef.current, modKey];
           setPressedModifiers([...pressedModifiersRef.current]);
@@ -260,7 +276,7 @@ export default function SceneForm({
     const handleKeyUp = (e: KeyboardEvent) => {
       // 修饰键释放时，从列表中移除
       if (isModifierKey(e.key)) {
-        const modKey = normalizeModifierName(e);
+        const modKey = normalizeModifierName(e, isMacRef.current);
 
         // 保存松开前的修饰键列表（用于生成快捷键）
         const modifiersBeforeRelease = [...pressedModifiersRef.current];

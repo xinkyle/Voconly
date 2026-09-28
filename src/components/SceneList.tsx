@@ -82,6 +82,14 @@ export default function SceneList({
   // Ref for setPaused (to avoid stale closure)
   const setPausedRef = useRef(setPaused);
 
+  // 平台检测（用于修饰键映射）
+  const isMacRef = useRef<boolean>(false);
+
+  // 初始化平台检测
+  useEffect(() => {
+    isMacRef.current = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+  }, []);
+
   // Update setPaused ref
   useEffect(() => {
     setPausedRef.current = setPaused;
@@ -224,7 +232,7 @@ export default function SceneList({
     }, 10000);
   }, [isRecording, setPaused]);
 
-  // 修饰键列表
+  // 修饰键列表（DOM 事件中 e.key 的可能值）
   const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'];
 
   // 判断是否为修饰键
@@ -232,7 +240,7 @@ export default function SceneList({
     return MODIFIER_KEYS.some(mod => key === mod || key.startsWith(mod));
   };
 
-  // 规范化修饰键名称
+  // 规范化修饰键名称（平台相关）
   const normalizeModifierName = (e: KeyboardEvent): string => {
     // 根据 e.code 和 e.location 区分左右修饰键
     if (e.key === 'Control') {
@@ -242,9 +250,17 @@ export default function SceneList({
       return e.location === 2 ? 'RightShift' : 'LeftShift';
     }
     if (e.key === 'Alt') {
+      // macOS 上 Alt 对应 Option 键
+      if (isMacRef.current) {
+        return e.location === 2 ? 'RightOption' : 'LeftOption';
+      }
       return e.location === 2 ? 'RightAlt' : 'LeftAlt';
     }
     if (e.key === 'Meta') {
+      // macOS 上 Meta 对应 Cmd 键
+      if (isMacRef.current) {
+        return e.location === 2 ? 'RightCmd' : 'LeftCmd';
+      }
       return e.location === 2 ? 'RightWindows' : 'LeftWindows';
     }
     return e.key;
