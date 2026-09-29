@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.14] - 2026-09-29
+
+### 体验优化
+1. **macOS 修饰键映射**，在 macOS 上正确显示 Option 和 Cmd 键名，而非 Alt 和 Windows，提供更符合平台习惯的快捷键显示。
+
+2. **GitHub Star 展示**，在关于页面添加 GitHub Star 数量展示，方便用户了解项目热度并支持项目发展。
+
+3. **系统快捷键干扰修复**，优化快捷键监听机制，只记录用户配置的相关键，避免系统快捷键（如 Win+D）干扰应用快捷键功能。
+
+---
+
+### Improvements
+1. **macOS modifier key mapping** - Correctly displays Option and Cmd key names on macOS instead of Alt and Windows, providing platform-appropriate shortcut display.
+
+2. **GitHub Star display** - Added GitHub Star count display in the About page, helping users see project popularity and support development.
+
+3. **System shortcut interference fix** - Optimized shortcut listening mechanism to only track user-configured relevant keys, preventing system shortcuts (e.g., Win+D) from interfering with app shortcut functionality.
+
+===
+
 ## [0.5.13] - 2026-09-27
 
 ### 体验优化
