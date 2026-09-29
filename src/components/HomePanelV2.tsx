@@ -1064,6 +1064,11 @@ export default function HomePanelV2({
                     if (modifierKey === 'RightAlt') return { prefix: t('keyboard.right'), keyName: 'Alt' };
                     if (modifierKey === 'LeftWindows') return { prefix: t('keyboard.left'), keyName: 'Win' };
                     if (modifierKey === 'RightWindows') return { prefix: t('keyboard.right'), keyName: 'Win' };
+                    // macOS 修饰键
+                    if (modifierKey === 'LeftOption') return { prefix: t('keyboard.left'), keyName: 'Option' };
+                    if (modifierKey === 'RightOption') return { prefix: t('keyboard.right'), keyName: 'Option' };
+                    if (modifierKey === 'LeftCmd') return { prefix: t('keyboard.left'), keyName: 'Cmd' };
+                    if (modifierKey === 'RightCmd') return { prefix: t('keyboard.right'), keyName: 'Cmd' };
                     return { prefix: '', keyName: modifierKey };
                   };
 
@@ -1122,6 +1127,11 @@ export default function HomePanelV2({
                   if (shortcut === 'RightAlt') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Alt', isCombo: false, isModifierOnly: true, isThreeKey: false };
                   if (shortcut === 'LeftWindows') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Win', isCombo: false, isModifierOnly: true, isThreeKey: false };
                   if (shortcut === 'RightWindows') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Win', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  // macOS 修饰键
+                  if (shortcut === 'LeftOption') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Option', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightOption') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Option', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'LeftCmd') return { topKey: t('keyboard.left'), middleKey: '', bottomKey: 'Cmd', isCombo: false, isModifierOnly: true, isThreeKey: false };
+                  if (shortcut === 'RightCmd') return { topKey: t('keyboard.right'), middleKey: '', bottomKey: 'Cmd', isCombo: false, isModifierOnly: true, isThreeKey: false };
 
                   // 普通单键
                   const display = formatMainKey(shortcut);
