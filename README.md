@@ -1,4 +1,4 @@
-# Voconly — Voice in. Text out. Done.
+﻿# Voconly — Voice in. Text out. Done.
 
 **Speak naturally. Voconly transcribes locally, refines with AI, and puts finished text right at your cursor — in any app.**
 
@@ -175,6 +175,8 @@ Built by Xing Yong (老幸.AI - 公众号同名) — exploring a simple question
 What can one person build with AI today?  
 Voconly is one of those experiments.  
 📧 laoxingai@139.com
+
+![Feedback Group QR Code](https://serverless-qrcode-hub.savagexykj.workers.dev/voconly)
 
 ### Tech Stack
 
