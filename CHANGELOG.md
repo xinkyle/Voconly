@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.15] - 2026-09-29
+
+### 问题修复
+1. **macOS 快捷键问题修复**，修复了 macOS 功能键（如 Option，cmd）无法正常设置为快捷键问题，支持单键，也支持组合键作为快捷键。
+
+### 体验优化
+2. **键帽尺寸优化**，主界面快捷键键帽从 80px 增大到 90px，底座同步调整，视觉效果更加饱满醒目。
+
+---
+
+### Bug Fixes
+1. **macOS shortcuts fixed** - Fixed issue where macOS modifier keys (e.g., Option, Cmd) could not be correctly set as shortcuts, supporting both single-key and combo-key shortcuts.
+
+### Improvements
+2. **Keypad size optimized** - Enlarged home keypad from 80px to 90px with matching base adjustment for more prominent visual presence.
+
+===
+
 ## [0.5.14] - 2026-09-29
 
 ### 体验优化
