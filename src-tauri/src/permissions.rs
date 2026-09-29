@@ -107,7 +107,7 @@ fn save_signature(signature: &str) -> Option<()> {
     fs::write(path, signature).ok()
 }
 
-/// 清理旧的授权条目
+/// 清理旧的授权条目，并触发系统重新注册
 #[cfg(target_os = "macos")]
 fn clear_old_permissions() {
     // 获取应用标识符
@@ -120,6 +120,11 @@ fn clear_old_permissions() {
     reset_tcc_service("Accessibility", &identifier);
 
     log::info!("[Signature] Cleared old permissions for: {}", identifier);
+
+    // 触发系统重新注册应用到授权列表（不弹窗，只注册）
+    // 这样前端检测时就能正确显示"未授权"状态
+    log::info!("[Signature] Triggering system re-registration");
+    ax_is_trusted(true);
 }
 
 /// 非 macOS 平台无需清理
@@ -262,7 +267,9 @@ pub fn ax_is_trusted(prompt: bool) -> bool {
         CFBoolean::false_value()
     };
     let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
-    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
+    let result = unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) };
+    log::info!("[Permissions] ax_is_trusted(prompt={}) returned: {}", prompt, result);
+    result
 }
 
 /// 通过官方 tccutil 清理指定服务的授权条目（无需管理员权限）。
@@ -288,10 +295,14 @@ pub fn reset_tcc_service(service: &str, identifier: &str) {
 /// 返回调用时刻的授权状态。
 #[cfg(target_os = "macos")]
 pub fn request_accessibility(_identifier: &str) -> bool {
+    log::info!("[Permissions] request_accessibility called, triggering system prompt");
     // 清理工作已在 check_accessibility_permission 中完成
     // 直接触发系统弹窗，把当前应用注册到系统设置列表中
-    ax_is_trusted(true);
-    ax_is_trusted(false)
+    let result = ax_is_trusted(true);
+    log::info!("[Permissions] ax_is_trusted(true) returned: {}", result);
+    let final_status = ax_is_trusted(false);
+    log::info!("[Permissions] Final accessibility status: {}", final_status);
+    final_status
 }
 
 /// 重置输入监控权限条目（用户点击 keyhook 横幅"去授权"时调用）。

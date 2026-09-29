@@ -481,12 +481,16 @@ async fn get_registered_shortcuts(app: AppHandle) -> Result<Vec<String>, String>
 #[tauri::command]
 fn check_accessibility_permission(app: AppHandle) -> bool {
     let identifier = app.config().identifier.clone();
-    if permissions::ax_is_trusted(false) {
+    let trusted = permissions::ax_is_trusted(false);
+    info!("[Permissions] check_accessibility_permission: ax_is_trusted(false) = {}, identifier = {}", trusted, identifier);
+
+    if trusted {
         return true;
     }
 
     // 未授权 → 清理老条目（包括用户拒绝的记录）
     // 这不会影响用户的选择权，只是让列表更干净
+    info!("[Permissions] Not trusted, clearing old entries");
     permissions::reset_tcc_service("Accessibility", &identifier);
     false
 }
