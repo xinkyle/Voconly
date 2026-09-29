@@ -397,7 +397,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 【关键修复】精确匹配：当前按下的键数量必须等于快捷键的键数量
       // 这样可以区分 RightAlt 和 RightAlt+. 等组合键
       if (pressedCount !== keys.length) {
-        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键，快捷键需要 ${keys.length} 个`);
+        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键 (${Array.from(pressedKeys).join('+')})，快捷键需要 ${keys.length} 个`);
         continue;
       }
 
@@ -449,7 +449,7 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 【关键修复】精确匹配：当前按下的键数量必须等于快捷键的键数量
       // 这样可以区分 RightAlt 和 RightAlt+. 等组合键
       if (pressedCount !== keys.length) {
-        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键，快捷键需要 ${keys.length} 个`);
+        log.debug(`快捷键 ${shortcut} 不精确匹配: 按下 ${pressedCount} 个键 (${Array.from(pressedKeys).join('+')})，快捷键需要 ${keys.length} 个`);
         continue;
       }
 
