@@ -115,6 +115,7 @@ fn clear_old_permissions() {
 fn clear_old_permissions() {}
 
 /// 获取应用标识符（用于 tccutil）
+/// 从 Info.plist 读取真实的 Bundle Identifier
 #[cfg(target_os = "macos")]
 fn get_app_identifier() -> String {
     // 获取当前应用的路径
@@ -126,14 +127,29 @@ fn get_app_identifier() -> String {
                 .map(|p| p.to_path_buf())
         })
     {
-        // 从 .app 路径提取应用名称
+        // 从 Info.plist 读取 CFBundleIdentifier
+        let info_plist_path = app_path.join("Contents").join("Info.plist");
+        if info_plist_path.exists() {
+            // 使用 plutil 命令解析 plist
+            if let Ok(output) = std::process::Command::new("/usr/bin/plutil")
+                .args(["-extract", "CFBundleIdentifier", "raw", &info_plist_path.to_string_lossy()])
+                .output()
+            {
+                let bundle_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !bundle_id.is_empty() {
+                    return bundle_id;
+                }
+            }
+        }
+
+        // 如果读取失败，从 .app 路径提取应用名称作为后备
         if let Some(name) = app_path.file_stem() {
             return format!("com.{}", name.to_string_lossy());
         }
     }
 
-    // 默认使用 Voconly
-    "com.Voconly".to_string()
+    // 默认使用 voconly.desktop（与 tauri.conf.json 保持一致）
+    "com.voconly.desktop".to_string()
 }
 
 /// 检查签名是否变化，如果变化则清理旧授权条目
