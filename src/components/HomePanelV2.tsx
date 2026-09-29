@@ -1156,11 +1156,11 @@ export default function HomePanelV2({
                       }}
                     >
                       {/* 键帽底座 - 浅灰色层 */}
-                      <div className="absolute top-[72px] left-1/2 -translate-x-1/2 w-[72px] h-3 rounded-b-lg bg-gray-400 transition-all duration-150 group-hover:bg-gray-500 group-hover:-translate-y-0.5"></div>
+                      <div className="absolute top-[80px] left-1/2 -translate-x-1/2 w-[82px] h-3.5 rounded-b-lg bg-gray-400 transition-all duration-150 group-hover:bg-gray-500 group-hover:-translate-y-0.5"></div>
 
                       {/* 键帽顶部 */}
                       <div
-                        className={`relative w-20 h-20 rounded-xl font-mono text-2xl font-bold flex items-center justify-center transition-all duration-150 ${
+                        className={`relative w-[90px] h-[90px] rounded-xl font-mono text-2xl font-bold flex items-center justify-center transition-all duration-150 ${
                           isListening
                             ? 'bg-amber-400 text-amber-900 animate-pulse'
                             : 'bg-gray-800 text-white group-hover:bg-gray-900 group-hover:-translate-y-0.5'

@@ -159,6 +159,18 @@ const MACOS_KEY_MAP: Record<number, string> = {
   119: 'End',
   116: 'PageUp',
   121: 'PageDown',
+  // 标点符号键（macOS 键码）
+  47: 'Period',        // . >
+  43: 'Comma',         // , <
+  44: 'Slash',         // / ?
+  41: 'Semicolon',     // ; :
+  42: 'Backslash',     // \ |
+  33: 'BracketLeft',   // [ {
+  30: 'BracketRight',  // ] }
+  39: 'Quote',         // ' "
+  50: 'Backquote',     // ` ~
+  27: 'Minus',         // - _
+  24: 'Equal',         // = +
 };
 
 /**
@@ -214,22 +226,22 @@ export function mapKeycodeToShortcut(keycode: string, rawCode: number, isMac: bo
     return symbolMap[keycode];
   }
 
-  // macOS 字母键（使用 rawCode）
+  // macOS 字母键（使用 rawCode）-> 返回 KeyA 格式
   if (isMac && rawCode >= 0 && rawCode <= 51) {
     const letterMap: Record<number, string> = {
-      0: 'A', 1: 'S', 2: 'D', 3: 'F', 4: 'H', 5: 'G', 6: 'Z', 7: 'X',
-      8: 'C', 9: 'V', 11: 'B', 12: 'Q', 13: 'W', 14: 'E', 15: 'R',
-      16: 'Y', 17: 'T', 31: 'O', 32: 'U', 34: 'I', 35: 'P', 37: 'L',
-      38: 'J', 40: 'K', 45: 'N', 46: 'M',
+      0: 'KeyA', 1: 'KeyS', 2: 'KeyD', 3: 'KeyF', 4: 'KeyH', 5: 'KeyG', 6: 'KeyZ', 7: 'KeyX',
+      8: 'KeyC', 9: 'KeyV', 11: 'KeyB', 12: 'KeyQ', 13: 'KeyW', 14: 'KeyE', 15: 'KeyR',
+      16: 'KeyY', 17: 'KeyT', 31: 'KeyO', 32: 'KeyU', 34: 'KeyI', 35: 'KeyP', 37: 'KeyL',
+      38: 'KeyJ', 40: 'KeyK', 45: 'KeyN', 46: 'KeyM',
     };
     if (letterMap[rawCode]) return letterMap[rawCode];
   }
 
-  // macOS 数字键（使用 rawCode）
+  // macOS 数字键（使用 rawCode）-> 返回 Digit0 格式
   if (isMac && rawCode >= 18 && rawCode <= 29) {
     const digitMap: Record<number, string> = {
-      18: '1', 19: '2', 20: '3', 21: '4', 23: '5', 22: '6',
-      26: '7', 28: '8', 25: '9', 29: '0',
+      18: 'Digit1', 19: 'Digit2', 20: 'Digit3', 21: 'Digit4', 23: 'Digit5', 22: 'Digit6',
+      26: 'Digit7', 28: 'Digit8', 25: 'Digit9', 29: 'Digit0',
     };
     if (digitMap[rawCode]) return digitMap[rawCode];
   }
@@ -245,21 +257,21 @@ export function mapKeycodeToShortcut(keycode: string, rawCode: number, isMac: bo
  */
 export function mapRawCodeToKeyName(rawCode: number, isMac: boolean): string | null {
   if (isMac) {
-    // macOS: 字母键码范围
+    // macOS: 字母键码范围 -> 返回 KeyA 格式
     if (rawCode >= 0 && rawCode <= 51) {
       const letterMap: Record<number, string> = {
-        0: 'A', 1: 'S', 2: 'D', 3: 'F', 4: 'H', 5: 'G', 6: 'Z', 7: 'X',
-        8: 'C', 9: 'V', 11: 'B', 12: 'Q', 13: 'W', 14: 'E', 15: 'R',
-        16: 'Y', 17: 'T', 31: 'O', 32: 'U', 34: 'I', 35: 'P', 37: 'L',
-        38: 'J', 40: 'K', 45: 'N', 46: 'M',
+        0: 'KeyA', 1: 'KeyS', 2: 'KeyD', 3: 'KeyF', 4: 'KeyH', 5: 'KeyG', 6: 'KeyZ', 7: 'KeyX',
+        8: 'KeyC', 9: 'KeyV', 11: 'KeyB', 12: 'KeyQ', 13: 'KeyW', 14: 'KeyE', 15: 'KeyR',
+        16: 'KeyY', 17: 'KeyT', 31: 'KeyO', 32: 'KeyU', 34: 'KeyI', 35: 'KeyP', 37: 'KeyL',
+        38: 'KeyJ', 40: 'KeyK', 45: 'KeyN', 46: 'KeyM',
       };
       if (letterMap[rawCode]) return letterMap[rawCode];
     }
-    // macOS: 数字键码范围
+    // macOS: 数字键码范围 -> 返回 Digit0 格式
     if (rawCode >= 18 && rawCode <= 29) {
       const digitMap: Record<number, string> = {
-        18: '1', 19: '2', 20: '3', 21: '4', 23: '5', 22: '6',
-        26: '7', 28: '8', 25: '9', 29: '0',
+        18: 'Digit1', 19: 'Digit2', 20: 'Digit3', 21: 'Digit4', 23: 'Digit5', 22: 'Digit6',
+        26: 'Digit7', 28: 'Digit8', 25: 'Digit9', 29: 'Digit0',
       };
       if (digitMap[rawCode]) return digitMap[rawCode];
     }
@@ -367,14 +379,18 @@ export function extractShortcutFromEvent(e: KeyboardEvent): string {
     return e.key;
   }
 
-  // Handle single digits (0-9)
-  if (/^[0-9]$/.test(e.key)) {
-    return e.key;
+  // 【重要修复】数字键：使用 e.code（物理键码），不受 Shift 影响
+  // Shift + 1 时，e.key = '!'，但 e.code = 'Digit1'
+  // 这样设置和使用时的格式一致：LeftShift+Digit1
+  if (e.code.startsWith('Digit')) {
+    return e.code; // 返回 'Digit1', 'Digit2' 等
   }
 
-  // Handle letters (a-z, A-Z)
-  if (/^[a-zA-Z]$/.test(e.key)) {
-    return e.key.toUpperCase();
+  // 【重要修复】字母键：使用 e.code（物理键码），不受 Option/Shift 影响
+  // Option + A 时，e.key 可能是特殊字符，但 e.code = 'KeyA'
+  // 这样设置和使用时的格式一致：LeftOption+KeyA
+  if (e.code.startsWith('Key')) {
+    return e.code; // 返回 'KeyA', 'KeyB' 等
   }
 
   // Handle special keys
