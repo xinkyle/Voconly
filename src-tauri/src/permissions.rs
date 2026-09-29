@@ -155,10 +155,10 @@ pub fn check_signature_changed() -> bool {
     let stored_sig = get_stored_signature();
 
     // 判断是否变化
-    let changed = match stored_sig {
+    let changed = match &stored_sig {
         Some(stored) => {
             // 有历史签名，对比是否变化
-            stored != current_sig
+            stored != &current_sig
         }
         None => {
             // 无历史签名（新安装），视为"变化"，执行清理
