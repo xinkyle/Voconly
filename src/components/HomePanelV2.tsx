@@ -1081,6 +1081,21 @@ export default function HomePanelV2({
                       const arrowMap: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
                       return arrowMap[mainKey] || mainKey;
                     }
+                    // 标点符号键（使用 code 名称）
+                    const punctuationMap: Record<string, string> = {
+                      Comma: ',',
+                      Period: '.',
+                      Slash: '/',
+                      Semicolon: ';',
+                      Quote: "'",
+                      BracketLeft: '[',
+                      BracketRight: ']',
+                      Backslash: '\\',
+                      Minus: '-',
+                      Equal: '=',
+                      Backquote: '`',
+                    };
+                    if (punctuationMap[mainKey]) return punctuationMap[mainKey];
                     return mainKey;
                   };
 

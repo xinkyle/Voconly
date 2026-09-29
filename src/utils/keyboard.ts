@@ -208,22 +208,10 @@ export function mapKeycodeToShortcut(keycode: string, rawCode: number, isMac: bo
     return keycode.slice(5); // Digit0 -> 0
   }
 
-  // 标点符号键 - 返回对应的符号
-  const symbolMap: Record<string, string> = {
-    'Semicolon': ';',
-    'Equal': '=',
-    'Comma': ',',
-    'Minus': '-',
-    'Period': '.',
-    'Slash': '/',
-    'Backquote': '`',
-    'BracketLeft': '[',
-    'Backslash': '\\',
-    'BracketRight': ']',
-    'Quote': "'",
-  };
-  if (symbolMap[keycode]) {
-    return symbolMap[keycode];
+  // 标点符号键 - 直接返回标准名称（与数字键、字母键格式一致）
+  const punctuationNames = ['Comma', 'Period', 'Slash', 'Semicolon', 'Quote', 'BracketLeft', 'BracketRight', 'Backslash', 'Minus', 'Equal', 'Backquote'];
+  if (punctuationNames.includes(keycode)) {
+    return keycode;
   }
 
   // macOS 字母键（使用 rawCode）-> 返回 KeyA 格式
@@ -244,6 +232,15 @@ export function mapKeycodeToShortcut(keycode: string, rawCode: number, isMac: bo
       26: 'Digit7', 28: 'Digit8', 25: 'Digit9', 29: 'Digit0',
     };
     if (digitMap[rawCode]) return digitMap[rawCode];
+  }
+
+  // macOS 标点符号键（keyhook 返回 "Other"）-> 使用 rawCode 查找
+  if (isMac && keycode === 'Other') {
+    const keyName = MACOS_KEY_MAP[rawCode];
+    if (keyName) {
+      // 返回标准名称格式（如 Comma、Period）
+      return keyName;
+    }
   }
 
   return null;
@@ -398,9 +395,11 @@ export function extractShortcutFromEvent(e: KeyboardEvent): string {
     return e.key;
   }
 
-  // Handle punctuation and symbols
-  if (['[', ']', '{', '}', '(', ')', '/', '?', ',', '.', '<', '>', '-', '_', '=', '+', ';', ':', "'", '"', '`', '~', '\\', '|', '!', '@', '#', '$', '%', '^', '&', '*'].includes(e.key)) {
-    return e.key;
+  // 【重要修复】标点符号键：使用 e.code（物理键码），不受 Option/Shift 影响
+  // Option + , 时，e.key 可能是特殊字符，但 e.code = 'Comma'
+  // 这样设置和使用时的格式一致：LeftOption+Comma
+  if (['Comma', 'Period', 'Slash', 'Semicolon', 'Quote', 'BracketLeft', 'BracketRight', 'Backslash', 'Minus', 'Equal', 'Backquote'].includes(e.code)) {
+    return e.code;
   }
 
   // Handle arrow keys
