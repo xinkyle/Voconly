@@ -693,6 +693,10 @@ fn install_update_v2(file_path: &PathBuf, app_handle: &tauri::AppHandle) -> Resu
 
                 // 创建备份目录
                 let backup_dir = std::env::temp_dir().join("voconly_backup");
+                if !backup_dir.exists() {
+                    fs::create_dir_all(&backup_dir)
+                        .map_err(|e| format!("Failed to create backup dir: {}", e))?;
+                }
 
                 // 尝试移动当前应用到备份目录
                 let move_result = fs::rename(&app_path, backup_dir.join("old_app"));
