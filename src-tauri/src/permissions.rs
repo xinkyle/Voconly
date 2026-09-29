@@ -51,6 +51,8 @@ fn get_current_signature() -> Option<String> {
         .find(|p| p.extension().map(|e| e == "app").unwrap_or(false))?
         .to_path_buf();
 
+    log::info!("[Signature] Checking signature for: {:?}", app_bundle_path);
+
     // 执行 codesign 命令获取签名信息
     let output = std::process::Command::new("/usr/bin/codesign")
         .args(["-dv", &app_bundle_path.to_string_lossy()])
@@ -59,10 +61,12 @@ fn get_current_signature() -> Option<String> {
 
     // 解析输出，提取 CDHash 或 Identifier
     let output_str = String::from_utf8_lossy(&output.stderr);
+    log::info!("[Signature] codesign output:\n{}", output_str);
 
     // 尝试提取 CDHash（更精确的签名标识）
     for line in output_str.lines() {
         if line.starts_with("CDHash=") {
+            log::info!("[Signature] Found CDHash: {}", line);
             return Some(line.to_string());
         }
     }
@@ -70,10 +74,12 @@ fn get_current_signature() -> Option<String> {
     // 如果没有 CDHash，尝试提取 Identifier
     for line in output_str.lines() {
         if line.starts_with("Identifier=") {
+            log::info!("[Signature] No CDHash found, using Identifier: {}", line);
             return Some(line.to_string());
         }
     }
 
+    log::warn!("[Signature] No CDHash or Identifier found in codesign output");
     None
 }
 
@@ -86,7 +92,13 @@ fn get_current_signature() -> Option<String> {
 /// 读取存储的签名
 fn get_stored_signature() -> Option<String> {
     let path = get_signature_file_path()?;
-    fs::read_to_string(path).ok()
+    let signature = fs::read_to_string(&path).ok();
+    if let Some(ref sig) = signature {
+        log::info!("[Signature] Stored signature from {:?}: {}", path, sig);
+    } else {
+        log::info!("[Signature] No stored signature found at {:?}", path);
+    }
+    signature
 }
 
 /// 保存当前签名
@@ -129,6 +141,8 @@ fn get_app_identifier() -> String {
     {
         // 从 Info.plist 读取 CFBundleIdentifier
         let info_plist_path = app_path.join("Contents").join("Info.plist");
+        log::info!("[Signature] Looking for Info.plist at: {:?}", info_plist_path);
+
         if info_plist_path.exists() {
             // 使用 plutil 命令解析 plist
             if let Ok(output) = std::process::Command::new("/usr/bin/plutil")
@@ -137,6 +151,7 @@ fn get_app_identifier() -> String {
             {
                 let bundle_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 if !bundle_id.is_empty() {
+                    log::info!("[Signature] Bundle ID from Info.plist: {}", bundle_id);
                     return bundle_id;
                 }
             }
@@ -144,11 +159,14 @@ fn get_app_identifier() -> String {
 
         // 如果读取失败，从 .app 路径提取应用名称作为后备
         if let Some(name) = app_path.file_stem() {
-            return format!("com.{}", name.to_string_lossy());
+            let fallback_id = format!("com.{}", name.to_string_lossy());
+            log::info!("[Signature] Using fallback Bundle ID from app name: {}", fallback_id);
+            return fallback_id;
         }
     }
 
     // 默认使用 voconly.desktop（与 tauri.conf.json 保持一致）
+    log::info!("[Signature] Using default Bundle ID: com.voconly.desktop");
     "com.voconly.desktop".to_string()
 }
 
@@ -174,12 +192,14 @@ pub fn check_signature_changed() -> bool {
     let changed = match &stored_sig {
         Some(stored) => {
             // 有历史签名，对比是否变化
+            log::info!("[Signature] Comparing signatures:\n  Stored: {}\n  Current: {}", stored, current_sig);
             stored != &current_sig
         }
         None => {
             // 无历史签名（新安装），视为"变化"，执行清理
             // 这是安全的，因为新安装没有旧授权需要清理
             // 但可以确保签名文件被创建
+            log::info!("[Signature] No stored signature, treating as changed");
             true
         }
     };
@@ -201,6 +221,14 @@ pub fn check_signature_changed() -> bool {
         true
     } else {
         log::info!("[Signature] Signature unchanged: {}", current_sig);
+
+        // 即使签名未变化，也检查授权状态
+        // 如果辅助功能未授权，可能是之前用错误的 Bundle ID 清理失败
+        if !ax_is_trusted(false) {
+            log::info!("[Signature] Accessibility not granted, attempting to clear stale entries");
+            clear_old_permissions();
+        }
+
         false
     }
 }
