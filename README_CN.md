@@ -178,6 +178,8 @@ MIT License —— 版权所有 (c) 2026 Xing Yong
 Voconly 是这些实验中的一个。  
 📧 laoxingai@139.com
 
+![意见交流群二维码](https://serverless-qrcode-hub.savagexykj.workers.dev/voconly)
+
 ### 技术栈
 
 Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp
