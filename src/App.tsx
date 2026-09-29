@@ -308,6 +308,26 @@ function App() {
     checkUpdatesOnStartup();
   }, []);
 
+  // Check signature change on startup (macOS only)
+  // Detects if app signature changed (ad-hoc signing), clears old permission entries
+  useEffect(() => {
+    const checkSignature = async () => {
+      try {
+        // Delay 2 seconds to not block startup
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const changed = await invoke<boolean>('check_signature_changed');
+        if (changed) {
+          log.info('[Signature] App signature changed, old permission entries cleared');
+        }
+      } catch (error) {
+        log.error('Signature check failed: ' + String(error));
+      }
+    };
+
+    checkSignature();
+  }, []);
+
   // Keep a ref to the recorder for use in callbacks (avoids closure stale state)
   const recorderRef = useRef<ReturnType<typeof useRecorder> | null>(null);
 

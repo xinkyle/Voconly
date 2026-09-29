@@ -506,6 +506,14 @@ fn reset_input_monitoring_permission(app: AppHandle) {
     permissions::reset_input_monitoring(&app.config().identifier);
 }
 
+/// 检查应用签名是否变化（仅 macOS 有效）。
+/// 签名变化时，会自动清理旧的授权条目。
+/// 返回 true 表示签名变化（已执行清理）。
+#[tauri::command]
+fn check_signature_changed() -> bool {
+    permissions::check_signature_changed()
+}
+
 #[tauri::command]
 async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let start_time = std::time::Instant::now();
@@ -2102,6 +2110,7 @@ fn main() {
             check_accessibility_permission,
             request_accessibility_permission,
             reset_input_monitoring_permission,
+            check_signature_changed,
             load_config,
             save_config,
             get_model_storage_path,

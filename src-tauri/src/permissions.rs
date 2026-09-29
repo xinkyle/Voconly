@@ -12,6 +12,188 @@
 //!
 //! 输入监控权限的检查由 keyhook 插件处理（通过尝试创建 CGEventTap），
 //! 本模块只负责辅助功能权限和重置输入监控条目。
+//!
+//! 签名检测：
+//! - ad-hoc 签名的应用每次构建签名都会变化
+//! - 签名变化后，旧的授权条目失效，需要清理
+//! - 通过对比存储的签名和当前签名，判断是否需要清理
+
+use std::path::PathBuf;
+use std::fs;
+
+/// 获取应用配置目录（用于存储签名文件）
+fn get_signature_file_path() -> Option<PathBuf> {
+    // 使用应用数据目录
+    let home = std::env::var("HOME").ok()?;
+    let config_dir = PathBuf::from(home)
+        .join("Library")
+        .join("Application Support")
+        .join("Voconly");
+
+    // 确保目录存在
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).ok()?;
+    }
+
+    Some(config_dir.join("app_signature.txt"))
+}
+
+/// 获取当前应用的签名标识（CDHash）
+/// 使用 codesign 命令获取签名信息
+#[cfg(target_os = "macos")]
+fn get_current_signature() -> Option<String> {
+    // 获取当前应用的路径
+    let app_path = std::env::current_exe().ok()?;
+
+    // 获取 .app 包路径（从 MacOS/Voconly 回退到 .app）
+    let app_bundle_path = app_path
+        .ancestors()
+        .find(|p| p.extension().map(|e| e == "app").unwrap_or(false))?
+        .to_path_buf();
+
+    // 执行 codesign 命令获取签名信息
+    let output = std::process::Command::new("/usr/bin/codesign")
+        .args(["-dv", &app_bundle_path.to_string_lossy()])
+        .output()
+        .ok()?;
+
+    // 解析输出，提取 CDHash 或 Identifier
+    let output_str = String::from_utf8_lossy(&output.stderr);
+
+    // 尝试提取 CDHash（更精确的签名标识）
+    for line in output_str.lines() {
+        if line.starts_with("CDHash=") {
+            return Some(line.to_string());
+        }
+    }
+
+    // 如果没有 CDHash，尝试提取 Identifier
+    for line in output_str.lines() {
+        if line.starts_with("Identifier=") {
+            return Some(line.to_string());
+        }
+    }
+
+    None
+}
+
+/// 非 macOS 平台没有签名检测
+#[cfg(not(target_os = "macos"))]
+fn get_current_signature() -> Option<String> {
+    None
+}
+
+/// 读取存储的签名
+fn get_stored_signature() -> Option<String> {
+    let path = get_signature_file_path()?;
+    fs::read_to_string(path).ok()
+}
+
+/// 保存当前签名
+fn save_signature(signature: &str) -> Option<()> {
+    let path = get_signature_file_path()?;
+    fs::write(path, signature).ok()
+}
+
+/// 清理旧的授权条目
+#[cfg(target_os = "macos")]
+fn clear_old_permissions() {
+    // 获取应用标识符
+    let identifier = get_app_identifier();
+
+    // 清理输入监控权限
+    reset_tcc_service("ListenEvent", &identifier);
+
+    // 清理辅助功能权限
+    reset_tcc_service("Accessibility", &identifier);
+
+    log::info!("[Signature] Cleared old permissions for: {}", identifier);
+}
+
+/// 非 macOS 平台无需清理
+#[cfg(not(target_os = "macos"))]
+fn clear_old_permissions() {}
+
+/// 获取应用标识符（用于 tccutil）
+#[cfg(target_os = "macos")]
+fn get_app_identifier() -> String {
+    // 获取当前应用的路径
+    if let Some(app_path) = std::env::current_exe()
+        .ok()
+        .and_then(|p| {
+            p.ancestors()
+                .find(|p| p.extension().map(|e| e == "app").unwrap_or(false))
+                .map(|p| p.to_path_buf())
+        })
+    {
+        // 从 .app 路径提取应用名称
+        if let Some(name) = app_path.file_stem() {
+            return format!("com.{}", name.to_string_lossy());
+        }
+    }
+
+    // 默认使用 Voconly
+    "com.Voconly".to_string()
+}
+
+/// 检查签名是否变化，如果变化则清理旧授权条目
+/// 返回 true 表示签名变化（已执行清理）
+/// 返回 false 表示签名未变化
+#[cfg(target_os = "macos")]
+pub fn check_signature_changed() -> bool {
+    // 获取当前签名
+    let current_sig = match get_current_signature() {
+        Some(sig) => sig,
+        None => {
+            // 获取签名失败，按保守策略处理（不清理）
+            log::warn!("[Signature] Failed to get current signature, skip clearing");
+            return false;
+        }
+    };
+
+    // 读取存储的签名
+    let stored_sig = get_stored_signature();
+
+    // 判断是否变化
+    let changed = match stored_sig {
+        Some(stored) => {
+            // 有历史签名，对比是否变化
+            stored != current_sig
+        }
+        None => {
+            // 无历史签名（新安装），视为"变化"，执行清理
+            // 这是安全的，因为新安装没有旧授权需要清理
+            // 但可以确保签名文件被创建
+            true
+        }
+    };
+
+    if changed {
+        log::info!("[Signature] Signature changed: {} -> {}",
+            stored_sig.as_deref().unwrap_or("(none)"),
+            current_sig
+        );
+
+        // 清理旧的授权条目
+        clear_old_permissions();
+
+        // 保存当前签名
+        if save_signature(&current_sig).is_none() {
+            log::error!("[Signature] Failed to save signature");
+        }
+
+        true
+    } else {
+        log::info!("[Signature] Signature unchanged: {}", current_sig);
+        false
+    }
+}
+
+/// 非 macOS 平台签名永远不会变化
+#[cfg(not(target_os = "macos"))]
+pub fn check_signature_changed() -> bool {
+    false
+}
 
 /// 静默检查当前进程是否被信任为辅助功能（Accessibility）客户端。
 /// `prompt` 为 true 时，未授权会弹出系统引导窗，并把当前二进制注册进
