@@ -569,12 +569,14 @@ impl ModelManager {
             .as_ref()
             .ok_or_else(|| format!("Model path not set: {}", model_id))?;
 
+        // TODO: 内存检查暂时禁用，后续修复单位转换问题后重新启用
         // 检查内存是否足够（除非跳过检查）
-        if !skip_memory_check {
-            if let Err(mem_error) = Self::check_memory_available(model_path, &model_config) {
-                return Err(mem_error);
-            }
-        }
+        // if !skip_memory_check {
+        //     if let Err(mem_error) = Self::check_memory_available(model_path, &model_config) {
+        //         return Err(mem_error);
+        //     }
+        // }
+        let _ = skip_memory_check; // 避免未使用变量警告
 
         info!(
             "[ModelManager] 模型配置: backend={:?}, path={}",
