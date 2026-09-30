@@ -413,6 +413,8 @@ function App() {
         const granted = await checkAccessibilityPermission();
         if (granted) {
           setShowAccessibilityBanner(false);
+          // 显示重启对话框
+          setShowPermissionRestartDialog(true);
           // 辅助功能已授权，尝试重启键盘监听
           try {
             const { commands } = await import('@tauri-keyhook');
@@ -436,6 +438,8 @@ function App() {
           if (!isListening) {
             log.info('Window focused, trying to restart keyhook');
             await commands.startListen();
+            // 如果启动成功，显示重启对话框
+            setShowPermissionRestartDialog(true);
           }
         } catch (err) {
           log.error(`Failed to restart keyhook: ${err}`);
@@ -2054,23 +2058,10 @@ function App() {
         <AccessibilityBanner
           mode="accessibility"
           onAuthorize={async () => {
-            const granted = await requestAccessibilityPermission();
-            if (granted) {
-              setShowAccessibilityBanner(false);
-              // 显示重启对话框
-              setShowPermissionRestartDialog(true);
-              // 辅助功能授权成功后，立即启动 keyhook（触发输入监控授权）
-              try {
-                const { commands } = await import('@tauri-keyhook');
-                const isListening = await commands.isListening();
-                if (!isListening) {
-                  log.info('Starting keyhook after accessibility permission granted');
-                  await commands.startListen();
-                }
-              } catch (err) {
-                log.error(`Failed to start keyhook: ${err}`);
-              }
-            }
+            // 打开系统设置让用户授权
+            await requestAccessibilityPermission();
+            // 用户将在系统设置中授权，返回应用后会触发窗口焦点事件
+            // 焦点事件会检查权限状态并显示重启对话框
           }}
           onDismiss={() => setShowAccessibilityBanner(false)}
         />
@@ -2095,8 +2086,8 @@ function App() {
               const { commands } = await import('@tauri-keyhook');
               await commands.startListen();
               log.info('Keyhook restarted after resetting input monitoring');
-              // 显示重启对话框
-              setShowPermissionRestartDialog(true);
+              // 用户将在系统设置中授权，返回应用后会触发窗口焦点事件
+              // 焦点事件会检查权限状态并显示重启对话框
             } catch (err) {
               log.error(`Failed to restart keyhook: ${err}`);
             }
