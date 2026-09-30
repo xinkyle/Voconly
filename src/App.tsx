@@ -252,6 +252,8 @@ function App() {
     if (config?.tutorialCompleted === true && !permissionChecked) {
       // Tutorial was already completed, check permission now
       checkMicPermission();
+      // 检查辅助功能权限（macOS）
+      checkAccessibility();
       // 显示配置重置提示（如果需要）
       if (showConfigResetNotice) {
         log.info('[ConfigReset] Showing toast notification');
@@ -261,7 +263,7 @@ function App() {
         log.info('[ConfigReset] showConfigResetNotice is false, skipping toast');
       }
     }
-  }, [config?.tutorialCompleted, permissionChecked, checkMicPermission, showConfigResetNotice, showToast, t]);
+  }, [config?.tutorialCompleted, permissionChecked, checkMicPermission, checkAccessibility, showConfigResetNotice, showToast, t]);
 
   // Check for updates on startup
   useEffect(() => {
