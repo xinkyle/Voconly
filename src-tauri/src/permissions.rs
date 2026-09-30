@@ -107,7 +107,7 @@ fn save_signature(signature: &str) -> Option<()> {
     fs::write(path, signature).ok()
 }
 
-/// 清理旧的授权条目，并触发系统重新注册
+/// 清理旧的授权条目
 #[cfg(target_os = "macos")]
 fn clear_old_permissions() {
     // 获取应用标识符
@@ -121,10 +121,7 @@ fn clear_old_permissions() {
 
     log::info!("[Signature] Cleared old permissions for: {}", identifier);
 
-    // 触发系统重新注册应用到授权列表（不弹窗，只注册）
-    // 这样前端检测时就能正确显示"未授权"状态
-    log::info!("[Signature] Triggering system re-registration");
-    ax_is_trusted(true);
+    // 注意：不在这里触发授权弹窗，等前端检测到未授权后由用户主动触发
 }
 
 /// 非 macOS 平台无需清理

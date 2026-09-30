@@ -42,7 +42,6 @@ import { checkForUpdates, getUpdateState } from './services/updater';
 import UpdateDialog from './components/UpdateDialog';
 import PermissionModal from './components/PermissionModal';
 import AccessibilityBanner from './components/AccessibilityBanner';
-import AccessibilityModal from './components/AccessibilityModal';
 import DownloadErrorDialog from './components/DownloadErrorDialog';
 import { checkAccessibilityPermission, requestAccessibilityPermission, resetInputMonitoringPermission } from './services/permissions';
 import type { RemoteVersionInfo } from './types/updater';
@@ -173,7 +172,6 @@ function App() {
 
   // Accessibility permission state (macOS only, other platforms always granted)
   const [showAccessibilityBanner, setShowAccessibilityBanner] = useState(false);
-  const [showAccessibilityModal, setShowAccessibilityModal] = useState(false);
   const [accessibilityChecked, setAccessibilityChecked] = useState(false);
   const [showKeyhookBanner, setShowKeyhookBanner] = useState(false);
 
@@ -231,20 +229,18 @@ function App() {
       log.info(`Accessibility permission: ${granted}`);
 
       if (!granted) {
-        // 未授权 → 显示引导弹窗（首次）或横幅（后续）
-        setShowAccessibilityModal(!showAccessibilityBanner);
+        // 未授权 → 显示横幅
         setShowAccessibilityBanner(true);
       } else {
-        // 已授权 → 清除所有引导 UI
+        // 已授权 → 清除引导 UI
         setShowAccessibilityBanner(false);
-        setShowAccessibilityModal(false);
       }
       setAccessibilityChecked(true);
     } catch (error) {
       log.error(`Accessibility check failed: ${error}`);
       setAccessibilityChecked(true); // 失败时也标记已检查，避免反复尝试
     }
-  }, [accessibilityChecked, showAccessibilityBanner]);
+  }, [accessibilityChecked]);
 
   // Check permission when config is loaded and tutorial is already completed
   useEffect(() => {
@@ -2042,13 +2038,24 @@ function App() {
       />
 
       {/* Accessibility Permission Banner (macOS only) */}
-      {showAccessibilityBanner && !showAccessibilityModal && (
+      {showAccessibilityBanner && (
         <AccessibilityBanner
           mode="accessibility"
           onAuthorize={async () => {
             const granted = await requestAccessibilityPermission();
             if (granted) {
               setShowAccessibilityBanner(false);
+              // 辅助功能授权成功后，立即启动 keyhook（触发输入监控授权）
+              try {
+                const { commands } = await import('@tauri-keyhook');
+                const isListening = await commands.isListening();
+                if (!isListening) {
+                  log.info('Starting keyhook after accessibility permission granted');
+                  await commands.startListen();
+                }
+              } catch (err) {
+                log.error(`Failed to start keyhook: ${err}`);
+              }
             }
           }}
           onDismiss={() => setShowAccessibilityBanner(false)}
@@ -2081,19 +2088,6 @@ function App() {
           onDismiss={() => setShowKeyhookBanner(false)}
         />
       )}
-
-      {/* Accessibility Permission Modal (first-time onboarding) */}
-      <AccessibilityModal
-        isOpen={showAccessibilityModal}
-        onSkip={() => setShowAccessibilityModal(false)}
-        onAuthorize={async () => {
-          const granted = await requestAccessibilityPermission();
-          if (granted) {
-            setShowAccessibilityModal(false);
-            setShowAccessibilityBanner(false);
-          }
-        }}
-      />
     </div>
   );
 }
