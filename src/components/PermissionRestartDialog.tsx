@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { restartApp } from '../services/updater';
+import { createLogger } from '../services/log';
+
+const log = createLogger('PermissionRestartDialog');
 
 interface PermissionRestartDialogProps {
   visible: boolean;
@@ -15,7 +18,14 @@ export default function PermissionRestartDialog({
   if (!visible) return null;
 
   const handleRestart = async () => {
-    await restartApp();
+    try {
+      log.info('User clicked restart button, calling restartApp()');
+      await restartApp();
+      log.info('restartApp() completed successfully');
+    } catch (error) {
+      log.error(`restartApp() failed: ${error}`);
+      alert(`重启失败: ${error}`);
+    }
   };
 
   return (
@@ -43,7 +53,7 @@ export default function PermissionRestartDialog({
           </button>
           <button
             onClick={handleRestart}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
           >
             {t('common.restartNow', '立即重启')}
           </button>

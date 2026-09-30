@@ -55,6 +55,7 @@
     "keyhook:allow-stop-listen",
     "keyhook:allow-is-listening",
     "keyhook:allow-set-shortcut-block",
-    "keyhook:allow-clear-block-rule"
+    "keyhook:allow-clear-block-rule",
+    "process:allow-restart"
   ]
 }
