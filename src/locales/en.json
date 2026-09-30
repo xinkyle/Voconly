@@ -681,6 +681,12 @@
     "error": "Permission request failed. Please try again.",
     "openSettings": "Open System Settings"
   },
+  "accessibility": {
+    "permissionGranted": "Permission Granted",
+    "restartRequired": "Please restart the app to take effect",
+    "restartNow": "Restart Now",
+    "later": "Restart Later"
+  },
   "download": {
     "errorTitle": "Download Failed",
     "errorDesc": "{{name}} download failed. You can retry or select another downloaded model.",

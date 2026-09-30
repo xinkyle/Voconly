@@ -709,7 +709,11 @@
     "keyhookBannerText": "全局快捷键暂不可用，请在「输入监控」中允许 Voconly",
     "keyhookAuthorizeHint": "请在「输入监控」列表中打开 Voconly 的开关",
     "dismiss": "暂不提醒",
-    "pasteFailedToast": "未获辅助功能权限：文字已复制到剪贴板，可手动 ⌘V 粘贴"
+    "pasteFailedToast": "未获辅助功能权限：文字已复制到剪贴板，可手动 ⌘V 粘贴",
+    "permissionGranted": "授权成功",
+    "restartRequired": "需要重启应用才能生效",
+    "restartNow": "立即重启",
+    "later": "稍后重启"
   },
   "download": {
     "errorTitle": "模型下载失败",

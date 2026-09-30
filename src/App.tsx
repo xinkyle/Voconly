@@ -19,6 +19,7 @@ import { subscribeToDownloadProgress, subscribeToDownloadComplete, subscribeToDo
 import { useSceneShortcuts } from './hooks/useShortcut';
 import { useRecorder } from './hooks/useRecorder';
 import MemoryErrorDialog from './components/MemoryErrorDialog';
+import PermissionRestartDialog from './components/PermissionRestartDialog';
 import {
   recordPerformance,
   initPerformanceCache,
@@ -191,6 +192,9 @@ function App() {
     requiredMemory: '',
     availableMemory: '',
   });
+
+  // Permission restart dialog state
+  const [showPermissionRestartDialog, setShowPermissionRestartDialog] = useState(false);
 
   // Check microphone permission - called after tutorial is complete or if tutorial was already completed
   const checkMicPermission = useCallback(async () => {
@@ -2037,6 +2041,14 @@ function App() {
         }}
       />
 
+      {/* Permission Restart Dialog */}
+      <PermissionRestartDialog
+        visible={showPermissionRestartDialog}
+        onClose={() => {
+          setShowPermissionRestartDialog(false);
+        }}
+      />
+
       {/* Accessibility Permission Banner (macOS only) */}
       {showAccessibilityBanner && (
         <AccessibilityBanner
@@ -2045,6 +2057,8 @@ function App() {
             const granted = await requestAccessibilityPermission();
             if (granted) {
               setShowAccessibilityBanner(false);
+              // 显示重启对话框
+              setShowPermissionRestartDialog(true);
               // 辅助功能授权成功后，立即启动 keyhook（触发输入监控授权）
               try {
                 const { commands } = await import('@tauri-keyhook');
@@ -2081,6 +2095,8 @@ function App() {
               const { commands } = await import('@tauri-keyhook');
               await commands.startListen();
               log.info('Keyhook restarted after resetting input monitoring');
+              // 显示重启对话框
+              setShowPermissionRestartDialog(true);
             } catch (err) {
               log.error(`Failed to restart keyhook: ${err}`);
             }
