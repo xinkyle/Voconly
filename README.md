@@ -176,7 +176,7 @@ What can one person build with AI today?
 Voconly is one of those experiments.  
 📧 laoxingai@139.com
 
-![Feedback Group QR Code](public/wechat-group.png)
+<img src="public/wechat-group.png" alt="Feedback Group QR Code" width="200" />
 
 ### Tech Stack
 

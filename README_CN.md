@@ -178,7 +178,7 @@ MIT License —— 版权所有 (c) 2026 Xing Yong
 Voconly 是这些实验中的一个。  
 📧 laoxingai@139.com
 
-![意见交流群二维码](public/wechat-group.png)
+<img src="public/wechat-group.png" alt="意见交流群二维码" width="200" />
 
 ### 技术栈
 
