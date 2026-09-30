@@ -1,4 +1,16 @@
 # Changelog
+## [0.5.18] - 2026-09-30
+
+### 体验优化
+1. **授权重启提示优化** - macOS 授权成功后显示对话框，提示用户需要重启应用才能生效，并提供"立即重启"和"稍后重启"按钮。
+
+---
+
+### Improvements
+1. **Authorization restart prompt optimized** - After macOS permission is granted, a dialog appears to inform user that app restart is required, with "Restart Now" and "Restart Later" buttons.
+
+===
+
 ## [0.5.17] - 2026-09-30
 
 ### 问题修复
