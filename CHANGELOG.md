@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.16] - 2026-09-30
+
+### 问题修复
+1. **内存检测错误修复**，修复了 macOS 和 Windows 平台上内存检测单位转换错误导致误报内存不足的问题。该问题表现为即使系统有充足内存也会提示"内存空间不足，可用空间为 0"。已临时移除内存检测功能，后续将修复单位转换问题后重新启用。
+
+---
+
+### Bug Fixes
+1. **Memory detection error fixed** - Fixed memory detection unit conversion errors on macOS and Windows that caused false "insufficient memory" warnings. The issue manifested as showing "memory space insufficient, available space is 0" even when the system had ample memory. Memory detection has been temporarily disabled, and will be re-enabled after fixing the unit conversion issue.
+
+===
+
 ## [0.5.15] - 2026-09-29
 
 ### 问题修复
