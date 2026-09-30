@@ -544,6 +544,16 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
     try {
       log.info('[initializeKeyhook] Starting...');
 
+      // macOS 上需要先检查辅助功能权限
+      if (/Mac|iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        const { checkAccessibilityPermission } = await import('../services/permissions');
+        const accessibilityGranted = await checkAccessibilityPermission();
+        if (!accessibilityGranted) {
+          log.info('[initializeKeyhook] Accessibility permission not granted, skipping keyhook initialization');
+          return; // 辅助功能未授权，不启动 keyhook
+        }
+      }
+
       // 动态导入 keyhook 模块
       const { commands, events } = await import('@tauri-keyhook');
       log.info('[initializeKeyhook] Module imported');
