@@ -1,4 +1,22 @@
 # Changelog
+## [0.5.19] - 2026-10-05
+
+### 新功能
+1. **开机启动后最小化到托盘**，应用开机启动后自动最小化到系统托盘，不显示主窗口，用户可在系统设置中自定义此行为，默认开启。
+
+### 问题修复
+2. **Provider API Key 保存问题修复**，修复更新已配置的 Provider 的 API Key 后无法保存新 API Key 的问题。
+
+---
+
+### New Features
+1. **Minimize to tray on startup** - The app automatically minimizes to system tray on startup without showing the main window, users can customize this behavior in system settings, enabled by default.
+
+### Bug Fixes
+2. **Provider API Key save issue fixed** - Fixed the issue where updating API Key for a configured Provider could not save the new API Key.
+
+===
+
 ## [0.5.18] - 2026-09-30
 
 ### 体验优化
