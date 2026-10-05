@@ -153,6 +153,7 @@ export interface AppConfig {
   llmProfiles?: LlmProfile[];
   llmPromptPresets?: UserPromptPresets;  // 提示词预设（单一存储）
   autoStart?: boolean;          // 开机自启
+  minimizeToTrayOnStartup?: boolean;  // 开机启动后最小化到托盘（默认 true）
   defaultMicrophone?: string;   // 默认麦克风设备ID
   checkUpdates?: boolean;       // 自动检查更新
   showShortcutHint?: boolean;  // 显示快捷键提示

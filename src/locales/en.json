@@ -33,6 +33,8 @@
       "languageEn": "English",
       "autostart": "Auto-start on boot",
       "autostartDesc": "Automatically run the application when system starts",
+      "minimizeToTray": "Minimize to tray on startup",
+      "minimizeToTrayDesc": "The app will minimize to system tray on startup without showing the main window",
       "checkUpdates": "Auto-check updates",
       "checkUpdatesDesc": "Automatically check for updates on startup",
       "previewHeight": "Preview Window Height",

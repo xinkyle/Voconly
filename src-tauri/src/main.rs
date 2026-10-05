@@ -2057,6 +2057,10 @@ fn main() {
         main_start.elapsed().as_millis()
     );
 
+    // 提取配置：开机启动后是否最小化到托盘
+    let minimize_to_tray_on_startup = config.minimize_to_tray_on_startup.unwrap_or(true);
+    debug!("[STARTUP] 开机启动后最小化到托盘: {}", minimize_to_tray_on_startup);
+
     let console_filter_clone = console_filter.clone();
     let result = tauri::Builder::default()
         .manage(AppState {
@@ -2246,7 +2250,7 @@ fn main() {
             voconly::file_transcription::delete_file_transcription,
             voconly::file_transcription::clear_file_transcription_history,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let setup_start = Instant::now();
             info!("[STARTUP] ===== Tauri Setup 开始 =====");
 
@@ -2285,6 +2289,7 @@ fn main() {
             // Create main window with custom WebView data directory
             // Window is initially hidden to prevent showing blank content
             // It will be shown after the page loads (via on_page_load event)
+            // unless minimize_to_tray_on_startup is enabled
             let main_window_start = Instant::now();
             let main_window = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("Voconly - 语音输入")
@@ -2300,10 +2305,15 @@ fn main() {
                 .visible(false) // Initially hidden, show after page loads
                 .center()
                 .data_directory(webview_data_dir.clone())
-                .on_page_load(|window, _payload| {
-                    debug!("[STARTUP] Main window page loaded, showing window");
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                .on_page_load(move |window, _payload| {
+                    // 根据配置决定是否显示窗口
+                    if minimize_to_tray_on_startup {
+                        debug!("[STARTUP] Main window page loaded, keeping hidden (minimize to tray on startup)");
+                    } else {
+                        debug!("[STARTUP] Main window page loaded, showing window");
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
                 })
                 .build()
                 .expect("Failed to create main window");

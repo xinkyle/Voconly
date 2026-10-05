@@ -17,6 +17,7 @@ interface SettingsSystemProps {
 export default function SettingsSystem({ config, onSave }: SettingsSystemProps) {
   const { t, i18n } = useTranslation();
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart ?? true);
+  const [minimizeToTray, setMinimizeToTray] = useState<boolean>(config.minimizeToTrayOnStartup ?? true);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
   const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'low');
   const [asrIdleTimeout, setAsrIdleTimeout] = useState<number>(config.asrIdleTimeoutSeconds ?? 300);
@@ -35,12 +36,13 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   // Sync state when config changes
   useEffect(() => {
     setAutostartEnabled(config.autoStart ?? true);
+    setMinimizeToTray(config.minimizeToTrayOnStartup ?? true);
     setCheckUpdates(config.checkUpdates ?? false);
     setPreviewHeight(config.previewHeight ?? 'low');
     setSelectedMic(config.defaultMicrophone || '');
     setAsrIdleTimeout(config.asrIdleTimeoutSeconds ?? 300);
     setLoading(false);
-  }, [config.autoStart, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);
+  }, [config.autoStart, config.minimizeToTrayOnStartup, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);
 
   // Load microphones and log dir on mount
   useEffect(() => {
@@ -105,6 +107,12 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleMinimizeToTrayToggle = (enabled: boolean) => {
+    setMinimizeToTray(enabled);
+    const newConfig = { ...config, minimizeToTrayOnStartup: enabled };
+    onSave(newConfig);
   };
 
   const handleCheckUpdatesToggle = (enabled: boolean) => {
@@ -196,6 +204,35 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                 autostartEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Minimize to tray on startup setting */}
+        <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
+          minimizeToTray ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+        }`}>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className={`w-4 h-4 ${minimizeToTray ? 'text-gray-900' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.minimizeToTray')}</p>
+              <p className="text-xs text-gray-500">{t('settings.system.minimizeToTrayDesc')}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleMinimizeToTrayToggle(!minimizeToTray)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 ${
+              minimizeToTray ? 'bg-gray-700' : 'bg-gray-200'
+            } cursor-pointer`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                minimizeToTray ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
           </button>

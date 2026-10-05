@@ -33,6 +33,8 @@
       "languageEn": "English",
       "autostart": "开机自启",
       "autostartDesc": "系统启动时自动运行应用程序",
+      "minimizeToTray": "开机启动后最小化到托盘",
+      "minimizeToTrayDesc": "开机启动后应用将最小化到系统托盘，不显示主窗口",
       "checkUpdates": "自动检查更新",
       "checkUpdatesDesc": "启动时自动检查应用程序更新",
       "previewHeight": "预览窗口高度",

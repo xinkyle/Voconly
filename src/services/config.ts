@@ -92,6 +92,7 @@ interface RustAppConfig {
   llmProviders?: Record<string, RustLlmProviderInstance>;
   userDictionary?: RustUserDictionary;
   autoStart?: boolean;
+  minimizeToTrayOnStartup?: boolean;
   defaultMicrophone?: string;
   checkUpdates?: boolean;
   showShortcutHint?: boolean;
@@ -256,6 +257,7 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     ) : undefined,
     userDictionary: rust.userDictionary,
     autoStart: rust.autoStart,
+    minimizeToTrayOnStartup: rust.minimizeToTrayOnStartup,
     defaultMicrophone: rust.defaultMicrophone,
     checkUpdates: rust.checkUpdates,
     showShortcutHint: rust.showShortcutHint,
@@ -303,6 +305,7 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
     ) : undefined,
     userDictionary: config.userDictionary,
     autoStart: config.autoStart,
+    minimizeToTrayOnStartup: config.minimizeToTrayOnStartup,
     defaultMicrophone: config.defaultMicrophone,
     checkUpdates: config.checkUpdates,
     showShortcutHint: config.showShortcutHint,
