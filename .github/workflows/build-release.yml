@@ -19,9 +19,6 @@ on:
           - 'all'       # 构建所有平台
           - 'windows'   # 仅构建 Windows
           - 'macos'     # 仅构建 macOS
-  push:
-    tags:
-      - 'v*'
 
 # 添加权限配置，允许创建 release
 permissions:
@@ -54,11 +51,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
 
       - name: Install Vulkan SDK
         uses: jakoch/install-vulkan-sdk-action@v1.0.0
@@ -185,11 +177,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
 
       - name: Install dependencies
         run: pnpm install
