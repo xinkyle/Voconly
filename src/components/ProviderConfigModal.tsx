@@ -60,6 +60,9 @@ export default function ProviderConfigModal({
   // 高级设置展开状态（默认收起）
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
+  // API Key 是否被修改（用于判断是否进入"新配置"流程）
+  const [isApiKeyDirty, setIsApiKeyDirty] = useState(false);
+
   // 已配置时，自动加载模型列表
   useEffect(() => {
     if (isConfigured) {
@@ -133,6 +136,8 @@ export default function ProviderConfigModal({
     setSelectedModel('');
     const error = validateApiKey(value);
     setApiKeyError(error);
+    // 标记 API Key 已修改，进入"新配置"流程
+    setIsApiKeyDirty(true);
   };
 
   // Test connection and fetch models
@@ -211,6 +216,8 @@ export default function ProviderConfigModal({
       };
 
       await onSave(meta.id, instance);
+      // 保存成功后重置状态，表示 API Key 不再是"新修改"状态
+      setIsApiKeyDirty(false);
     } catch (err) {
       log.error(`Failed to save: ${err}`);
     } finally {
@@ -424,8 +431,8 @@ export default function ProviderConfigModal({
               {t('common.cancel')}
             </button>
 
-            {/* 未配置：显示连接按钮 */}
-            {!isConfigured && testResult !== 'success' && (
+            {/* 未配置或 API Key 已修改：显示连接按钮 */}
+            {(isApiKeyDirty || !isConfigured) && testResult !== 'success' && (
               <button
                 onClick={handleConnect}
                 disabled={testing || (meta.requiresApiKey && !apiKey.trim())}
@@ -434,18 +441,18 @@ export default function ProviderConfigModal({
                 {testing ? t('provider.connecting') : t('provider.connect')}
               </button>
             )}
-            {/* 首次配置成功：显示保存并选择 */}
-            {!isConfigured && testResult === 'success' && (
+            {/* 首次配置成功或修改 API Key 后连接成功：显示保存 */}
+            {(isApiKeyDirty || !isConfigured) && testResult === 'success' && (
               <button
                 onClick={handleSave}
                 disabled={saving || !selectedModel}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {saving ? t('common.saving') : t('provider.saveAndSelect')}
+                {saving ? t('common.saving') : t('common.save')}
               </button>
             )}
-            {/* 已配置：显示保存 */}
-            {isConfigured && (
+            {/* 已配置且 API Key 未修改：显示保存 */}
+            {!isApiKeyDirty && isConfigured && (
               <button
                 onClick={handleSave}
                 disabled={saving || !selectedModel}
