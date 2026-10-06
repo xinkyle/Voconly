@@ -100,6 +100,9 @@ You're not locked into a single AI stack. Choose between fully local workflows o
 ## Get Started in 60 Seconds
 
 1. **Download** Voconly → [Releases](https://github.com/xinkyle/Voconly/releases)
+   > ⚠️ **Installation notes:**
+   > - **Windows:** If you see "Windows protected your PC", click "More info" → "Run anyway". [Learn more](https://www.voconly.com/zh/faq/#windows-prompt)
+   > - **macOS:** If you see "app is damaged", run `xattr -cr /Applications/voconly.app` in Terminal. [Learn more](https://www.voconly.com/zh/faq/#macos-damaged)
 2. **Launch** it — pick a recommended model
 3. **Press hotkey and start talking** — press again for polished text, double-press for raw transcript
 

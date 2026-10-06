@@ -101,6 +101,9 @@ Voconly 把语音变成**成品文字**。
 ## 60 秒上手
 
 1. **下载** Voconly → [Releases](https://github.com/xinkyle/Voconly/releases)
+   > ⚠️ **安装提示：**
+   > - **Windows：** 如提示"Windows 已保护你的电脑"，点击"更多信息"→"仍要运行"。[了解更多](https://www.voconly.com/zh/faq/#windows-prompt)
+   > - **macOS：** 如提示"安装文件已损坏"，在终端运行 `xattr -cr /Applications/voconly.app`。[了解更多](https://www.voconly.com/zh/faq/#macos-damaged)
 2. **启动**——选择一个推荐模型
 3. **按下快捷键开始说话**——再按一次输出润色文字，双击输出原始转录
 
