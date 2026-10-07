@@ -67,21 +67,9 @@ jobs:
           echo "✅ 下载完成，文件列表："
           ls -lh release-assets/
 
-      - name: Setup SSH for SourceForge
-        run: |
-          # 创建 .ssh 目录
-          mkdir -p ~/.ssh
-
-          # 设置 SSH 私钥
-          echo "${{ secrets.SF_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          # 设置 known_hosts
-          echo "${{ secrets.SF_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Upload to SourceForge
+      - name: Upload to SourceForge using API
         env:
+          SF_API_KEY: ${{ secrets.SF_API_KEY }}
           SF_USERNAME: ${{ secrets.SF_USERNAME }}
           VERSION: ${{ steps.release.outputs.VERSION }}
         run: |
@@ -89,14 +77,36 @@ jobs:
           PROJECT_NAME="voconly"
 
           # SourceForge FRS 路径
-          FRS_PATH="/home/frs/project/${PROJECT_NAME}/${VERSION}"
+          FRS_PATH="${PROJECT_NAME}/${VERSION}"
 
-          # 创建远程目录（如果不存在）
-          ssh ${SF_USERNAME}@shell.sourceforge.net "mkdir -p ${FRS_PATH}"
+          echo "项目名称: ${PROJECT_NAME}"
+          echo "目标路径: ${FRS_PATH}"
+          echo "版本: ${VERSION}"
 
-          # 上传所有文件
+          # 上传每个文件
           echo "开始上传到 SourceForge..."
-          scp -r release-assets/* ${SF_USERNAME}@shell.sourceforge.net:${FRS_PATH}/
+          for file in release-assets/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "上传: ${filename}"
+
+              # 使用 SourceForge API 上传文件
+              response=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Authorization: Bearer ${SF_API_KEY}" \
+                -F "file=@${file}" \
+                "https://sourceforge.net/projects/${PROJECT_NAME}/files/${VERSION}/${filename}" || true)
+
+              http_code=$(echo "$response" | tail -n1)
+              body=$(echo "$response" | head -n -1)
+
+              if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+                echo "✅ ${filename} 上传成功"
+              else
+                echo "❌ ${filename} 上传失败 (HTTP ${http_code})"
+                echo "响应: ${body}"
+              fi
+            fi
+          done
 
           echo ""
           echo "✅ 上传完成！"
