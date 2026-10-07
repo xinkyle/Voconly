@@ -71,12 +71,27 @@ jobs:
         env:
           SF_SSH_KEY_BASE64: ${{ secrets.SF_SSH_KEY_BASE64 }}
         run: |
+          set -x  # 打印每个命令
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
+          # 调试：检查 base64 字符串长度
+          echo "Base64 字符串长度: ${#SF_SSH_KEY_BASE64}"
+
           # 从 base64 解码私钥，保留原始格式
-          echo "$SF_SSH_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
+          echo "$SF_SSH_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa || {
+            echo "❌ Base64 解码失败"
+            exit 1
+          }
+
           chmod 600 ~/.ssh/id_rsa
+
+          # 检查文件是否创建
+          if [ ! -f ~/.ssh/id_rsa ]; then
+            echo "❌ 私钥文件未创建"
+            exit 1
+          fi
 
           # 添加 SourceForge 到 known_hosts
           ssh-keyscan shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
