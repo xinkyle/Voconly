@@ -1,0 +1,112 @@
+name: Publish to SourceForge
+
+# 触发条件：
+# 1. 手动触发 - 在 GitHub Actions 页面点击 "Run workflow"，输入版本号
+# 2. 自动触发 - 当 release 发布时自动触发
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: 0.5.19)'
+        required: true
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-to-sourceforge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 根据触发方式获取版本号
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # 手动触发：使用输入的版本号
+            VERSION="${{ github.event.inputs.version }}"
+            echo "手动触发，版本号: ${VERSION}"
+          else
+            # Release 触发：从 tag 提取版本号
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "Release 触发，版本号: ${VERSION}"
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+          # 验证 release 是否存在
+          echo "检查 release v${VERSION} 是否存在..."
+          gh release view "v${VERSION}" --repo "${{ github.repository }}" || {
+            echo "❌ 错误：Release v${VERSION} 不存在！"
+            exit 1
+          }
+
+      - name: Download release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.release.outputs.VERSION }}"
+
+          # 创建目录
+          mkdir -p release-assets
+
+          # 下载指定版本的所有 release 资产
+          echo "下载 release v${VERSION} 的文件..."
+          gh release download "v${VERSION}" \
+            --dir release-assets \
+            --repo "${{ github.repository }}"
+
+          echo ""
+          echo "✅ 下载完成，文件列表："
+          ls -lh release-assets/
+
+      - name: Setup SSH for SourceForge
+        run: |
+          # 创建 .ssh 目录
+          mkdir -p ~/.ssh
+
+          # 设置 SSH 私钥
+          echo "${{ secrets.SF_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # 设置 known_hosts
+          echo "${{ secrets.SF_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload to SourceForge
+        env:
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          VERSION: ${{ steps.release.outputs.VERSION }}
+        run: |
+          # SourceForge 项目名称
+          PROJECT_NAME="voconly"
+
+          # SourceForge FRS 路径
+          FRS_PATH="/home/frs/project/${PROJECT_NAME}/${VERSION}"
+
+          # 创建远程目录（如果不存在）
+          ssh ${SF_USERNAME}@shell.sourceforge.net "mkdir -p ${FRS_PATH}"
+
+          # 上传所有文件
+          echo "开始上传到 SourceForge..."
+          scp -r release-assets/* ${SF_USERNAME}@shell.sourceforge.net:${FRS_PATH}/
+
+          echo ""
+          echo "✅ 上传完成！"
+          echo "项目页面：https://sourceforge.net/projects/${PROJECT_NAME}/files/${VERSION}/"
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.release.outputs.VERSION }}"
+          echo "## 发布到 SourceForge 完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "版本: v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "SourceForge 文件页面：https://sourceforge.net/projects/voconly/files/${VERSION}/" >> $GITHUB_STEP_SUMMARY
