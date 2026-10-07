@@ -69,13 +69,13 @@ jobs:
 
       - name: Setup SSH for SourceForge
         env:
-          SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
+          SF_SSH_KEY_BASE64: ${{ secrets.SF_SSH_KEY_BASE64 }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # 直接写入私钥，保持原格式
-          echo "$SF_SSH_KEY" > ~/.ssh/id_rsa
+          # 从 base64 解码私钥，保留原始格式
+          echo "$SF_SSH_KEY_BASE64" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           # 添加 SourceForge 到 known_hosts
@@ -86,6 +86,8 @@ jobs:
           echo "验证私钥文件..."
           echo "文件大小: $(wc -c < ~/.ssh/id_rsa) 字节"
           echo "行数: $(wc -l < ~/.ssh/id_rsa) 行"
+          echo "前 3 行内容:"
+          head -n 3 ~/.ssh/id_rsa
 
           # 测试私钥是否有效
           if ssh-keygen -l -f ~/.ssh/id_rsa 2>/dev/null; then
@@ -93,10 +95,9 @@ jobs:
           else
             echo "❌ 私钥格式无效"
             echo ""
-            echo "请检查 GitHub Secret 中的 SF_SSH_KEY："
-            echo "- 是否包含完整的 '-----BEGIN ... PRIVATE KEY-----' 和 '-----END ... PRIVATE KEY-----'"
-            echo "- 是否有多余的空格或换行"
-            echo "- 是否是完整的私钥内容"
+            echo "请检查 GitHub Secret 中的 SF_SSH_KEY_BASE64："
+            echo "- 是否使用了 base64 编码"
+            echo "- 编码命令: cat 私钥文件 | base64 -w 0"
             exit 1
           fi
 
