@@ -93,8 +93,8 @@ jobs:
             exit 1
           fi
 
-          # 添加 SourceForge 到 known_hosts
-          ssh-keyscan shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
+          # 添加 SourceForge 到 known_hosts（失败不影响流程）
+          ssh-keyscan shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null || true
           chmod 644 ~/.ssh/known_hosts
 
           # 验证私钥文件
