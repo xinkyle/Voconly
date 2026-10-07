@@ -68,27 +68,38 @@ jobs:
           ls -lh release-assets/
 
       - name: Setup SSH for SourceForge
+        env:
+          SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # 设置 SSH 私钥
-          echo "${{ secrets.SF_SSH_KEY }}" > ~/.ssh/id_rsa
+          # 正确写入多行 SSH 私钥
+          printf '%s\n' "$SF_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
+          # 验证私钥格式
+          echo "验证私钥格式..."
+          head -1 ~/.ssh/id_rsa
+          tail -1 ~/.ssh/id_rsa
+
           # 添加 SourceForge 到 known_hosts
-          ssh-keyscan -H shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
 
-          # 测试 SSH 连接
+          # 测试 SSH 连接（添加详细调试信息）
           echo "测试 SSH 连接到 SourceForge..."
-          ssh -o BatchMode=yes -o ConnectTimeout=30 ${{ secrets.SF_USERNAME }}@shell.sourceforge.net "echo '连接成功'" || {
+          ssh -v -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=no ${{ secrets.SF_USERNAME }}@shell.sourceforge.net "echo 'SSH连接成功'" 2>&1 || {
+            echo ""
             echo "❌ SSH 连接失败"
             echo ""
-            echo "可能需要先在 SourceForge 网站上激活 Shell 服务："
-            echo "1. 登录 https://sourceforge.net/"
-            echo "2. 访问: Me -> Profile -> Shell Service"
-            echo "3. 激活 Shell 访问权限"
+            echo "调试信息："
+            echo "1. 检查私钥文件权限："
+            ls -la ~/.ssh/id_rsa
+            echo ""
+            echo "2. 测试私钥格式："
+            ssh-keygen -l -f ~/.ssh/id_rsa 2>&1 || echo "私钥格式无效"
+            echo ""
             exit 1
           }
 
