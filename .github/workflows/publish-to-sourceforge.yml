@@ -67,50 +67,58 @@ jobs:
           echo "✅ 下载完成，文件列表："
           ls -lh release-assets/
 
-      - name: Upload to SourceForge using API
+      - name: Setup SSH for SourceForge
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 设置 SSH 私钥
+          echo "${{ secrets.SF_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # 添加 SourceForge 到 known_hosts
+          ssh-keyscan -H shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+          # 测试 SSH 连接
+          echo "测试 SSH 连接到 SourceForge..."
+          ssh -o BatchMode=yes -o ConnectTimeout=30 ${{ secrets.SF_USERNAME }}@shell.sourceforge.net "echo '连接成功'" || {
+            echo "❌ SSH 连接失败"
+            echo ""
+            echo "可能需要先在 SourceForge 网站上激活 Shell 服务："
+            echo "1. 登录 https://sourceforge.net/"
+            echo "2. 访问: Me -> Profile -> Shell Service"
+            echo "3. 激活 Shell 访问权限"
+            exit 1
+          }
+
+      - name: Upload to SourceForge via SSH
         env:
-          SF_API_KEY: ${{ secrets.SF_API_KEY }}
           SF_USERNAME: ${{ secrets.SF_USERNAME }}
           VERSION: ${{ steps.release.outputs.VERSION }}
         run: |
-          # SourceForge 项目名称
           PROJECT_NAME="voconly"
+          FRS_PATH="/home/frs/project/${PROJECT_NAME}/${VERSION}"
 
-          # SourceForge FRS 路径
-          FRS_PATH="${PROJECT_NAME}/${VERSION}"
-
-          echo "项目名称: ${PROJECT_NAME}"
-          echo "目标路径: ${FRS_PATH}"
+          echo "项目: ${PROJECT_NAME}"
           echo "版本: ${VERSION}"
+          echo "路径: ${FRS_PATH}"
 
-          # 上传每个文件
-          echo "开始上传到 SourceForge..."
-          for file in release-assets/*; do
-            if [ -f "$file" ]; then
-              filename=$(basename "$file")
-              echo "上传: ${filename}"
+          # 创建远程目录
+          echo "创建远程目录..."
+          ssh ${SF_USERNAME}@shell.sourceforge.net "mkdir -p ${FRS_PATH}"
 
-              # 使用 SourceForge API 上传文件
-              response=$(curl -s -w "\n%{http_code}" -X POST \
-                -H "Authorization: Bearer ${SF_API_KEY}" \
-                -F "file=@${file}" \
-                "https://sourceforge.net/projects/${PROJECT_NAME}/files/${VERSION}/${filename}" || true)
-
-              http_code=$(echo "$response" | tail -n1)
-              body=$(echo "$response" | head -n -1)
-
-              if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
-                echo "✅ ${filename} 上传成功"
-              else
-                echo "❌ ${filename} 上传失败 (HTTP ${http_code})"
-                echo "响应: ${body}"
-              fi
-            fi
-          done
+          # 使用 rsync 上传文件（比 scp 更可靠，支持断点续传）
+          echo "开始上传文件..."
+          rsync -avP --progress release-assets/ ${SF_USERNAME}@shell.sourceforge.net:${FRS_PATH}/
 
           echo ""
           echo "✅ 上传完成！"
-          echo "项目页面：https://sourceforge.net/projects/${PROJECT_NAME}/files/${VERSION}/"
+          echo "文件列表："
+          ssh ${SF_USERNAME}@shell.sourceforge.net "ls -lh ${FRS_PATH}/"
+
+          echo ""
+          echo "🔗 访问: https://sourceforge.net/projects/${PROJECT_NAME}/files/${VERSION}/"
 
       - name: Summary
         run: |
