@@ -74,32 +74,47 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # 正确写入多行 SSH 私钥
-          printf '%s\n' "$SF_SSH_KEY" > ~/.ssh/id_rsa
+          # 直接写入私钥，保持原格式
+          echo "$SF_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-          # 验证私钥格式
-          echo "验证私钥格式..."
-          head -1 ~/.ssh/id_rsa
-          tail -1 ~/.ssh/id_rsa
 
           # 添加 SourceForge 到 known_hosts
           ssh-keyscan shell.sourceforge.net >> ~/.ssh/known_hosts 2>/dev/null
           chmod 644 ~/.ssh/known_hosts
 
-          # 测试 SSH 连接（添加详细调试信息）
+          # 验证私钥文件
+          echo "验证私钥文件..."
+          echo "文件大小: $(wc -c < ~/.ssh/id_rsa) 字节"
+          echo "行数: $(wc -l < ~/.ssh/id_rsa) 行"
+
+          # 测试私钥是否有效
+          if ssh-keygen -l -f ~/.ssh/id_rsa 2>/dev/null; then
+            echo "✅ 私钥格式有效"
+          else
+            echo "❌ 私钥格式无效"
+            echo ""
+            echo "请检查 GitHub Secret 中的 SF_SSH_KEY："
+            echo "- 是否包含完整的 '-----BEGIN ... PRIVATE KEY-----' 和 '-----END ... PRIVATE KEY-----'"
+            echo "- 是否有多余的空格或换行"
+            echo "- 是否是完整的私钥内容"
+            exit 1
+          fi
+
+          # 测试 SSH 连接
+          echo ""
           echo "测试 SSH 连接到 SourceForge..."
-          ssh -v -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=no ${{ secrets.SF_USERNAME }}@shell.sourceforge.net "echo 'SSH连接成功'" 2>&1 || {
+          ssh -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=no ${{ secrets.SF_USERNAME }}@shell.sourceforge.net "echo 'SSH连接成功'" || {
             echo ""
             echo "❌ SSH 连接失败"
             echo ""
-            echo "调试信息："
-            echo "1. 检查私钥文件权限："
-            ls -la ~/.ssh/id_rsa
+            echo "可能的原因："
+            echo "1. SSH 公钥未添加到 SourceForge"
+            echo "2. 用户名不正确"
+            echo "3. SourceForge Shell 服务未激活"
             echo ""
-            echo "2. 测试私钥格式："
-            ssh-keygen -l -f ~/.ssh/id_rsa 2>&1 || echo "私钥格式无效"
-            echo ""
+            echo "请检查："
+            echo "- SourceForge: Me → Settings → SSH Settings"
+            echo "- 确保已添加对应的公钥"
             exit 1
           }
 
