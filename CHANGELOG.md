@@ -16,7 +16,7 @@
 ### 问题修复
 5. **快捷键状态残留修复**，修复快捷键监听启动时修饰键状态残留导致的错误拦截问题。
 
-6. **快捷键显示优化**，优化快捷键显示格式，支持组合键格式化（如 `右 Alt+P`），字母和数字键显示更加友好。
+6. **快捷键显示优化**，优化快捷键显示格式，支持组合键格式化，字母和数字键显示更加友好。
 
 ---
 
@@ -35,7 +35,7 @@
 ### Bug Fixes
 5. **Shortcut state residue fixed** - Fixed issue where modifier key state residue on shortcut listener startup caused incorrect interception.
 
-6. **Shortcut display optimized** - Improved shortcut display format, supporting combo key formatting (e.g., `Right Alt+P`), making letter and number key display more user-friendly.
+6. **Shortcut display optimized** - Improved shortcut display format, supporting combo key formatting, making letter and number key display more user-friendly.
 
 ===
 
