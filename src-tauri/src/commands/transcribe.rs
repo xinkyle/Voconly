@@ -648,48 +648,13 @@ pub fn get_audio_duration(audio_path: String) -> Result<u32, String> {
 
 /// 获取音频文件的时长（内部实现）
 fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
-    use std::process::Command;
+    use crate::audio::get_audio_info;
 
-    let mut cmd = Command::new("ffprobe");
-    cmd.args([
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        audio_path,
-    ]);
+    let info = get_audio_info(audio_path)
+        .map_err(|e| format!("Failed to get audio info: {}", e))?;
 
-    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let result = cmd.output();
-
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                let duration_str = String::from_utf8_lossy(&output.stdout);
-                let duration: f32 = duration_str
-                    .trim()
-                    .parse()
-                    .map_err(|e| format!("Failed to parse duration: {}", e))?;
-                // 向上取整为整数秒
-                Ok(duration.ceil() as u32)
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed to get audio duration: {}", stderr))
-            }
-        }
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Err("ffprobe not found. Please install ffmpeg.".to_string())
-            } else {
-                Err(format!("Failed to run ffprobe: {}", e))
-            }
-        }
-    }
+    // 向上取整为整数秒
+    Ok(info.duration_secs.ceil() as u32)
 }
 
 /// 分割音频文件为多个片段
