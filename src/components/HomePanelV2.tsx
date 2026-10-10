@@ -132,7 +132,7 @@ export default function HomePanelV2({
   onTutorialComplete,
   setPaused,
 }: HomePanelV2Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { showToast } = useToast();
   const [localScenes, setLocalScenes] = useState<Scene[]>(scenes);
   const [asrModels, setAsrModels] = useState<AsrModelWithStatus[]>([]);
@@ -1330,7 +1330,7 @@ export default function HomePanelV2({
           downloadStates={downloadStates}
           onDownload={onDownload}
           onDownloadCancel={onDownloadCancel}
-          currentLanguage="zh"
+          currentLanguage={i18n.language}
           modelQuantPrefs={modelQuantPrefs}
           onQuantPrefChange={onQuantPrefChange}
         />

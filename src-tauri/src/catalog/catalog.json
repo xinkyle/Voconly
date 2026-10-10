@@ -25,13 +25,13 @@
           "filename": "Qwen3-ASR-1.7B-Q5_K_M.gguf",
           "quant": "Q5_K_M",
           "size_bytes": 1517290464,
-          "is_recommended": true
+          "is_recommended": false
         },
         {
           "filename": "Qwen3-ASR-1.7B-Q8_0.gguf",
           "quant": "Q8_0",
           "size_bytes": 2185030624,
-          "is_recommended": false
+          "is_recommended": true
         },
         {
           "filename": "Qwen3-ASR-1.7B-F16.gguf",
@@ -40,7 +40,7 @@
           "is_recommended": false
         }
       ],
-      "default_quant": "Q5_K_M",
+      "default_quant": "Q8_0",
       "download_urls": [
         {
           "name": "ModelScope",
@@ -75,13 +75,13 @@
           "filename": "cohere-transcribe-03-2026-Q5_K_M.gguf",
           "quant": "Q5_K_M",
           "size_bytes": 1770270208,
-          "is_recommended": true
+          "is_recommended": false
         },
         {
           "filename": "cohere-transcribe-03-2026-Q8_0.gguf",
           "quant": "Q8_0",
           "size_bytes": 2410655232,
-          "is_recommended": false
+          "is_recommended": true
         },
         {
           "filename": "cohere-transcribe-03-2026-F16.gguf",
@@ -90,7 +90,7 @@
           "is_recommended": false
         }
       ],
-      "default_quant": "Q5_K_M",
+      "default_quant": "Q8_0",
       "download_urls": [
         {
           "name": "ModelScope",
@@ -225,13 +225,13 @@
           "filename": "sensevoice-small-Q5_K_M.gguf",
           "quant": "Q5_K_M",
           "size_bytes": 172474880,
-          "is_recommended": true
+          "is_recommended": false
         },
         {
           "filename": "sensevoice-small-Q8_0.gguf",
           "quant": "Q8_0",
           "size_bytes": 252684608,
-          "is_recommended": false
+          "is_recommended": true
         },
         {
           "filename": "sensevoice-small-F16.gguf",
@@ -240,7 +240,7 @@
           "is_recommended": false
         }
       ],
-      "default_quant": "Q5_K_M",
+      "default_quant": "Q8_0",
       "download_urls": [
         {
           "name": "ModelScope",
