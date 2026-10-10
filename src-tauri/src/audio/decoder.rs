@@ -188,8 +188,15 @@ pub fn get_audio_info(path: &str) -> Result<AudioInfo, DecoderError> {
 
     // 获取音频参数
     let codec_params = &track.codec_params;
-    let sample_rate = codec_params.sample_rate.ok_or(DecoderError::InvalidParams)?;
-    let channels = codec_params.channels.ok_or(DecoderError::InvalidParams)?.count() as u16;
+
+    // 尝试从元数据获取参数
+    let (sample_rate, channels) = match (codec_params.sample_rate, codec_params.channels) {
+        (Some(sr), Some(ch)) => (sr, ch.count() as u16),
+        _ => {
+            // 无法从元数据获取，尝试解码第一帧来获取参数
+            get_audio_info_by_decoding(path, &hint)?
+        }
+    };
 
     // 计算时长
     let duration_secs = if let (Some(tb), Some(n_frames)) =
@@ -211,6 +218,43 @@ pub fn get_audio_info(path: &str) -> Result<AudioInfo, DecoderError> {
         duration_secs,
         total_samples,
     })
+}
+
+/// 通过解码第一帧获取音频信息（当元数据不可用时）
+fn get_audio_info_by_decoding(path: &str, hint: &Hint) -> Result<(u32, u16), DecoderError> {
+    // 打开文件
+    let file = std::fs::File::open(path)
+        .map_err(|e| DecoderError::OpenError(e.to_string()))?;
+
+    // 创建媒体流
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    // 探测格式
+    let mut probed = symphonia::default::get_probe()
+        .format(hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    let track = probed
+        .format
+        .default_track()
+        .ok_or(DecoderError::NoTrack)?;
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    // 解码第一帧
+    let packet = probed
+        .format
+        .next_packet()
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    let decoded = decoder
+        .decode(&packet)
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    let spec = decoded.spec();
+    Ok((spec.rate, spec.channels.count() as u16))
 }
 
 /// 将立体声混音为单声道

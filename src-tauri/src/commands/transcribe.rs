@@ -655,27 +655,23 @@ fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
 ///
 /// # Arguments
 /// * `services` - 应用服务
-/// * `audio_path` - 音频文件路径
-/// * `scene_id` - 场景 ID
-/// * `language` - 语言（可选）
+/// * `request` - 转录请求参数
 /// * `app_handle` - Tauri 应用句柄
 #[tauri::command]
 pub async fn transcribe_audio_streaming(
     services: State<'_, AppServices>,
-    audio_path: String,
-    scene_id: String,
-    language: Option<String>,
+    request: TranscribeRequest,
     app_handle: tauri::AppHandle,
 ) -> Result<TranscribeResponse, String> {
     use crate::audio::StreamingDecoder;
 
     info!(
         "Streaming transcription for file: {} with scene: {}",
-        audio_path, scene_id
+        request.audio_path, request.scene_id
     );
 
     // 创建流式解码器
-    let mut decoder = StreamingDecoder::new(&audio_path)
+    let mut decoder = StreamingDecoder::new(&request.audio_path)
         .map_err(|e| format!("Failed to create streaming decoder: {}", e))?;
 
     let audio_info = decoder.audio_info();
@@ -705,7 +701,7 @@ pub async fn transcribe_audio_streaming(
             .ok_or("Model manager not initialized")?;
 
         let model = mgr
-            .get_or_load_model(&scene_id)
+            .get_or_load_model(&request.scene_id)
             .map_err(|e| format!("Failed to get model: {}", e))?;
 
         model.touch();
@@ -713,7 +709,7 @@ pub async fn transcribe_audio_streaming(
     };
 
     // 获取语言配置
-    let language = if let Some(lang) = language {
+    let language = if let Some(lang) = request.language {
         lang
     } else {
         let config = services
