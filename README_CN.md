@@ -95,6 +95,7 @@ Voconly 把语音变成**成品文字**。
 
 - **语音识别（ASR）：** Whisper · SenseVoice · Parakeet · Qwen-ASR
 - **大语言模型（LLM）：** Ollama（本地）+ 主流云端 API 服务商
+- **音频格式：** WAV · MP3 · M4A · OGG · FLAC（纯 Rust 处理，无需 ffmpeg）
 
 ---
 
@@ -185,4 +186,4 @@ Voconly 是这些实验中的一个。
 
 ### 技术栈
 
-Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp
+Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp · Symphonia
