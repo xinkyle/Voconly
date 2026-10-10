@@ -159,11 +159,15 @@ impl StreamingDecoder {
     }
 
     /// 获取处理进度（0.0 - 1.0）
+    ///
+    /// 基于时长计算进度，因为 processed_samples 是重采样到 16kHz 后的样本数，
+    /// 而 total_samples 是原始采样率下的样本数，直接相除会导致进度错误。
     pub fn progress(&self) -> f32 {
-        if self.audio_info.total_samples == 0 {
+        if self.audio_info.duration_secs == 0.0 {
             return 0.0;
         }
-        self.processed_samples as f32 / self.audio_info.total_samples as f32
+        let processed_duration = self.processed_samples as f64 / 16000.0;
+        (processed_duration / self.audio_info.duration_secs).min(1.0) as f32
     }
 
     /// 是否已完成
