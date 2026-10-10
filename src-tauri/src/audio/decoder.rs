@@ -67,8 +67,94 @@ fn detect_format(path: &str) -> Result<Hint, DecoderError> {
 /// * 16kHz 单声道 PCM 数据（f32 数组）
 /// * 音频信息
 pub fn decode_audio_file(path: &str) -> Result<(Vec<f32>, AudioInfo), DecoderError> {
-    // 将在后续任务中实现
-    todo!()
+    // 获取音频信息
+    let info = get_audio_info(path)?;
+
+    // 打开文件
+    let file = std::fs::File::open(path)
+        .map_err(|e| DecoderError::OpenError(e.to_string()))?;
+
+    // 创建媒体流
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    // 创建格式探测提示
+    let hint = detect_format(path)?;
+
+    // 探测格式
+    let mut probed = symphonia::default::get_probe()
+        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    // 获取默认音频轨道
+    let track = probed
+        .format
+        .default_track()
+        .ok_or(DecoderError::NoTrack)?;
+
+    // 创建解码器
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    // 解码所有音频包
+    let mut all_samples = Vec::new();
+    let mut sample_buf = None;
+
+    loop {
+        // 读取下一个包
+        let packet = match probed.format.next_packet() {
+            Ok(packet) => packet,
+            Err(SymphoniaError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                break; // 文件结束
+            }
+            Err(e) => {
+                return Err(DecoderError::DecodeError(e.to_string()));
+            }
+        };
+
+        // 解码包
+        let decoded = decoder
+            .decode(&packet)
+            .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+        // 转换为样本缓冲区
+        if sample_buf.is_none() {
+            let spec = *decoded.spec();
+            let duration = decoded.capacity() as u64;
+            sample_buf = Some(SampleBuffer::<f32>::new(duration, spec));
+        }
+
+        if let Some(ref mut buf) = sample_buf {
+            buf.copy_interleaved_ref(decoded);
+
+            // 将样本添加到结果中
+            all_samples.extend_from_slice(buf.samples());
+        }
+    }
+
+    // 混音为单声道（如果是立体声）
+    let mono_samples = if info.channels == 2 {
+        mix_to_mono(&all_samples)
+    } else {
+        all_samples
+    };
+
+    // 重采样到 16kHz（如果不是 16kHz）
+    let resampled = if info.sample_rate != 16000 {
+        resample_to_16k(&mono_samples, info.sample_rate)?
+    } else {
+        mono_samples
+    };
+
+    // 更新音频信息
+    let final_info = AudioInfo {
+        sample_rate: 16000,
+        channels: 1,
+        duration_secs: resampled.len() as f64 / 16000.0,
+        total_samples: resampled.len() as u64,
+    };
+
+    Ok((resampled, final_info))
 }
 
 /// 获取音频文件信息（不解码全部内容）
@@ -125,4 +211,42 @@ pub fn get_audio_info(path: &str) -> Result<AudioInfo, DecoderError> {
         duration_secs,
         total_samples,
     })
+}
+
+/// 将立体声混音为单声道
+fn mix_to_mono(samples: &[f32]) -> Vec<f32> {
+    let frame_count = samples.len() / 2;
+    let mut mono = Vec::with_capacity(frame_count);
+
+    for i in 0..frame_count {
+        let left = samples[i * 2];
+        let right = samples[i * 2 + 1];
+        mono.push((left + right) / 2.0);
+    }
+
+    mono
+}
+
+/// 重采样到 16kHz（简化版：线性插值）
+fn resample_to_16k(samples: &[f32], source_rate: u32) -> Result<Vec<f32>, DecoderError> {
+    let ratio = 16000.0 / source_rate as f64;
+    let new_len = (samples.len() as f64 * ratio) as usize;
+    let mut resampled = Vec::with_capacity(new_len);
+
+    for i in 0..new_len {
+        let src_idx = i as f64 / ratio;
+        let src_idx_floor = src_idx.floor() as usize;
+
+        // 线性插值
+        if src_idx_floor + 1 < samples.len() {
+            let frac = src_idx - src_idx_floor as f64;
+            let sample = samples[src_idx_floor] * (1.0 - frac as f32)
+                + samples[src_idx_floor + 1] * frac as f32;
+            resampled.push(sample);
+        } else if src_idx_floor < samples.len() {
+            resampled.push(samples[src_idx_floor]);
+        }
+    }
+
+    Ok(resampled)
 }
