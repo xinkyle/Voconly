@@ -901,7 +901,7 @@ pub async fn transcribe_audio_streaming(
         }
 
         // 更新时间偏移
-        time_offset = chunk_samples.len() as f32 / 16000.0;
+        time_offset += chunk_samples.len() as f32 / 16000.0;
 
         // 发送进度事件
         let progress = decoder.progress();
