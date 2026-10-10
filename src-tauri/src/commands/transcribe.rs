@@ -646,12 +646,16 @@ pub fn get_audio_duration(audio_path: String) -> Result<u32, String> {
     get_audio_duration_internal(&audio_path)
 }
 
-/// 获取音频文件的时长（内部实现）
+/// 获取音频文件的时长(内部实现)
 fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
     use crate::audio::get_audio_info;
 
     let info = get_audio_info(audio_path)
         .map_err(|e| format!("Failed to get audio info: {}", e))?;
+
+    if info.duration_secs == 0.0 {
+        return Err("Audio duration could not be determined from metadata. The file may need to be fully decoded.".to_string());
+    }
 
     // 向上取整为整数秒
     Ok(info.duration_secs.ceil() as u32)
