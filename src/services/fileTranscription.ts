@@ -8,15 +8,6 @@ const log = createLogger('FileTranscription');
 // 内存缓存
 let historyCache: FileTranscriptionRecord[] | null = null;
 
-// 大文件阈值（字节）- 10MB
-const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024;
-
-// 分片时长（秒）
-const CHUNK_DURATION = 30;
-
-// 片段重叠时长（秒）
-const CHUNK_OVERLAP = 2;
-
 /**
  * 获取音频时长
  */
@@ -31,107 +22,7 @@ export async function getAudioDuration(filePath: string): Promise<number> {
 }
 
 /**
- * 分割音频文件
- */
-export async function splitAudioFile(
-  audioPath: string,
-  chunkDuration: number = CHUNK_DURATION,
-  overlap: number = CHUNK_OVERLAP,
-  onProgress?: (current: number, total: number, percent: number) => void
-): Promise<string[]> {
-  log.info(`Splitting audio file: ${audioPath}`);
-
-  // 监听分割进度
-  const unlisten = await listen<{ current: number; total: number; percent: number }>(
-    'audio-split-progress',
-    (event) => {
-      if (onProgress) {
-        onProgress(event.payload.current, event.payload.total, event.payload.percent);
-      }
-    }
-  );
-
-  try {
-    const chunkPaths = await invoke<string[]>('split_audio_file', {
-      audioPath,
-      chunkDuration,
-      overlap,
-    });
-
-    log.info(`Audio split into ${chunkPaths.length} chunks`);
-    return chunkPaths;
-  } finally {
-    unlisten();
-  }
-}
-
-/**
- * 分片转录音频
- */
-export async function transcribeAudioChunks(
-  chunkPaths: string[],
-  sceneId: string,
-  language?: string,
-  onProgress?: (current: number, total: number, percent: number) => void
-): Promise<{ text: string; duration: number }> {
-  log.info(`Transcribing ${chunkPaths.length} chunks`);
-
-  // 监听转录进度
-  const unlisten = await listen<{ current: number; total: number; percent: number }>(
-    'transcribe-chunk-progress',
-    (event) => {
-      if (onProgress) {
-        onProgress(event.payload.current, event.payload.total, event.payload.percent);
-      }
-    }
-  );
-
-  try {
-    const result = await invoke<{ text: string; language?: string; segments: Array<{ text: string; start: number; end: number }> }>(
-      'transcribe_audio_chunks',
-      {
-        chunkPaths,
-        sceneId,
-        language: language || null,
-      }
-    );
-
-    const duration = result.segments.length > 0
-      ? Math.ceil(result.segments[result.segments.length - 1].end)
-      : 0;
-
-    log.info(`Chunk transcription complete: ${result.text.length} chars, ${duration}s`);
-
-    return {
-      text: result.text,
-      duration,
-    };
-  } finally {
-    unlisten();
-  }
-}
-
-/**
- * 转换音频文件为 WAV 格式
- * 使用 ffmpeg 将 MP3、M4A、OGG、WEBM 等格式转换为 WAV
- */
-export async function convertAudioToWav(filePath: string): Promise<string> {
-  try {
-    log.info(`Converting audio to WAV: ${filePath}`);
-
-    const wavPath = await invoke<string>('convert_audio_to_wav', { audioPath: filePath });
-
-    log.info(`Audio converted to: ${wavPath}`);
-    return wavPath;
-  } catch (error) {
-    log.error(`Failed to convert audio: ${error}`);
-    throw error;
-  }
-}
-
-/**
- * 转录音频文件
- * 自动判断是否需要分割大文件
+ * 转录音频文件（使用流式API）
  */
 export async function transcribeAudioFile(
   filePath: string,
@@ -139,7 +30,7 @@ export async function transcribeAudioFile(
   language?: string,
   options?: {
     fileSize?: number;
-    audioDuration?: number;  // 音频时长（秒），优先使用
+    audioDuration?: number;
     onProgress?: (current: number, total: number, percent: number) => void;
   }
 ): Promise<{ text: string; duration: number }> {
@@ -148,69 +39,24 @@ export async function transcribeAudioFile(
   try {
     log.info(`Transcribing file: ${filePath} with scene: ${sceneId}`);
 
-    // 检查文件格式，如果不是 WAV 则先转换
-    const ext = filePath.split('.').pop()?.toLowerCase();
-    let wavPath = filePath;
-
-    if (ext && ext !== 'wav') {
-      console.log('[FileTranscriptionService] Non-WAV format, will convert:', ext);
-      log.info(`Non-WAV format detected: ${ext}, converting to WAV...`);
-      wavPath = await convertAudioToWav(filePath);
-      console.log('[FileTranscriptionService] Conversion complete:', wavPath);
-      log.info(`Converted to WAV: ${wavPath}`);
-    }
-
-    // 判断是否需要分割
-    const fileSize = options?.fileSize || 0;
-    const needSplit = fileSize > LARGE_FILE_THRESHOLD;
-
-    if (needSplit) {
-      log.info(`Large file detected (${(fileSize / 1024 / 1024).toFixed(2)}MB), will split`);
-      console.log('[FileTranscriptionService] Large file, splitting...');
-
-      // 分割音频（占前 20% 进度）
-      const chunkPaths = await splitAudioFile(
-        wavPath,
-        CHUNK_DURATION,
-        CHUNK_OVERLAP,
-        (current, total, percent) => {
-          if (options?.onProgress) {
-            // 分割进度映射到 0% - 20%
-            options.onProgress(current, total, percent * 0.2);
-          }
+    // 监听转录进度
+    const unlisten = await listen<{ current: number; total: number; percent: number }>(
+      'transcribe-streaming-progress',
+      (event) => {
+        if (options?.onProgress) {
+          // 流式API返回的进度已经是完整进度，直接传递
+          options.onProgress(event.payload.current, event.payload.total, event.payload.percent);
         }
-      );
+      }
+    );
 
-      // 分片转录（占后 80% 进度）
-      const result = await transcribeAudioChunks(
-        chunkPaths,
-        sceneId,
-        language,
-        (current, total, percent) => {
-          if (options?.onProgress) {
-            // 转录进度映射到 20% - 100%
-            options.onProgress(current, total, 20 + percent * 0.8);
-          }
-        }
-      );
-
-      // 优先使用传入的音频时长
-      const duration = options?.audioDuration || result.duration;
-
-      return {
-        text: result.text,
-        duration,
-      };
-    } else {
-      // 小文件，直接转录
-      console.log('[FileTranscriptionService] Calling invoke transcribe_audio...');
-
+    try {
       const result = await invoke<{ text: string; language?: string; segments: Array<{ text: string; start: number; end: number }> }>(
-        'transcribe_audio',
+        'transcribe_audio_streaming',
         {
           request: {
             sceneId,
-            audioPath: wavPath,
+            audioPath: filePath,
             language: language || null,
           }
         }
@@ -229,6 +75,8 @@ export async function transcribeAudioFile(
         text: result.text,
         duration,
       };
+    } finally {
+      unlisten();
     }
   } catch (error) {
     log.error(`Failed to transcribe file: ${error}`);
