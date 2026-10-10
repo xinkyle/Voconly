@@ -1952,9 +1952,10 @@ function App() {
                 }}
               />
             )}
-            {activeNav === 'file' && (
+            {/* Keep FileTranscriptionPanel always mounted to preserve transcription progress on tab switch */}
+            <div className={activeNav === 'file' ? '' : 'hidden'}>
               <FileTranscriptionPanel />
-            )}
+            </div>
           </div>
         </main>
       </div>
