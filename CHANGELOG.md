@@ -1,4 +1,40 @@
 # Changelog
+## [0.5.20] - 2026-10-10
+
+### 新功能
+1. **移除 FFmpeg 依赖**，使用 Symphonia 库进行音频解码，彻底移除 FFmpeg 依赖，简化部署，减少应用体积，提升启动性能。
+
+2. **流式转录大文件**，支持流式解码大音频文件进行转录，无需等待完整加载，大幅降低内存占用。
+
+### 体验优化
+3. **文件转录进度条优化**，进度条独立显示，不受 tab 切换影响，切换到其他页面后返回仍可看到进度。
+
+4. **转录进度即时显示**，开始转录后立即显示进度条，提升用户体验。
+
+### 问题修复
+5. **快捷键状态残留修复**，修复快捷键监听启动时修饰键状态残留导致的错误拦截问题。
+
+6. **快捷键显示优化**，优化快捷键显示格式，支持组合键格式化（如"右 Alt+P"），字母和数字键显示更加友好。
+
+---
+
+### New Features
+1. **FFmpeg dependency removed** - Switched to Symphonia library for audio decoding, completely removing FFmpeg dependency, simplifying deployment, reducing app size, and improving startup performance.
+
+2. **Large file streaming transcription** - Support streaming decoding for large audio files, no need to wait for complete loading, significantly reducing memory usage.
+
+### Improvements
+3. **File transcription progress bar optimized** - Progress bar displays independently, unaffected by tab switching, remains visible when returning from other pages.
+
+4. **Transcription progress instant display** - Progress bar shows immediately after transcription starts, improving user experience.
+
+### Bug Fixes
+5. **Shortcut state residue fixed** - Fixed issue where modifier key state residue on shortcut listener startup caused incorrect interception.
+
+6. **Shortcut display optimized** - Improved shortcut display format, supporting combo key formatting (e.g., "右 Alt+P"), making letter and number key display more user-friendly.
+
+===
+
 ## [0.5.19] - 2026-10-05
 
 ### 新功能
