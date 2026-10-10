@@ -144,13 +144,9 @@ export default function FileTranscriptionPanel() {
       // 提供更友好的错误信息
       let errorMessage = '转录失败';
       if (err instanceof Error) {
-        if (err.message.includes('ffmpeg not found')) {
-          errorMessage = '未找到 ffmpeg，无法转换音频格式。请安装 ffmpeg 后重试。';
-        } else if (err.message.includes('Failed to convert audio')) {
-          errorMessage = `音频格式转换失败：${err.message}`;
-        } else {
-          errorMessage = err.message;
-        }
+        // 移除 ffmpeg 相关的错误提示
+        // 现在使用 symphonia，不再需要 ffmpeg
+        errorMessage = err.message;
       }
 
       setError(errorMessage);
