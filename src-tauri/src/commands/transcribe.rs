@@ -182,10 +182,10 @@ fn decode_audio_to_samples(audio_path: &str) -> Result<Vec<f32>, String> {
     match ext.as_str() {
         "wav" => decode_wav(&data),
         "webm" | "mp3" | "ogg" => {
-            // For other formats, we'd need ffmpeg or a decoder
-            // For now, return an error suggesting conversion to WAV
+            // For other formats, use Symphonia decoder
+            // See audio::decoder::decode_audio_file for full format support
             Err(format!(
-                "Audio format '{}' not supported. Please convert to WAV first.",
+                "Audio format '{}' not supported in this context. Use streaming transcription or convert to WAV.",
                 ext
             ))
         }
