@@ -418,24 +418,49 @@ export function extractShortcutFromEvent(e: KeyboardEvent): string {
 /**
  * Format shortcut for display
  * Converts internal shortcut names to user-friendly display text
+ * Supports both single keys and combined shortcuts (e.g., "RightAlt+KeyP" -> "右 Alt+P")
  */
 export function formatShortcut(shortcut: string): string {
-  if (shortcut === 'AltRight' || shortcut === 'RightAlt') return '右 Alt';
-  if (shortcut === 'AltLeft' || shortcut === 'LeftAlt') return '左 Alt';
-  if (shortcut === 'ControlRight' || shortcut === 'RightCtrl') return '右 Ctrl';
-  if (shortcut === 'ControlLeft' || shortcut === 'LeftCtrl') return '左 Ctrl';
-  if (shortcut === 'ShiftRight' || shortcut === 'RightShift') return '右 Shift';
-  if (shortcut === 'ShiftLeft' || shortcut === 'LeftShift') return '左 Shift';
-  if (shortcut === 'MetaRight' || shortcut === 'RightWindows') return '右 Win';
-  if (shortcut === 'MetaLeft' || shortcut === 'LeftWindows') return '左 Win';
-  if (shortcut === 'RightOption' || shortcut === 'LeftOption') {
-    return shortcut === 'RightOption' ? '右 Option' : '左 Option';
+  // 处理组合键（包含 + 分隔符）
+  if (shortcut.includes('+')) {
+    const keys = shortcut.split('+');
+    return keys.map(key => formatKeyDisplay(key)).join('+');
   }
-  if (shortcut === 'RightCmd' || shortcut === 'LeftCmd') {
-    return shortcut === 'RightCmd' ? '右 Cmd' : '左 Cmd';
+
+  return formatKeyDisplay(shortcut);
+}
+
+/**
+ * 格式化单个键用于显示（简单版本，用于 formatShortcut）
+ */
+function formatKeyDisplay(key: string): string {
+  if (key === 'AltRight' || key === 'RightAlt') return '右 Alt';
+  if (key === 'AltLeft' || key === 'LeftAlt') return '左 Alt';
+  if (key === 'ControlRight' || key === 'RightCtrl') return '右 Ctrl';
+  if (key === 'ControlLeft' || key === 'LeftCtrl') return '左 Ctrl';
+  if (key === 'ShiftRight' || key === 'RightShift') return '右 Shift';
+  if (key === 'ShiftLeft' || key === 'LeftShift') return '左 Shift';
+  if (key === 'MetaRight' || key === 'RightWindows') return '右 Win';
+  if (key === 'MetaLeft' || key === 'LeftWindows') return '左 Win';
+  if (key === 'RightOption' || key === 'LeftOption') {
+    return key === 'RightOption' ? '右 Option' : '左 Option';
   }
-  if (/^F\d+$/.test(shortcut)) return shortcut;
-  return shortcut.toUpperCase();
+  if (key === 'RightCmd' || key === 'LeftCmd') {
+    return key === 'RightCmd' ? '右 Cmd' : '左 Cmd';
+  }
+  if (/^F\d+$/.test(key)) return key;
+
+  // 字母键 KeyA -> A
+  if (key.startsWith('Key') && key.length === 4) {
+    return key.slice(3);
+  }
+
+  // 数字键 Digit0 -> 0
+  if (key.startsWith('Digit') && key.length === 6) {
+    return key.slice(5);
+  }
+
+  return key.toUpperCase();
 }
 
 /**

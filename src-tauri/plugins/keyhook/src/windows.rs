@@ -227,6 +227,12 @@ pub fn start_hook_thread() {
         return;
     }
 
+    // 清除之前的修饰键状态，防止状态残留导致错误拦截
+    if let Ok(mut guard) = PRESSED_MODIFIERS.lock() {
+        guard.clear();
+        tracing::debug!("[Keyhook] Cleared pressed modifiers state");
+    }
+
     // 在启动线程前设置状态
     IS_LISTENING.store(true, Ordering::SeqCst);
     tracing::info!("[Keyhook] Starting grab thread...");

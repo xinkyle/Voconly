@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatShortcut } from '../utils/keyboard';
 
 interface ShortcutErrorModalProps {
   isOpen: boolean;
@@ -36,13 +37,14 @@ export default function ShortcutErrorModal({
 
   // Get appropriate error message based on error type
   const getErrorMessage = () => {
+    const displayShortcut = formatShortcut(shortcut);
     if (errorType === 'unsupported') {
-      return t('sceneForm.shortcutErrorUnsupported', { shortcut });
+      return t('sceneForm.shortcutErrorUnsupported', { shortcut: displayShortcut });
     }
     if (errorType === 'occupied') {
-      return t('sceneForm.shortcutErrorOccupied', { shortcut });
+      return t('sceneForm.shortcutErrorOccupied', { shortcut: displayShortcut });
     }
-    return t('sceneForm.shortcutErrorUnknown', { shortcut, error: errorMessage });
+    return t('sceneForm.shortcutErrorUnknown', { shortcut: displayShortcut, error: errorMessage });
   };
 
   return (

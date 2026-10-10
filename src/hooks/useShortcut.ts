@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import type { Scene } from '../types';
 import { createLogger } from '../services/log';
-import { mapRawCodeToKeyName } from '../utils/keyboard';
+import { mapRawCodeToKeyName, formatShortcut } from '../utils/keyboard';
 
 // 创建日志记录器
 const log = createLogger('Shortcut');
@@ -240,9 +240,10 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
   const checkConflict = useCallback((shortcut: string): string | null => {
     if (registeredShortcutsRef.current.includes(shortcut)) {
       const conflictingScene = shortcutToSceneRef.current.get(shortcut);
+      const displayShortcut = formatShortcut(shortcut);
       return conflictingScene
-        ? `快捷键 "${shortcut}" 已绑定到场景 "${conflictingScene}"`
-        : `快捷键 "${shortcut}" 已被使用`;
+        ? `快捷键 "${displayShortcut}" 已绑定到场景 "${conflictingScene}"`
+        : `快捷键 "${displayShortcut}" 已被使用`;
     }
     return null;
   }, []);
