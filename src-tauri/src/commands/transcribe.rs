@@ -627,18 +627,6 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
     Ok(())
 }
 
-/// 将音频文件转换为 WAV 格式（已弃用，改用 decode_audio_file）
-///
-/// 保留此函数是为了向后兼容，实际使用 symphonia 解码
-#[tauri::command]
-pub async fn convert_audio_to_wav(
-    audio_path: String,
-    _app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    // 不再需要转换，直接返回原路径
-    // 前端已经更新为直接使用 decode_audio_file
-    Err("This function is deprecated. Use decode_audio_file instead.".to_string())
-}
 
 /// 获取音频文件的时长（秒，向上取整）
 #[tauri::command]
@@ -661,112 +649,7 @@ fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
     Ok(info.duration_secs.ceil() as u32)
 }
 
-/// 分割音频文件为多个片段（已弃用，改用流式解码器）
-///
-/// 保留此函数是为了向后兼容，实际使用 StreamingDecoder
-#[tauri::command]
-pub async fn split_audio_file(
-    _audio_path: String,
-    _chunk_duration: f32,
-    _overlap: f32,
-    _app_handle: tauri::AppHandle,
-) -> Result<Vec<String>, String> {
-    Err("This function is deprecated. Use StreamingDecoder instead.".to_string())
-}
 
-/// 分片转录音频文件
-/// 将大文件分割后逐个转录，并合并结果
-#[tauri::command]
-pub async fn transcribe_audio_chunks(
-    services: State<'_, AppServices>,
-    chunk_paths: Vec<String>,
-    scene_id: String,
-    language: Option<String>,
-    app_handle: tauri::AppHandle,
-) -> Result<TranscribeResponse, String> {
-    info!(
-        "Transcribing {} chunks for scene: {}",
-        chunk_paths.len(),
-        scene_id
-    );
-
-    let mut all_text = String::new();
-    let mut all_segments: Vec<TranscribeSegment> = Vec::new();
-    let mut detected_language: Option<String> = None;
-    let mut time_offset = 0.0;
-
-    for (i, chunk_path) in chunk_paths.iter().enumerate() {
-        info!("Transcribing chunk {}/{}: {}", i + 1, chunk_paths.len(), chunk_path);
-
-        // 调用现有的转录函数
-        let request = TranscribeRequest {
-            scene_id: scene_id.clone(),
-            audio_path: chunk_path.clone(),
-            language: language.clone(),
-            translate: None,
-            initial_prompt: None,
-        };
-
-        let result = transcribe_audio(services.clone(), request).await?;
-
-        // 合并结果
-        if i == 0 {
-            detected_language = result.language;
-        }
-
-        // 添加文本（用空格或换行分隔）
-        if !all_text.is_empty() && !result.text.is_empty() {
-            // 根据语言添加适当的分隔符
-            if let Some(ref lang) = detected_language {
-                if lang.starts_with("zh") || lang == "ja" || lang == "ko" {
-                    // 中文、日文、韩文不需要额外分隔
-                } else {
-                    all_text.push(' ');
-                }
-            }
-        }
-        all_text.push_str(&result.text);
-
-        // 合并片段，调整时间戳
-        for mut segment in result.segments {
-            segment.start += time_offset;
-            segment.end += time_offset;
-            all_segments.push(segment);
-        }
-
-        // 更新时间偏移（考虑重叠部分）
-        // 每个片段的结束时间作为下一个片段的起始偏移
-        if let Some(last_segment) = all_segments.last() {
-            time_offset = last_segment.end;
-        }
-
-        // 发送进度事件
-        let _ = app_handle.emit("transcribe-chunk-progress", &serde_json::json!({
-            "current": i + 1,
-            "total": chunk_paths.len(),
-            "percent": ((i + 1) as f32 / chunk_paths.len() as f32 * 100.0) as i32
-        }));
-    }
-
-    info!(
-        "Chunk transcription complete: {} chars, {} segments",
-        all_text.chars().count(),
-        all_segments.len()
-    );
-
-    // 清理临时文件
-    for chunk_path in chunk_paths {
-        if let Err(e) = std::fs::remove_file(&chunk_path) {
-            info!("Warning: Failed to remove chunk file {}: {}", chunk_path, e);
-        }
-    }
-
-    Ok(TranscribeResponse {
-        text: all_text,
-        language: detected_language,
-        segments: all_segments,
-    })
-}
 
 /// 使用流式解码器转录大音频文件
 ///
