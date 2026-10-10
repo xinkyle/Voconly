@@ -627,78 +627,17 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
     Ok(())
 }
 
-/// 将音频文件转换为 WAV 格式
-/// 使用 ffmpeg 进行转换，支持多种输入格式（mp3, m4a, ogg, webm 等）
+/// 将音频文件转换为 WAV 格式（已弃用，改用 decode_audio_file）
+///
+/// 保留此函数是为了向后兼容，实际使用 symphonia 解码
 #[tauri::command]
 pub async fn convert_audio_to_wav(
     audio_path: String,
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    use std::process::Command;
-
-    info!("Converting audio to WAV: {}", audio_path);
-
-    let input_path = Path::new(&audio_path);
-    if !input_path.exists() {
-        return Err(format!("Audio file not found: {}", audio_path));
-    }
-
-    // 生成输出文件路径（临时目录）
-    let temp_dir = std::env::temp_dir();
-    let output_filename = format!(
-        "voconly_{}.wav",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S_%f")
-    );
-    let output_path = temp_dir.join(&output_filename);
-    let output_path_str = output_path.to_string_lossy().to_string();
-
-    // 使用 ffmpeg 转换
-    // 参数：-y 覆盖已存在的文件, -i 输入文件, -ar 16000 设置采样率, -ac 1 单声道, -f wav 输出格式
-    let mut cmd = Command::new("ffmpeg");
-    cmd.args([
-        "-y",
-        "-i",
-        &audio_path,
-        "-ar", "16000",  // 16kHz 采样率（ASR 模型常用）
-        "-ac", "1",       // 单声道
-        "-f", "wav",
-        &output_path_str,
-    ]);
-
-    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let result = cmd.output();
-
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                info!("Audio converted successfully: {}", output_path_str);
-
-                // 发送事件通知前端
-                let _ = app_handle.emit("audio-converted", &serde_json::json!({
-                    "originalPath": &audio_path,
-                    "convertedPath": &output_path_str
-                }));
-
-                Ok(output_path_str)
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed to convert audio: {}", stderr))
-            }
-        }
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Err("ffmpeg not found. Please install ffmpeg to convert audio files.".to_string())
-            } else {
-                Err(format!("Failed to run ffmpeg: {}", e))
-            }
-        }
-    }
+    // 不再需要转换，直接返回原路径
+    // 前端已经更新为直接使用 decode_audio_file
+    Err("This function is deprecated. Use decode_audio_file instead.".to_string())
 }
 
 /// 获取音频文件的时长（秒，向上取整）
