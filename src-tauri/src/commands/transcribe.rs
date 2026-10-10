@@ -767,3 +767,166 @@ pub async fn transcribe_audio_chunks(
         segments: all_segments,
     })
 }
+
+/// 使用流式解码器转录大音频文件
+///
+/// # Arguments
+/// * `services` - 应用服务
+/// * `audio_path` - 音频文件路径
+/// * `scene_id` - 场景 ID
+/// * `language` - 语言（可选）
+/// * `app_handle` - Tauri 应用句柄
+#[tauri::command]
+pub async fn transcribe_audio_streaming(
+    services: State<'_, AppServices>,
+    audio_path: String,
+    scene_id: String,
+    language: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<TranscribeResponse, String> {
+    use crate::audio::StreamingDecoder;
+
+    info!(
+        "Streaming transcription for file: {} with scene: {}",
+        audio_path, scene_id
+    );
+
+    // 创建流式解码器
+    let mut decoder = StreamingDecoder::new(&audio_path)
+        .map_err(|e| format!("Failed to create streaming decoder: {}", e))?;
+
+    let audio_info = decoder.audio_info();
+    info!(
+        "Audio info: {} Hz, {} channels, {:.2}s",
+        audio_info.sample_rate, audio_info.channels, audio_info.duration_secs
+    );
+
+    let mut all_text = String::new();
+    let mut all_segments: Vec<crate::backends::TranscribeSegment> = Vec::new();
+    let mut detected_language: Option<String> = None;
+    let mut time_offset = 0.0;
+    let mut chunk_index = 0;
+
+    // 每次处理 30 秒
+    const CHUNK_DURATION_SECS: f32 = 30.0;
+
+    // 获取模型（Arc 方案）
+    let loaded_model: std::sync::Arc<crate::model_manager::LoadedModel> = {
+        let mut model_manager = services
+            .model_manager
+            .lock()
+            .map_err(|e| format!("Failed to lock model manager: {}", e))?;
+
+        let mgr = model_manager
+            .as_mut()
+            .ok_or("Model manager not initialized")?;
+
+        let model = mgr
+            .get_or_load_model(&scene_id)
+            .map_err(|e| format!("Failed to get model: {}", e))?;
+
+        model.touch();
+        model
+    };
+
+    // 获取语言配置
+    let language = if let Some(lang) = language {
+        lang
+    } else {
+        let config = services
+            .config
+            .lock()
+            .map_err(|e| format!("Failed to lock config: {}", e))?;
+        let model_id = config.global_model_config.asr_model.model_id.clone();
+        config
+            .model_language_prefs
+            .get(&model_id)
+            .cloned()
+            .unwrap_or_else(|| "auto".to_string())
+    };
+
+    let mut params = TranscribeParams::default();
+    params.language = language;
+
+    // 获取用户词典
+    let dictionary = {
+        let config = services
+            .config
+            .lock()
+            .map_err(|e| format!("Failed to lock config: {}", e))?;
+        config.user_dictionary.clone()
+    };
+
+    let backend_type = loaded_model.backend.backend_type();
+
+    // 流式处理
+    while let Some(chunk_samples) = decoder
+        .next_chunk(CHUNK_DURATION_SECS)
+        .map_err(|e| format!("Failed to decode chunk: {}", e))?
+    {
+        chunk_index += 1;
+        info!(
+            "Processing chunk {} ({} samples, {:.2}s)",
+            chunk_index,
+            chunk_samples.len(),
+            chunk_samples.len() as f32 / 16000.0
+        );
+
+        // 转录当前块
+        let result = loaded_model
+            .backend
+            .transcribe(&chunk_samples, &params)
+            .map_err(|e| format!("Transcription failed: {}", e))?;
+
+        // 合并结果
+        if chunk_index == 1 {
+            detected_language = result.language.clone();
+        }
+
+        // 添加文本
+        if !all_text.is_empty() && !result.text.is_empty() {
+            if let Some(ref lang) = detected_language {
+                if !lang.starts_with("zh") && lang != "ja" && lang != "ko" {
+                    all_text.push(' ');
+                }
+            }
+        }
+        all_text.push_str(&result.text);
+
+        // 合并片段，调整时间戳
+        for mut segment in result.segments {
+            segment.start += time_offset;
+            segment.end += time_offset;
+            all_segments.push(segment);
+        }
+
+        // 更新时间偏移
+        time_offset = chunk_samples.len() as f32 / 16000.0;
+
+        // 发送进度事件
+        let progress = decoder.progress();
+        let _ = app_handle.emit("transcribe-streaming-progress", &serde_json::json!({
+            "current": chunk_index,
+            "percent": (progress * 100.0) as i32
+        }));
+    }
+
+    info!(
+        "Streaming transcription complete: {} chars, {} segments",
+        all_text.chars().count(),
+        all_segments.len()
+    );
+
+    // 转换结果
+    let response = convert_result(
+        BackendTranscribeResult {
+            text: all_text,
+            language: detected_language,
+            segments: all_segments,
+        },
+        &dictionary,
+        backend_type,
+    );
+
+    Ok(response)
+}

@@ -2160,6 +2160,7 @@ fn main() {
             rebuild_stats,
             // New commands for local model management
             commands::transcribe::transcribe_audio,
+            commands::transcribe::transcribe_audio_streaming,
             commands::transcribe::cleanup_all_resources,
             commands::transcribe::convert_audio_to_wav,
             commands::transcribe::split_audio_file,
