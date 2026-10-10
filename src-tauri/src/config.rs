@@ -470,7 +470,7 @@ pub struct AppConfig {
     pub llm_prompt_presets: Option<UserPromptPresets>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_start: Option<bool>,
-    /// 开机启动后最小化到托盘（默认 true）
+    /// 开机启动后最小化到托盘（默认 false）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minimize_to_tray_on_startup: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -582,7 +582,7 @@ impl Default for AppConfig {
                 },
             ],
             auto_start: Some(true), // 默认开启开机自启
-            minimize_to_tray_on_startup: Some(true), // 默认开机启动后最小化到托盘
+            minimize_to_tray_on_startup: Some(false), // 默认不开启，用户手动开启后才会生效
             default_microphone: None,
             check_updates: Some(true),
             show_shortcut_hint: Some(true),

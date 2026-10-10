@@ -11,10 +11,12 @@
 
 4. **转录进度即时显示**，开始转录后立即显示进度条，提升用户体验。
 
+7. **开机启动行为优化**，默认不再自动最小化到托盘，避免新用户困惑。用户可在设置中手动开启此功能。
+
 ### 问题修复
 5. **快捷键状态残留修复**，修复快捷键监听启动时修饰键状态残留导致的错误拦截问题。
 
-6. **快捷键显示优化**，优化快捷键显示格式，支持组合键格式化（如"右 Alt+P"），字母和数字键显示更加友好。
+6. **快捷键显示优化**，优化快捷键显示格式，支持组合键格式化（如 `右 Alt+P`），字母和数字键显示更加友好。
 
 ---
 
@@ -28,10 +30,12 @@
 
 4. **Transcription progress instant display** - Progress bar shows immediately after transcription starts, improving user experience.
 
+7. **Startup behavior optimized** - No longer minimizes to tray by default on startup, avoiding confusion for new users. Users can manually enable this feature in settings.
+
 ### Bug Fixes
 5. **Shortcut state residue fixed** - Fixed issue where modifier key state residue on shortcut listener startup caused incorrect interception.
 
-6. **Shortcut display optimized** - Improved shortcut display format, supporting combo key formatting (e.g., "右 Alt+P"), making letter and number key display more user-friendly.
+6. **Shortcut display optimized** - Improved shortcut display format, supporting combo key formatting (e.g., `Right Alt+P`), making letter and number key display more user-friendly.
 
 ===
 
