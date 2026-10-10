@@ -6,12 +6,14 @@
 //! - Smoothed VAD with prefill/hangover/onset logic
 
 mod capture;
+mod decoder;
 mod silero;
 mod stream_router;
 mod streaming;
 mod vad;
 
 pub use capture::AudioCapture;
+pub use decoder::{get_audio_info, decode_audio_file, AudioInfo, DecoderError};
 pub use silero::SileroVad;
 pub use stream_router::{StreamCmd, StreamRouter};
 pub use streaming::{
