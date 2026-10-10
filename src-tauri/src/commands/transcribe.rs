@@ -661,104 +661,17 @@ fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
     Ok(info.duration_secs.ceil() as u32)
 }
 
-/// 分割音频文件为多个片段
-/// 返回分割后的文件路径列表
+/// 分割音频文件为多个片段（已弃用，改用流式解码器）
+///
+/// 保留此函数是为了向后兼容，实际使用 StreamingDecoder
 #[tauri::command]
 pub async fn split_audio_file(
-    audio_path: String,
-    chunk_duration: f32,
-    overlap: f32,
-    app_handle: tauri::AppHandle,
+    _audio_path: String,
+    _chunk_duration: f32,
+    _overlap: f32,
+    _app_handle: tauri::AppHandle,
 ) -> Result<Vec<String>, String> {
-    use std::process::Command;
-
-    info!(
-        "Splitting audio: {} into {}s chunks with {}s overlap",
-        audio_path, chunk_duration, overlap
-    );
-
-    let input_path = Path::new(&audio_path);
-    if !input_path.exists() {
-        return Err(format!("Audio file not found: {}", audio_path));
-    }
-
-    // 获取音频总时长
-    let total_duration = get_audio_duration_internal(&audio_path)?;
-    info!("Total audio duration: {}s", total_duration);
-
-    // 计算需要分割的片段数
-    // 有效步长 = chunk_duration - overlap
-    let step = chunk_duration - overlap;
-    let num_chunks = (total_duration as f32 / step).ceil() as usize;
-    info!("Will split into {} chunks", num_chunks);
-
-    // 创建临时目录
-    let temp_dir = std::env::temp_dir();
-    let base_name = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("audio");
-
-    let mut chunk_paths = Vec::new();
-
-    for i in 0..num_chunks {
-        let start_time = i as f32 * step;
-        let chunk_path = temp_dir.join(format!("{}_chunk_{:03}.wav", base_name, i));
-        let chunk_path_str = chunk_path.to_string_lossy().to_string();
-
-        // 使用 ffmpeg 分割
-        let mut cmd = Command::new("ffmpeg");
-        cmd.args([
-            "-y",
-            "-ss", &start_time.to_string(),
-            "-i", &audio_path,
-            "-t", &chunk_duration.to_string(),
-            "-ar", "16000",
-            "-ac", "1",
-            "-f", "wav",
-            &chunk_path_str,
-        ]);
-
-        // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-        #[cfg(target_os = "windows")]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let result = cmd.output();
-
-        match result {
-            Ok(output) => {
-                if output.status.success() {
-                    info!("Created chunk {}: {}", i, chunk_path_str);
-                    chunk_paths.push(chunk_path_str);
-
-                    // 发送进度事件
-                    let _ = app_handle.emit("audio-split-progress", &serde_json::json!({
-                        "current": i + 1,
-                        "total": num_chunks,
-                        "percent": ((i + 1) as f32 / num_chunks as f32 * 100.0) as i32
-                    }));
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(format!("Failed to create chunk {}: {}", i, stderr));
-                }
-            }
-            Err(e) => {
-                return Err(format!("Failed to run ffmpeg for chunk {}: {}", i, e));
-            }
-        }
-    }
-
-    info!("Audio splitting complete: {} chunks created", chunk_paths.len());
-
-    // 发送完成事件
-    let _ = app_handle.emit("audio-split-complete", &serde_json::json!({
-        "totalChunks": chunk_paths.len()
-    }));
-
-    Ok(chunk_paths)
+    Err("This function is deprecated. Use StreamingDecoder instead.".to_string())
 }
 
 /// 分片转录音频文件
