@@ -211,14 +211,16 @@ export default function FileTranscriptionPanel() {
               </div>
             )}
 
-            {/* 进度显示 */}
-            {status === 'transcribing' && progress.percent > 0 && (
+            {/* 进度显示 - 只要正在转录就立即显示 */}
+            {status === 'transcribing' && (
               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700">
-                    正在转录...
+                    {progress.percent === 0 ? '正在初始化...' : '正在转录...'}
                   </span>
-                  <span className="text-sm text-gray-700">{Math.round(progress.percent)}%</span>
+                  <span className="text-sm text-gray-700">
+                    {progress.percent > 0 ? `${Math.round(progress.percent)}%` : ''}
+                  </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
