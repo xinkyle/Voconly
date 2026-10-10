@@ -79,6 +79,50 @@ pub fn decode_audio_file(path: &str) -> Result<(Vec<f32>, AudioInfo), DecoderErr
 /// # Returns
 /// * 音频信息
 pub fn get_audio_info(path: &str) -> Result<AudioInfo, DecoderError> {
-    // 将在后续任务中实现
-    todo!()
+    // 打开文件
+    let file = std::fs::File::open(path)
+        .map_err(|e| DecoderError::OpenError(e.to_string()))?;
+
+    // 创建媒体流
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    // 创建格式探测提示
+    let hint = detect_format(path)?;
+
+    // 探测格式
+    let probed = symphonia::default::get_probe()
+        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .map_err(|e| DecoderError::DecodeError(e.to_string()))?;
+
+    // 获取默认音频轨道
+    let track = probed
+        .format
+        .default_track()
+        .ok_or(DecoderError::NoTrack)?;
+
+    // 获取音频参数
+    let codec_params = &track.codec_params;
+    let sample_rate = codec_params.sample_rate.ok_or(DecoderError::InvalidParams)?;
+    let channels = codec_params.channels.ok_or(DecoderError::InvalidParams)?.count() as u16;
+
+    // 计算时长
+    let duration_secs = if let (Some(tb), Some(n_frames)) =
+        (codec_params.time_base, codec_params.n_frames)
+    {
+        let duration_ts = n_frames as f64;
+        duration_ts * tb.numer as f64 / tb.denom as f64
+    } else {
+        // 无法从元数据获取时长，返回 0（后续可通过完整解码获取）
+        0.0
+    };
+
+    // 计算总样本数
+    let total_samples = (duration_secs * sample_rate as f64) as u64;
+
+    Ok(AudioInfo {
+        sample_rate,
+        channels,
+        duration_secs,
+        total_samples,
+    })
 }
