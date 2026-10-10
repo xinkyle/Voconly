@@ -94,6 +94,7 @@ You're not locked into a single AI stack. Choose between fully local workflows o
 
 - **ASR:** Whisper · SenseVoice · Parakeet · Qwen-ASR
 - **LLM:** Ollama (local) + major cloud API providers
+- **Audio formats:** WAV · MP3 · M4A · OGG · FLAC (pure Rust processing, no ffmpeg required)
 
 ---
 
@@ -183,4 +184,4 @@ Voconly is one of those experiments.
 
 ### Tech Stack
 
-Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp
+Tauri 2.0 · React + TypeScript · Rust · Whisper.cpp · Symphonia

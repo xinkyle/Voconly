@@ -182,10 +182,10 @@ fn decode_audio_to_samples(audio_path: &str) -> Result<Vec<f32>, String> {
     match ext.as_str() {
         "wav" => decode_wav(&data),
         "webm" | "mp3" | "ogg" => {
-            // For other formats, we'd need ffmpeg or a decoder
-            // For now, return an error suggesting conversion to WAV
+            // For other formats, use Symphonia decoder
+            // See audio::decoder::decode_audio_file for full format support
             Err(format!(
-                "Audio format '{}' not supported. Please convert to WAV first.",
+                "Audio format '{}' not supported in this context. Use streaming transcription or convert to WAV.",
                 ext
             ))
         }
@@ -627,79 +627,6 @@ pub fn cleanup_all_resources(services: State<'_, AppServices>) -> Result<(), Str
     Ok(())
 }
 
-/// 将音频文件转换为 WAV 格式
-/// 使用 ffmpeg 进行转换，支持多种输入格式（mp3, m4a, ogg, webm 等）
-#[tauri::command]
-pub async fn convert_audio_to_wav(
-    audio_path: String,
-    app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    use std::process::Command;
-
-    info!("Converting audio to WAV: {}", audio_path);
-
-    let input_path = Path::new(&audio_path);
-    if !input_path.exists() {
-        return Err(format!("Audio file not found: {}", audio_path));
-    }
-
-    // 生成输出文件路径（临时目录）
-    let temp_dir = std::env::temp_dir();
-    let output_filename = format!(
-        "voconly_{}.wav",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S_%f")
-    );
-    let output_path = temp_dir.join(&output_filename);
-    let output_path_str = output_path.to_string_lossy().to_string();
-
-    // 使用 ffmpeg 转换
-    // 参数：-y 覆盖已存在的文件, -i 输入文件, -ar 16000 设置采样率, -ac 1 单声道, -f wav 输出格式
-    let mut cmd = Command::new("ffmpeg");
-    cmd.args([
-        "-y",
-        "-i",
-        &audio_path,
-        "-ar", "16000",  // 16kHz 采样率（ASR 模型常用）
-        "-ac", "1",       // 单声道
-        "-f", "wav",
-        &output_path_str,
-    ]);
-
-    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let result = cmd.output();
-
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                info!("Audio converted successfully: {}", output_path_str);
-
-                // 发送事件通知前端
-                let _ = app_handle.emit("audio-converted", &serde_json::json!({
-                    "originalPath": &audio_path,
-                    "convertedPath": &output_path_str
-                }));
-
-                Ok(output_path_str)
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed to convert audio: {}", stderr))
-            }
-        }
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Err("ffmpeg not found. Please install ffmpeg to convert audio files.".to_string())
-            } else {
-                Err(format!("Failed to run ffmpeg: {}", e))
-            }
-        }
-    }
-}
 
 /// 获取音频文件的时长（秒，向上取整）
 #[tauri::command]
@@ -707,199 +634,138 @@ pub fn get_audio_duration(audio_path: String) -> Result<u32, String> {
     get_audio_duration_internal(&audio_path)
 }
 
-/// 获取音频文件的时长（内部实现）
+/// 获取音频文件的时长(内部实现)
 fn get_audio_duration_internal(audio_path: &str) -> Result<u32, String> {
-    use std::process::Command;
+    use crate::audio::get_audio_info;
 
-    let mut cmd = Command::new("ffprobe");
-    cmd.args([
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        audio_path,
-    ]);
+    let info = get_audio_info(audio_path)
+        .map_err(|e| format!("Failed to get audio info: {}", e))?;
 
-    // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+    if info.duration_secs == 0.0 {
+        return Err("Audio duration could not be determined from metadata. The file may need to be fully decoded.".to_string());
     }
 
-    let result = cmd.output();
-
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                let duration_str = String::from_utf8_lossy(&output.stdout);
-                let duration: f32 = duration_str
-                    .trim()
-                    .parse()
-                    .map_err(|e| format!("Failed to parse duration: {}", e))?;
-                // 向上取整为整数秒
-                Ok(duration.ceil() as u32)
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed to get audio duration: {}", stderr))
-            }
-        }
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Err("ffprobe not found. Please install ffmpeg.".to_string())
-            } else {
-                Err(format!("Failed to run ffprobe: {}", e))
-            }
-        }
-    }
+    // 向上取整为整数秒
+    Ok(info.duration_secs.ceil() as u32)
 }
 
-/// 分割音频文件为多个片段
-/// 返回分割后的文件路径列表
+
+
+/// 使用流式解码器转录大音频文件
+///
+/// # Arguments
+/// * `services` - 应用服务
+/// * `request` - 转录请求参数
+/// * `app_handle` - Tauri 应用句柄
 #[tauri::command]
-pub async fn split_audio_file(
-    audio_path: String,
-    chunk_duration: f32,
-    overlap: f32,
-    app_handle: tauri::AppHandle,
-) -> Result<Vec<String>, String> {
-    use std::process::Command;
-
-    info!(
-        "Splitting audio: {} into {}s chunks with {}s overlap",
-        audio_path, chunk_duration, overlap
-    );
-
-    let input_path = Path::new(&audio_path);
-    if !input_path.exists() {
-        return Err(format!("Audio file not found: {}", audio_path));
-    }
-
-    // 获取音频总时长
-    let total_duration = get_audio_duration_internal(&audio_path)?;
-    info!("Total audio duration: {}s", total_duration);
-
-    // 计算需要分割的片段数
-    // 有效步长 = chunk_duration - overlap
-    let step = chunk_duration - overlap;
-    let num_chunks = (total_duration as f32 / step).ceil() as usize;
-    info!("Will split into {} chunks", num_chunks);
-
-    // 创建临时目录
-    let temp_dir = std::env::temp_dir();
-    let base_name = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("audio");
-
-    let mut chunk_paths = Vec::new();
-
-    for i in 0..num_chunks {
-        let start_time = i as f32 * step;
-        let chunk_path = temp_dir.join(format!("{}_chunk_{:03}.wav", base_name, i));
-        let chunk_path_str = chunk_path.to_string_lossy().to_string();
-
-        // 使用 ffmpeg 分割
-        let mut cmd = Command::new("ffmpeg");
-        cmd.args([
-            "-y",
-            "-ss", &start_time.to_string(),
-            "-i", &audio_path,
-            "-t", &chunk_duration.to_string(),
-            "-ar", "16000",
-            "-ac", "1",
-            "-f", "wav",
-            &chunk_path_str,
-        ]);
-
-        // Windows 平台：禁止创建控制台窗口，避免窗口闪烁
-        #[cfg(target_os = "windows")]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        let result = cmd.output();
-
-        match result {
-            Ok(output) => {
-                if output.status.success() {
-                    info!("Created chunk {}: {}", i, chunk_path_str);
-                    chunk_paths.push(chunk_path_str);
-
-                    // 发送进度事件
-                    let _ = app_handle.emit("audio-split-progress", &serde_json::json!({
-                        "current": i + 1,
-                        "total": num_chunks,
-                        "percent": ((i + 1) as f32 / num_chunks as f32 * 100.0) as i32
-                    }));
-                } else {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(format!("Failed to create chunk {}: {}", i, stderr));
-                }
-            }
-            Err(e) => {
-                return Err(format!("Failed to run ffmpeg for chunk {}: {}", i, e));
-            }
-        }
-    }
-
-    info!("Audio splitting complete: {} chunks created", chunk_paths.len());
-
-    // 发送完成事件
-    let _ = app_handle.emit("audio-split-complete", &serde_json::json!({
-        "totalChunks": chunk_paths.len()
-    }));
-
-    Ok(chunk_paths)
-}
-
-/// 分片转录音频文件
-/// 将大文件分割后逐个转录，并合并结果
-#[tauri::command]
-pub async fn transcribe_audio_chunks(
+pub async fn transcribe_audio_streaming(
     services: State<'_, AppServices>,
-    chunk_paths: Vec<String>,
-    scene_id: String,
-    language: Option<String>,
+    request: TranscribeRequest,
     app_handle: tauri::AppHandle,
 ) -> Result<TranscribeResponse, String> {
+    use crate::audio::StreamingDecoder;
+
     info!(
-        "Transcribing {} chunks for scene: {}",
-        chunk_paths.len(),
-        scene_id
+        "Streaming transcription for file: {} with scene: {}",
+        request.audio_path, request.scene_id
+    );
+
+    // 创建流式解码器
+    let mut decoder = StreamingDecoder::new(&request.audio_path)
+        .map_err(|e| format!("Failed to create streaming decoder: {}", e))?;
+
+    let audio_info = decoder.audio_info();
+    info!(
+        "Audio info: {} Hz, {} channels, {:.2}s",
+        audio_info.sample_rate, audio_info.channels, audio_info.duration_secs
     );
 
     let mut all_text = String::new();
-    let mut all_segments: Vec<TranscribeSegment> = Vec::new();
+    let mut all_segments: Vec<crate::backends::TranscribeSegment> = Vec::new();
     let mut detected_language: Option<String> = None;
     let mut time_offset = 0.0;
+    let mut chunk_index = 0;
 
-    for (i, chunk_path) in chunk_paths.iter().enumerate() {
-        info!("Transcribing chunk {}/{}: {}", i + 1, chunk_paths.len(), chunk_path);
+    // 每次处理 30 秒
+    const CHUNK_DURATION_SECS: f32 = 30.0;
 
-        // 调用现有的转录函数
-        let request = TranscribeRequest {
-            scene_id: scene_id.clone(),
-            audio_path: chunk_path.clone(),
-            language: language.clone(),
-            translate: None,
-            initial_prompt: None,
-        };
+    // 获取模型（Arc 方案）
+    let loaded_model: std::sync::Arc<crate::model_manager::LoadedModel> = {
+        let mut model_manager = services
+            .model_manager
+            .lock()
+            .map_err(|e| format!("Failed to lock model manager: {}", e))?;
 
-        let result = transcribe_audio(services.clone(), request).await?;
+        let mgr = model_manager
+            .as_mut()
+            .ok_or("Model manager not initialized")?;
+
+        let model = mgr
+            .get_or_load_model(&request.scene_id)
+            .map_err(|e| format!("Failed to get model: {}", e))?;
+
+        model.touch();
+        model
+    };
+
+    // 获取语言配置
+    let language = if let Some(lang) = request.language {
+        lang
+    } else {
+        let config = services
+            .config
+            .lock()
+            .map_err(|e| format!("Failed to lock config: {}", e))?;
+        let model_id = config.global_model_config.asr_model.model_id.clone();
+        config
+            .model_language_prefs
+            .get(&model_id)
+            .cloned()
+            .unwrap_or_else(|| "auto".to_string())
+    };
+
+    let mut params = TranscribeParams::default();
+    params.language = language;
+
+    // 获取用户词典
+    let dictionary = {
+        let config = services
+            .config
+            .lock()
+            .map_err(|e| format!("Failed to lock config: {}", e))?;
+        config.user_dictionary.clone()
+    };
+
+    let backend_type = loaded_model.backend.backend_type();
+
+    // 流式处理
+    while let Some(chunk_samples) = decoder
+        .next_chunk(CHUNK_DURATION_SECS)
+        .map_err(|e| format!("Failed to decode chunk: {}", e))?
+    {
+        chunk_index += 1;
+        info!(
+            "Processing chunk {} ({} samples, {:.2}s)",
+            chunk_index,
+            chunk_samples.len(),
+            chunk_samples.len() as f32 / 16000.0
+        );
+
+        // 转录当前块
+        let result = loaded_model
+            .backend
+            .transcribe(&chunk_samples, &params)
+            .map_err(|e| format!("Transcription failed: {}", e))?;
 
         // 合并结果
-        if i == 0 {
-            detected_language = result.language;
+        if chunk_index == 1 {
+            detected_language = result.language.clone();
         }
 
-        // 添加文本（用空格或换行分隔）
+        // 添加文本
         if !all_text.is_empty() && !result.text.is_empty() {
-            // 根据语言添加适当的分隔符
             if let Some(ref lang) = detected_language {
-                if lang.starts_with("zh") || lang == "ja" || lang == "ko" {
-                    // 中文、日文、韩文不需要额外分隔
-                } else {
+                if !lang.starts_with("zh") && lang != "ja" && lang != "ko" {
                     all_text.push(' ');
                 }
             }
@@ -913,36 +779,33 @@ pub async fn transcribe_audio_chunks(
             all_segments.push(segment);
         }
 
-        // 更新时间偏移（考虑重叠部分）
-        // 每个片段的结束时间作为下一个片段的起始偏移
-        if let Some(last_segment) = all_segments.last() {
-            time_offset = last_segment.end;
-        }
+        // 更新时间偏移
+        time_offset += chunk_samples.len() as f32 / 16000.0;
 
         // 发送进度事件
-        let _ = app_handle.emit("transcribe-chunk-progress", &serde_json::json!({
-            "current": i + 1,
-            "total": chunk_paths.len(),
-            "percent": ((i + 1) as f32 / chunk_paths.len() as f32 * 100.0) as i32
+        let progress = decoder.progress();
+        let _ = app_handle.emit("transcribe-streaming-progress", &serde_json::json!({
+            "current": chunk_index,
+            "percent": (progress * 100.0) as i32
         }));
     }
 
     info!(
-        "Chunk transcription complete: {} chars, {} segments",
+        "Streaming transcription complete: {} chars, {} segments",
         all_text.chars().count(),
         all_segments.len()
     );
 
-    // 清理临时文件
-    for chunk_path in chunk_paths {
-        if let Err(e) = std::fs::remove_file(&chunk_path) {
-            info!("Warning: Failed to remove chunk file {}: {}", chunk_path, e);
-        }
-    }
+    // 转换结果
+    let response = convert_result(
+        BackendTranscribeResult {
+            text: all_text,
+            language: detected_language,
+            segments: all_segments,
+        },
+        &dictionary,
+        backend_type,
+    );
 
-    Ok(TranscribeResponse {
-        text: all_text,
-        language: detected_language,
-        segments: all_segments,
-    })
+    Ok(response)
 }
