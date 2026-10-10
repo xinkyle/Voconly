@@ -173,6 +173,28 @@ export default function FileTranscriptionPanel() {
         <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('file.title')}</h1>
       </div>
 
+      {/* 进度显示 - 移到 tabs 外部 */}
+      {status === 'transcribing' && (
+        <div className="max-w-2xl mx-auto mb-4">
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {progress.percent === 0 ? '正在初始化...' : '正在转录...'}
+              </span>
+              <span className="text-sm text-gray-700">
+                {progress.percent > 0 ? `${Math.round(progress.percent)}%` : ''}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-gray-700 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex justify-center mb-6">
         <div className="inline-flex bg-gray-100/80 p-1 rounded-xl">
@@ -208,26 +230,6 @@ export default function FileTranscriptionPanel() {
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            {/* 进度显示 - 只要正在转录就立即显示 */}
-            {status === 'transcribing' && (
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    {progress.percent === 0 ? '正在初始化...' : '正在转录...'}
-                  </span>
-                  <span className="text-sm text-gray-700">
-                    {progress.percent > 0 ? `${Math.round(progress.percent)}%` : ''}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-gray-700 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress.percent}%` }}
-                  />
-                </div>
               </div>
             )}
 
