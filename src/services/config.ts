@@ -271,8 +271,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     versionInfoUrl: rust.versionInfoUrl,
     // ASR 模型闲置自动卸载时间
     asrIdleTimeoutSeconds: rust.asrIdleTimeoutSeconds,
-    // 输出文字脚本
-    outputScript: rust.outputScript,
+    // 输出文字脚本（类型转换）
+    outputScript: rust.outputScript === 'zh-TW' ? 'zh-TW' : rust.outputScript === 'zh-CN' ? 'zh-CN' : undefined,
   };
 }
 
