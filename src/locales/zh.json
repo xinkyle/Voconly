@@ -60,7 +60,11 @@
       "asrIdleTimeout5min": "5 分钟（推荐）",
       "asrIdleTimeout10min": "10 分钟",
       "asrIdleTimeout15min": "15 分钟",
-      "asrIdleTimeout30min": "30 分钟"
+      "asrIdleTimeout30min": "30 分钟",
+      "outputScript": "输出文字",
+      "outputScriptDesc": "转录结果的文字形式",
+      "outputScriptZhCN": "简体中文",
+      "outputScriptZhTW": "繁体中文"
     },
     "prompt": {
       "title": "场景提示词管理",

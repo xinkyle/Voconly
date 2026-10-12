@@ -518,6 +518,15 @@ pub struct AppConfig {
     /// 默认 300 秒（5 分钟），设置为 0 禁用自动卸载
     #[serde(default = "default_asr_idle_timeout")]
     pub asr_idle_timeout_seconds: u64,
+    /// 输出文字脚本：简体中文 或 繁体中文
+    /// 默认 "zh-CN"
+    #[serde(default = "default_output_script")]
+    pub output_script: String,
+}
+
+/// 默认输出文字脚本
+fn default_output_script() -> String {
+    "zh-CN".to_string()
 }
 
 /// 默认 ASR 模型闲置超时时间（300 秒 = 5 分钟）
@@ -606,6 +615,7 @@ impl Default for AppConfig {
             llm_models: Vec::new(),
             custom_asr_model_dirs: Vec::new(),
             asr_idle_timeout_seconds: default_asr_idle_timeout(), // 默认 5 分钟
+            output_script: default_output_script(), // 默认简体中文
         }
     }
 }

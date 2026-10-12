@@ -6,6 +6,8 @@ import { invoke } from '../../utils/tauri';
 import { createLogger } from '../../services/log';
 import type { AppConfig, MicrophoneDevice, PreviewHeight } from '../../types';
 
+type OutputScript = 'zh-CN' | 'zh-TW';
+
 // 创建日志记录器
 const log = createLogger('SettingsSystem');
 
@@ -21,6 +23,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
   const [previewHeight, setPreviewHeight] = useState<PreviewHeight>(config.previewHeight ?? 'low');
   const [asrIdleTimeout, setAsrIdleTimeout] = useState<number>(config.asrIdleTimeoutSeconds ?? 300);
+  const [outputScript, setOutputScript] = useState<OutputScript>((config.outputScript as OutputScript) ?? 'zh-CN');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +44,9 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     setPreviewHeight(config.previewHeight ?? 'low');
     setSelectedMic(config.defaultMicrophone || '');
     setAsrIdleTimeout(config.asrIdleTimeoutSeconds ?? 300);
+    setOutputScript(config.outputScript ?? 'zh-CN');
     setLoading(false);
-  }, [config.autoStart, config.minimizeToTrayOnStartup, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds]);
+  }, [config.autoStart, config.minimizeToTrayOnStartup, config.checkUpdates, config.previewHeight, config.defaultMicrophone, config.asrIdleTimeoutSeconds, config.outputScript]);
 
   // Load microphones and log dir on mount
   useEffect(() => {
@@ -149,6 +153,12 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     const seconds = minutes === 0 ? 0 : minutes * 60;
     setAsrIdleTimeout(seconds);
     const newConfig = { ...config, asrIdleTimeoutSeconds: seconds };
+    onSave(newConfig);
+  };
+
+  const handleOutputScriptChange = (script: OutputScript) => {
+    setOutputScript(script);
+    const newConfig = { ...config, outputScript: script };
     onSave(newConfig);
   };
 
@@ -260,6 +270,31 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
             <option value="en">{t('settings.system.languageEn')}</option>
           </select>
         </div>
+
+        {/* Output Script setting - only show when UI language is Chinese */}
+        {i18n.language === 'zh' && (
+          <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">{t('settings.system.outputScript')}</p>
+                <p className="text-xs text-gray-500">{t('settings.system.outputScriptDesc')}</p>
+              </div>
+            </div>
+            <select
+              value={outputScript}
+              onChange={(e) => handleOutputScriptChange(e.target.value as OutputScript)}
+              className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
+            >
+              <option value="zh-CN">{t('settings.system.outputScriptZhCN')}</option>
+              <option value="zh-TW">{t('settings.system.outputScriptZhTW')}</option>
+            </select>
+          </div>
+        )}
 
         {/* Check updates setting */}
         <div className={`flex items-center justify-between p-3 rounded-xl border border-gray-100 transition-all duration-200 ${

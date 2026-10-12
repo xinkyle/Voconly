@@ -104,6 +104,8 @@ interface RustAppConfig {
   versionInfoUrl?: string;
   /// ASR 模型闲置自动卸载时间（秒）
   asrIdleTimeoutSeconds?: number;
+  /// 输出文字脚本：简体中文 或 繁体中文
+  outputScript?: string;
 }
 
 // ============== Rust LLM 类型 ==============
@@ -269,6 +271,8 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     versionInfoUrl: rust.versionInfoUrl,
     // ASR 模型闲置自动卸载时间
     asrIdleTimeoutSeconds: rust.asrIdleTimeoutSeconds,
+    // 输出文字脚本
+    outputScript: rust.outputScript,
   };
 }
 
@@ -317,6 +321,8 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
     versionInfoUrl: config.versionInfoUrl,
     // ASR 模型闲置自动卸载时间
     asrIdleTimeoutSeconds: config.asrIdleTimeoutSeconds,
+    // 输出文字脚本
+    outputScript: config.outputScript,
   };
 }
 

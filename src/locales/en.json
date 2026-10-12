@@ -60,7 +60,11 @@
       "asrIdleTimeout5min": "5 minutes (Recommended)",
       "asrIdleTimeout10min": "10 minutes",
       "asrIdleTimeout15min": "15 minutes",
-      "asrIdleTimeout30min": "30 minutes"
+      "asrIdleTimeout30min": "30 minutes",
+      "outputScript": "Output Script",
+      "outputScriptDesc": "Text script for transcription results",
+      "outputScriptZhCN": "Simplified Chinese",
+      "outputScriptZhTW": "Traditional Chinese"
     },
     "prompt": {
       "title": "Scene Prompt Management",

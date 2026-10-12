@@ -643,15 +643,6 @@ function App() {
     };
   }, [config]);
 
-  // Reload config when switching to models page to refresh download status
-  useEffect(() => {
-    if (activeNav === 'models' || activeNav === 'home') {
-      loadConfig()
-        .then(cfg => setConfig(cfg))
-        .catch(err => log.error(`Failed to reload config: ${err}`));
-    }
-  }, [activeNav]);
-
   // Subscribe to download events globally (persists across tab switches)
   useEffect(() => {
     let mounted = true;
@@ -1609,9 +1600,9 @@ function App() {
   };
 
   const handleSaveScenes = async (scenes: Scene[]) => {
-    // 先重新加载配置，确保 user_dictionary 等独立保存的数据是最新的
-    const latestConfig = await loadConfig();
-    const newConfig = { ...latestConfig, scenes };
+    // 直接使用当前 config
+    if (!config) return;
+    const newConfig = { ...config, scenes };
     setConfig(newConfig);
     await saveConfig(newConfig);
     log.debug('Config saved');
@@ -1864,11 +1855,9 @@ function App() {
               <SettingsSystem
                 config={config}
                 onSave={async (newConfig) => {
-                  // 先重新加载配置，确保 user_dictionary 等独立保存的数据是最新的
-                  const latestConfig = await loadConfig();
-                  const mergedConfig = { ...latestConfig, ...newConfig };
-                  setConfig(mergedConfig);
-                  await saveConfig(mergedConfig);
+                  // 直接使用当前 config，不需要重新加载
+                  setConfig(newConfig);
+                  await saveConfig(newConfig);
                 }}
               />
             )}
@@ -1907,11 +1896,10 @@ function App() {
                 onDownloadCancel={handleDownloadCancel}
                 onGlobalModelConfigChange={async (newGlobalConfig) => {
                   if (config) {
-                    // 重新加载配置，确保获取最新的 modelQuantPrefs 等数据
-                    const latestConfig = await loadConfig();
-                    const newConfig = { ...latestConfig, globalModelConfig: newGlobalConfig };
+                    // 直接使用当前 config，更新 globalModelConfig 并保存
+                    const newConfig = { ...config, globalModelConfig: newGlobalConfig };
                     setConfig(newConfig);
-                    // 不需要再次调用 saveConfig，因为 HomePanelV2 已经保存过了
+                    await saveConfig(newConfig);
                   }
                 }}
                 onNavigateToSettings={() => {

@@ -167,6 +167,8 @@ export interface AppConfig {
   versionInfoUrl?: string;         // 版本信息 URL（用于自动更新检查）
   /** ASR 模型闲置自动卸载时间（秒），默认 300 秒（5 分钟），设置为 0 禁用自动卸载 */
   asrIdleTimeoutSeconds?: number;
+  /** 输出文字脚本：简体中文 或 繁体中文，默认 'zh-CN' */
+  outputScript?: 'zh-CN' | 'zh-TW';
 }
 
 // 麦克风设备

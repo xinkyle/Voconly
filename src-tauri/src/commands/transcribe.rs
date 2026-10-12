@@ -79,9 +79,31 @@ static OPENCC_CONVERTER: Lazy<Option<OpenCC>> =
         }
     });
 
+/// Lazy-initialized OpenCC converter for Simplified to Traditional Chinese
+static OPENCC_S2T_CONVERTER: Lazy<Option<OpenCC>> =
+    Lazy::new(|| match OpenCC::from_config(BuiltinConfig::S2t) {
+        Ok(converter) => {
+            info!("[OpenCC] S2t converter initialized successfully");
+            Some(converter)
+        }
+        Err(e) => {
+            info!("[OpenCC] Failed to initialize S2t converter: {}", e);
+            None
+        }
+    });
+
 /// Convert traditional Chinese to simplified Chinese
 fn to_simplified_chinese(text: &str) -> String {
     if let Some(converter) = OPENCC_CONVERTER.as_ref() {
+        converter.convert(text)
+    } else {
+        text.to_string()
+    }
+}
+
+/// Convert simplified Chinese to traditional Chinese
+fn to_traditional_chinese(text: &str) -> String {
+    if let Some(converter) = OPENCC_S2T_CONVERTER.as_ref() {
         converter.convert(text)
     } else {
         text.to_string()
@@ -103,28 +125,40 @@ fn convert_result(
     result: BackendTranscribeResult,
     dictionary: &UserDictionary,
     backend_type: BackendType,
+    output_script: &str,
 ) -> TranscribeResponse {
-    // 检测文本是否包含中文字符，只有中文才需要繁体转简体
+    // 检测文本是否包含中文字符，只有中文才需要繁简转换
     let detected_lang = result.language.as_deref().unwrap_or("unknown");
     let is_chinese = contains_chinese(&result.text);
 
     debug!(
-        "[Transcribe] 检测语言字段: {}, 文本是否含中文: {}",
-        detected_lang, is_chinese
+        "[Transcribe] 检测语言字段: {}, 文本是否含中文: {}, 输出文字: {}",
+        detected_lang, is_chinese, output_script
     );
 
-    let mut text = if is_chinese {
-        debug!(
-            "[Transcribe] 执行繁体转简体转换，原文长度: {}",
-            result.text.len()
-        );
-        let converted = to_simplified_chinese(&result.text);
-        debug!("[Transcribe] 转换完成，结果长度: {}", converted.len());
-        converted
-    } else {
-        debug!("[Transcribe] 非中文，跳过繁体转简体");
-        result.text.clone()
+    // 根据配置决定转换方向
+    let convert_text = |text: &str| -> String {
+        if !contains_chinese(text) {
+            debug!("[Transcribe] 文本不含中文，跳过转换");
+            return text.to_string();
+        }
+
+        info!("[Transcribe] 输出文字设置: {}, 执行转换", output_script);
+        match output_script {
+            "zh-TW" => {
+                info!("[Transcribe] 执行简体转繁体转换，原文: {}", text.chars().take(50).collect::<String>());
+                let converted = to_traditional_chinese(text);
+                info!("[Transcribe] 转换结果: {}", converted.chars().take(50).collect::<String>());
+                converted
+            }
+            _ => {
+                info!("[Transcribe] 执行繁体转简体转换");
+                to_simplified_chinese(text)
+            }
+        }
     };
+
+    let mut text = convert_text(&result.text);
 
     // 只有不支持原生热词的模型才执行后处理修正
     // TranscribeCpp 后端已通过 context 参数在模型端处理热词
@@ -150,11 +184,7 @@ fn convert_result(
             .segments
             .into_iter()
             .map(|s| TranscribeSegment {
-                text: if contains_chinese(&s.text) {
-                    to_simplified_chinese(&s.text)
-                } else {
-                    s.text
-                },
+                text: convert_text(&s.text),
                 start: s.start,
                 end: s.end,
             })
@@ -402,16 +432,19 @@ pub async fn transcribe_audio(
     // 获取 backend 类型（用于判断是否需要后处理修正）
     let backend_type = loaded_model.backend.backend_type();
 
-    // 获取用户词典配置
-    let dictionary = {
+    // 获取用户词典配置和输出文字设置
+    let (dictionary, output_script) = {
         let config = services
             .config
             .lock()
             .map_err(|e| format!("Failed to lock config: {}", e))?;
-        config.user_dictionary.clone()
+        (
+            config.user_dictionary.clone(),
+            config.output_script.clone(),
+        )
     };
 
-    Ok(convert_result(result, &dictionary, backend_type))
+    Ok(convert_result(result, &dictionary, backend_type, &output_script))
 }
 
 /// 内部转录函数（供 capture.rs 直接调用，无需 IPC）
@@ -527,8 +560,9 @@ pub fn transcribe_samples_internal(
     params.language = language;
     params.translate = false;
 
-    // 获取用户词典
+    // 获取用户词典和输出文字设置
     let dictionary = config.user_dictionary.clone();
+    let output_script = config.output_script.clone();
     let backend_type = loaded_model.backend.backend_type();
 
     // 释放 config 锁，避免阻塞
@@ -542,8 +576,8 @@ pub fn transcribe_samples_internal(
         .map_err(|e| format!("Transcription failed: {}", e))?;
     let transcribe_ms = transcribe_start.elapsed().as_millis() as u64;
 
-    // 转换结果（繁体转简体、词典修正）
-    let response = convert_result(result, &dictionary, backend_type);
+    // 转换结果（繁简转换、词典修正）
+    let response = convert_result(result, &dictionary, backend_type, &output_script);
 
     // 确定设备类型（简化方案：使用 Auto 表示自动检测）
     // TODO: 未来可扩展为从 backend 获取实际使用的设备
@@ -727,13 +761,16 @@ pub async fn transcribe_audio_streaming(
     let mut params = TranscribeParams::default();
     params.language = language;
 
-    // 获取用户词典
-    let dictionary = {
+    // 获取用户词典和输出文字设置
+    let (dictionary, output_script) = {
         let config = services
             .config
             .lock()
             .map_err(|e| format!("Failed to lock config: {}", e))?;
-        config.user_dictionary.clone()
+        (
+            config.user_dictionary.clone(),
+            config.output_script.clone(),
+        )
     };
 
     let backend_type = loaded_model.backend.backend_type();
@@ -805,6 +842,7 @@ pub async fn transcribe_audio_streaming(
         },
         &dictionary,
         backend_type,
+        &output_script,
     );
 
     Ok(response)

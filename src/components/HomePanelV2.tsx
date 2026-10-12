@@ -5,7 +5,7 @@ import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
 import { extractShortcutFromEvent } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
-import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS, loadConfig, saveConfig } from '../services/config';
+import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
 import { subscribeToDownloadComplete, invalidateAsrModelsCache } from '../services/downloader';
 import { getFullStats, type FullStats } from '../services/history';
@@ -541,19 +541,17 @@ export default function HomePanelV2({
       },
     };
 
-    // 保存配置
+    // 通知父组件更新配置（父组件负责保存）
+    if (onGlobalModelConfigChange) {
+      onGlobalModelConfigChange(newConfig);
+    }
+
+    // 开始加载模型，设置加载中状态
+    setAsrLoading(true);
+    setAsrModelLoaded(false);
+    log.info(`Switching ASR model from ${oldModelId} to ${modelId}`);
+
     try {
-      const config = await loadConfig();
-      await saveConfig({
-        ...config,
-        globalModelConfig: newConfig,
-      });
-
-      // 开始加载模型，设置加载中状态
-      setAsrLoading(true);
-      setAsrModelLoaded(false);
-      log.info(`Switching ASR model from ${oldModelId} to ${modelId}`);
-
       // 切换模型（卸载旧模型 + 加载新模型）
       const result = await switchAsrModel(oldModelId, modelId);
 
@@ -585,12 +583,8 @@ export default function HomePanelV2({
           });
         }
       }
-
-      if (onGlobalModelConfigChange) {
-        onGlobalModelConfigChange(newConfig);
-      }
     } catch (err) {
-      log.error(`Failed to save ASR model: ${err}`);
+      log.error(`Failed to switch ASR model: ${err}`);
       setAsrModelLoaded(false);
       showToast({
         type: 'error',
@@ -918,23 +912,10 @@ export default function HomePanelV2({
 
     log.info(`[handleToggleLlm] newConfig: ${JSON.stringify(newConfig)}`);
 
-    // 保存配置到持久化存储
+    // 通知父组件更新配置（父组件负责保存）
     try {
-      log.info('[handleToggleLlm] 开始加载配置...');
-      const config = await loadConfig();
-      log.info(`[handleToggleLlm] 加载的配置: ${JSON.stringify(config.globalModelConfig)}`);
-
-      const configToSave = {
-        ...config,
-        globalModelConfig: newConfig,
-      };
-      log.info(`[handleToggleLlm] 准备保存的配置: ${JSON.stringify(configToSave.globalModelConfig)}`);
-
-      await saveConfig(configToSave);
-      log.info('[handleToggleLlm] 配置保存成功');
-
-      // 通知父组件更新状态
       onGlobalModelConfigChange(newConfig);
+      log.info('[handleToggleLlm] 配置已通知父组件保存');
 
       // 显示 Toast 提示
       showToast({
