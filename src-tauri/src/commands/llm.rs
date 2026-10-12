@@ -2,6 +2,7 @@
 //! 提供 LLM 相关的 Tauri 命令
 
 use crate::commands::performance::LlmPerformanceState;
+use crate::commands::transcribe::{contains_chinese, to_traditional_chinese};
 use crate::config::AppServices;
 use crate::llm::{
     empty_to_none, get_provider_meta_list, migrate_prompt, LlmConfig, LlmProfile, LlmProgressEvent,
@@ -487,8 +488,8 @@ pub async fn llm_process_text_for_scene_with_progress(
         text.chars().count()
     );
 
-    // 获取全局 LLM 配置 + 场景提示词
-    let (llm_config, prompt_type, custom_prompt, provider_id) = {
+    // 获取全局 LLM 配置 + 场景提示词 + 输出文字设置
+    let (llm_config, prompt_type, custom_prompt, provider_id, output_script) = {
         let config = services.config.lock().unwrap();
 
         // 获取场景配置（用于获取提示词）
@@ -529,6 +530,7 @@ pub async fn llm_process_text_for_scene_with_progress(
             scene.prompt_type.clone(),
             scene.custom_prompt.clone(),
             global_llm.provider_id.clone(),
+            config.output_script.clone(),
         )
     };
 
@@ -716,7 +718,7 @@ pub async fn llm_process_text_for_scene_with_progress(
     let model_id = llm_config.provider.model.clone();
 
     // 调用带进度的处理方法
-    let result = tokio::time::timeout(
+    let mut result = tokio::time::timeout(
         timeout,
         llm_service.process_text_with_progress(&text, Some(progress_tx)),
     )
@@ -730,6 +732,16 @@ pub async fn llm_process_text_for_scene_with_progress(
         "[LLM] Process completed in {:.0}ms for {} chars",
         elapsed_ms, text_len
     );
+
+    // 根据 output_script 配置进行繁简转换
+    if output_script == "zh-TW" {
+        if let Ok(ref mut response) = result {
+            if response.success && contains_chinese(&response.text) {
+                info!("[LLM] 执行简体转繁体转换（output_script=zh-TW）");
+                response.text = to_traditional_chinese(&response.text);
+            }
+        }
+    }
 
     result
 }

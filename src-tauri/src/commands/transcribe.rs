@@ -93,7 +93,7 @@ static OPENCC_S2T_CONVERTER: Lazy<Option<OpenCC>> =
     });
 
 /// Convert traditional Chinese to simplified Chinese
-fn to_simplified_chinese(text: &str) -> String {
+pub fn to_simplified_chinese(text: &str) -> String {
     if let Some(converter) = OPENCC_CONVERTER.as_ref() {
         converter.convert(text)
     } else {
@@ -102,7 +102,7 @@ fn to_simplified_chinese(text: &str) -> String {
 }
 
 /// Convert simplified Chinese to traditional Chinese
-fn to_traditional_chinese(text: &str) -> String {
+pub fn to_traditional_chinese(text: &str) -> String {
     if let Some(converter) = OPENCC_S2T_CONVERTER.as_ref() {
         converter.convert(text)
     } else {
@@ -111,7 +111,7 @@ fn to_traditional_chinese(text: &str) -> String {
 }
 
 /// 检测文本是否包含中文字符
-fn contains_chinese(text: &str) -> bool {
+pub fn contains_chinese(text: &str) -> bool {
     text.chars().any(|c| {
         // CJK Unified Ideographs: U+4E00 - U+9FFF
         // CJK Unified Ideographs Extension A: U+3400 - U+4DBF
