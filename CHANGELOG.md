@@ -1,4 +1,22 @@
 # Changelog
+## [0.5.21] - 2026-10-12
+
+### 新功能
+1. **繁体中文输出支持**，用户可在系统设置中选择输出文字为繁体中文，转录结果和 LLM 处理结果将自动转换为繁体。
+
+### 问题修复
+2. **繁体输出设置保存修复**，修复系统设置中繁体中文选项无法保存的问题。
+
+---
+
+### New Features
+1. **Traditional Chinese output support** - Users can select Traditional Chinese as output script in system settings, transcription results and LLM processed results will be automatically converted to Traditional Chinese.
+
+### Bug Fixes
+2. **Traditional Chinese setting save fixed** - Fixed the issue where Traditional Chinese option in system settings could not be saved.
+
+===
+
 ## [0.5.20] - 2026-10-10
 
 ### 新功能
