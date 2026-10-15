@@ -460,7 +460,32 @@ function formatKeyDisplay(key: string): string {
     return key.slice(5);
   }
 
-  return key.toUpperCase();
+  // 方向键
+  if (key === 'ArrowUp') return '↑';
+  if (key === 'ArrowDown') return '↓';
+  if (key === 'ArrowLeft') return '←';
+  if (key === 'ArrowRight') return '→';
+
+  // 空格键
+  if (key === 'Space') return '␣';
+
+  // 标点符号键（与主页保持一致的映射）
+  const punctuationMap: Record<string, string> = {
+    Comma: ',',
+    Period: '.',
+    Slash: '/',
+    Semicolon: ';',
+    Quote: "'",
+    BracketLeft: '[',
+    BracketRight: ']',
+    Backslash: '\\',
+    Minus: '-',
+    Equal: '=',
+    Backquote: '`',
+  };
+  if (punctuationMap[key]) return punctuationMap[key];
+
+  return key;
 }
 
 /**
