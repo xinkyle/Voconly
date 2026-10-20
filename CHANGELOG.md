@@ -1,4 +1,26 @@
 # Changelog
+## [0.5.22] - 2026-10-21
+
+### 新功能
+1. **历史记录原始文本对比**，支持查看 AI 润色前后的文本差异，新增差异高亮显示，直观展示修改内容。
+
+### 体验优化
+2. **LLM 错误提示优化**，支持中英文错误信息识别，错误状态改为两行显示，用户可清晰知道错误来源及原文已正常输出。
+
+3. **左侧导航栏宽度修复**，修复历史记录 tab 切换时导航栏可能被压缩变窄的问题。
+
+---
+
+### New Features
+1. **History original text comparison** - Support viewing text differences before and after AI polishing, with diff highlighting to show modifications intuitively.
+
+### Improvements
+2. **LLM error prompt optimized** - Support Chinese and English error message recognition, error status now displays in two lines, users can clearly know the error source and that original text has been output normally.
+
+3. **Left sidebar width fixed** - Fixed the issue where the navigation bar might be compressed when switching to the history tab.
+
+---
+
 ## [0.5.21] - 2026-10-12
 
 ### 新功能
