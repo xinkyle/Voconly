@@ -19,7 +19,7 @@
 
 3. **Left sidebar width fixed** - Fixed the issue where the navigation bar might be compressed when switching to the history tab.
 
----
+===
 
 ## [0.5.21] - 2026-10-12
 
