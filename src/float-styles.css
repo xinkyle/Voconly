@@ -646,6 +646,30 @@ body {
   animation: pulse 1s ease-in-out infinite;
 }
 
+/* Error text container - two lines */
+.error-text-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.error-text-main {
+  font-size: 12px;
+  color: #ff9500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.error-text-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
 /* Confirm button - checkmark button */
 .confirm-button {
   display: flex;

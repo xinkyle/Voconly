@@ -11,6 +11,61 @@ import type { LlmErrorPayload } from '../types';
 // 创建日志记录器
 const log = createLogger('FloatPanel');
 
+// LLM 错误类型映射
+function mapLlmError(error: string): string {
+  const lowerError = error.toLowerCase();
+
+  // 显存/内存不足
+  if (lowerError.includes('out of memory') ||
+      lowerError.includes('cudamalloc') ||
+      lowerError.includes('cuda')) {
+    return 'llmErrorMemory';
+  }
+
+  // 连接失败（支持中英文错误信息）
+  // 英文：connection refused, econnrefused, connect
+  // 中文：连接失败（后端返回 "连接失败: {错误详情}"）
+  if (lowerError.includes('connection refused') ||
+      lowerError.includes('econnrefused') ||
+      lowerError.includes('connect') ||
+      error.includes('连接失败')) {
+    return 'llmErrorConnection';
+  }
+
+  // 请求失败（可能是网络问题或连接问题）
+  // 后端返回 "请求失败: {错误详情}"，通常表示无法连接到服务
+  if (error.includes('请求失败')) {
+    return 'llmErrorConnection';
+  }
+
+  // 模型未找到
+  if (lowerError.includes('model not found') ||
+      lowerError.includes('model \'')) {
+    return 'llmErrorModelNotFound';
+  }
+
+  // 请求超时
+  if (lowerError.includes('timeout') ||
+      lowerError.includes('etimedout')) {
+    return 'llmErrorTimeout';
+  }
+
+  // 认证失败
+  if (lowerError.includes('api key') ||
+      lowerError.includes('authentication') ||
+      lowerError.includes('unauthorized')) {
+    return 'llmErrorAuth';
+  }
+
+  // 文本过长
+  if (error === 'CONTEXT_TOO_LONG') {
+    return 'llmSkippedTooLong';
+  }
+
+  // 默认
+  return 'llmError';
+}
+
 type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing';
 
 interface FloatPanelState {
@@ -1463,9 +1518,8 @@ export default function FloatPanelApp() {
   // 如果显示 LLM 错误状态，渲染错误状态 UI
   if (llmError.visible) {
     // 根据错误类型显示不同提示
-    const errorText = llmError.error === 'CONTEXT_TOO_LONG'
-      ? t('transcribe.status.llmSkippedTooLong')
-      : t('transcribe.status.llmError');
+    const errorKey = mapLlmError(llmError.error);
+    const errorText = t(`transcribe.status.${errorKey}`);
 
     return (
       <div className="float-panel-container" key="llm-error-container">
@@ -1474,7 +1528,10 @@ export default function FloatPanelApp() {
             <div className="float-panel-content">
               <div className="status-row" key="llm-error-status-row">
                 <span className="status-dot error" />
-                <span className="status-text">{errorText}</span>
+                <div className="error-text-container">
+                  <span className="error-text-main">{t('transcribe.status.llmErrorPrefix')}（{errorText}）</span>
+                  <span className="error-text-sub">{t('transcribe.status.llmErrorOriginalOutput')}</span>
+                </div>
                 <button
                   onClick={handleConfirmLlmError}
                   className="confirm-button"
