@@ -1630,7 +1630,7 @@ function App() {
     return (
       <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
         {/* 左侧 */}
-        <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
+        <div className="flex flex-col w-[240px] flex-shrink-0 bg-[#F5F5F7]">
           {/* Logo + 标题 */}
           <div
             className="h-9 flex items-center px-5 select-none pt-3.5"
@@ -1751,7 +1751,7 @@ function App() {
   return (
     <div className="h-screen flex overflow-hidden bg-[#F5F5F7] rounded-xl border border-gray-400">
       {/* 左侧 - Logo + 标题 + 导航 */}
-      <div className="flex flex-col w-[240px] bg-[#F5F5F7]">
+      <div className="flex flex-col w-[240px] flex-shrink-0 bg-[#F5F5F7]">
         {/* 顶部 - Logo + 标题（可拖动） */}
         <div
           className="h-9 flex items-center px-5 select-none pt-3.5"
