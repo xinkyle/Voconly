@@ -16,6 +16,7 @@ interface RustHistoryRecord {
   content: string;
   duration: number;
   wordCount: number;
+  rawContent?: string;
 }
 
 function fromRustRecord(record: RustHistoryRecord): HistoryRecord {
@@ -25,6 +26,7 @@ function fromRustRecord(record: RustHistoryRecord): HistoryRecord {
     content: record.content,
     duration: record.duration,
     wordCount: record.wordCount,
+    rawContent: record.rawContent,
   };
 }
 
@@ -120,6 +122,7 @@ export async function saveHistory(history: HistoryRecord[]): Promise<void> {
       content: r.content,
       duration: r.duration,
       wordCount: r.wordCount,
+      rawContent: r.rawContent,
     }));
     await invoke('save_history', { history: rustHistory });
     // 更新总数
@@ -139,6 +142,7 @@ export async function addHistoryRecord(record: Omit<HistoryRecord, 'id'>): Promi
       duration: record.duration,
       wordCount: record.wordCount,
       timestamp: record.timestamp,
+      rawContent: record.rawContent,
     });
 
     const newRecord = fromRustRecord(rustRecord);

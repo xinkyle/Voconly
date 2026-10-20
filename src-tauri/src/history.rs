@@ -14,6 +14,8 @@ pub struct HistoryRecord {
     pub content: String,
     pub duration: u32,
     pub word_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_content: Option<String>,
 }
 
 /// 归档统计信息
@@ -72,7 +74,8 @@ fn init_db_schema(conn: &Connection) -> Result<(), String> {
             timestamp INTEGER NOT NULL,
             content TEXT NOT NULL,
             duration INTEGER NOT NULL,
-            word_count INTEGER NOT NULL
+            word_count INTEGER NOT NULL,
+            raw_content TEXT
         );
 
         -- 时间戳索引（用于排序和分页）
@@ -86,6 +89,20 @@ fn init_db_schema(conn: &Connection) -> Result<(), String> {
         ",
     )
     .map_err(|e| format!("Failed to init database schema: {}", e))?;
+
+    // 尝试添加 raw_content 列（如果不存在）
+    // SQLite 不支持 IF NOT EXISTS，所以捕获错误并忽略
+    match conn.execute("ALTER TABLE history ADD COLUMN raw_content TEXT", []) {
+        Ok(_) => info!("Added raw_content column to history table"),
+        Err(e) => {
+            // 如果列已存在，会报错 "duplicate column name"，这是正常的
+            if e.to_string().contains("duplicate column name") {
+                info!("raw_content column already exists");
+            } else {
+                warn!("Failed to add raw_content column: {}", e);
+            }
+        }
+    }
 
     info!("Database schema initialized");
     Ok(())
@@ -107,7 +124,7 @@ pub fn load_history_paged(page: u32, page_size: u32) -> Result<Vec<HistoryRecord
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, timestamp, content, duration, word_count
+            "SELECT id, timestamp, content, duration, word_count, raw_content
              FROM history
              ORDER BY timestamp DESC
              LIMIT ?1 OFFSET ?2",
@@ -122,6 +139,7 @@ pub fn load_history_paged(page: u32, page_size: u32) -> Result<Vec<HistoryRecord
                 content: row.get(2)?,
                 duration: row.get(3)?,
                 word_count: row.get(4)?,
+                raw_content: row.get(5)?,
             })
         })
         .map_err(|e| format!("Failed to query history: {}", e))?
@@ -163,14 +181,15 @@ pub fn save_history(history: Vec<HistoryRecord>) -> Result<(), String> {
 
     for record in &history {
         tx.execute(
-            "INSERT INTO history (id, timestamp, content, duration, word_count)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO history (id, timestamp, content, duration, word_count, raw_content)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 record.id,
                 record.timestamp,
                 record.content,
                 record.duration,
-                record.word_count
+                record.word_count,
+                record.raw_content
             ],
         )
         .map_err(|e| format!("Failed to insert record: {}", e))?;
@@ -190,10 +209,14 @@ pub fn add_history_record(
     duration: u32,
     word_count: u32,
     timestamp: u64,
+    raw_content: Option<String>,
 ) -> Result<HistoryRecord, String> {
     info!(
-        "Adding history record: {} words, {} seconds, timestamp {}",
-        word_count, duration, timestamp
+        "Adding history record: {} words, {} seconds, timestamp {}, has_raw_content: {}",
+        word_count,
+        duration,
+        timestamp,
+        raw_content.is_some()
     );
 
     let conn = get_db_connection()?;
@@ -204,17 +227,19 @@ pub fn add_history_record(
         content,
         duration,
         word_count,
+        raw_content,
     };
 
     conn.execute(
-        "INSERT INTO history (id, timestamp, content, duration, word_count)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO history (id, timestamp, content, duration, word_count, raw_content)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             new_record.id,
             new_record.timestamp,
             new_record.content,
             new_record.duration,
-            new_record.word_count
+            new_record.word_count,
+            new_record.raw_content
         ],
     )
     .map_err(|e| format!("Failed to insert record: {}", e))?;

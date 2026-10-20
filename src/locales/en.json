@@ -265,7 +265,13 @@
     "statsRecords": "Records",
     "statsToday": "Today",
     "daysCount": "{{count}} days",
-    "avgDaily": "Avg {{count}}"
+    "avgDaily": "Avg {{count}}",
+    "compareOriginal": "View Original",
+    "compareTitle": "Compare with Original",
+    "originalText": "Original Text",
+    "polishedText": "Polished Text",
+    "diffHighlight": "Difference Highlight",
+    "copy": "Copy"
   },
   "file": {
     "title": "File Transcription",

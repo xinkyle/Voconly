@@ -265,7 +265,13 @@
     "statsRecords": "总次数",
     "statsToday": "今日记录",
     "daysCount": "共{{count}}天",
-    "avgDaily": "日均{{count}}"
+    "avgDaily": "日均{{count}}",
+    "compareOriginal": "查看原文",
+    "compareTitle": "原文对比",
+    "originalText": "原始文本",
+    "polishedText": "润色后文本",
+    "diffHighlight": "差异对比",
+    "copy": "复制"
   },
   "file": {
     "title": "文件转录",

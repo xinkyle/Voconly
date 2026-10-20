@@ -1360,11 +1360,14 @@ function App() {
       // 如果 LLM 处理成功，保存 LLM 结果；否则保存原始识别文本
       const historyContent = llmResult.processed && llmResult.text ? llmResult.text : previewText;
       const wordCount = countWords(historyContent);  // 智能统计：中文按字，英文按词
+      // 如果 LLM 处理成功，保存原始文本用于对比
+      const rawContent = llmResult.processed && llmResult.text ? previewText : undefined;
       const newRecord = await addHistoryRecord({
         timestamp: Date.now(),
         content: historyContent,
         duration: Math.round(duration),
         wordCount,
+        rawContent,
       });
       stepStart = recordTime('历史记录保存', stepStart);
       setHistory(prev => [newRecord, ...prev]);

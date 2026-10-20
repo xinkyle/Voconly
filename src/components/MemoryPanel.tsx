@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { HistoryRecord } from '../types';
 import { useToast } from './ui/Toast';
@@ -14,6 +15,84 @@ interface MemoryPanelProps {
 
 // 每页显示条数
 const PAGE_SIZE = 10;
+
+// 文本差异对比
+function diffText(original: string, modified: string): Array<{ type: 'same' | 'added' | 'removed'; text: string }> {
+  const result: Array<{ type: 'same' | 'added' | 'removed'; text: string }> = [];
+
+  // 简单的逐字对比算法
+  const origChars = original.split('');
+  const modChars = modified.split('');
+
+  let origIdx = 0;
+  let modIdx = 0;
+
+  while (origIdx < origChars.length || modIdx < modChars.length) {
+    if (origIdx >= origChars.length) {
+      // 原文已结束，修改文本还有内容 -> 新增
+      result.push({ type: 'added', text: modChars.slice(modIdx).join('') });
+      break;
+    }
+    if (modIdx >= modChars.length) {
+      // 修改文本已结束，原文还有内容 -> 删除
+      result.push({ type: 'removed', text: origChars.slice(origIdx).join('') });
+      break;
+    }
+
+    if (origChars[origIdx] === modChars[modIdx]) {
+      // 相同字符
+      result.push({ type: 'same', text: origChars[origIdx] });
+      origIdx++;
+      modIdx++;
+    } else {
+      // 字符不同，需要判断是新增、删除还是替换
+      // 查找原文后续是否有匹配
+      let foundInOrig = -1;
+      for (let i = origIdx + 1; i < Math.min(origIdx + 5, origChars.length); i++) {
+        if (origChars[i] === modChars[modIdx]) {
+          foundInOrig = i;
+          break;
+        }
+      }
+
+      let foundInMod = -1;
+      for (let i = modIdx + 1; i < Math.min(modIdx + 5, modChars.length); i++) {
+        if (modChars[i] === origChars[origIdx]) {
+          foundInMod = i;
+          break;
+        }
+      }
+
+      if (foundInOrig >= 0 && (foundInMod < 0 || foundInOrig - origIdx <= foundInMod - modIdx)) {
+        // 原文后续有匹配 -> 原文部分被删除
+        result.push({ type: 'removed', text: origChars.slice(origIdx, foundInOrig).join('') });
+        origIdx = foundInOrig;
+      } else if (foundInMod >= 0) {
+        // 修改文本后续有匹配 -> 修改文本部分是新增
+        result.push({ type: 'added', text: modChars.slice(modIdx, foundInMod).join('') });
+        modIdx = foundInMod;
+      } else {
+        // 都没找到匹配 -> 替换
+        result.push({ type: 'removed', text: origChars[origIdx] });
+        result.push({ type: 'added', text: modChars[modIdx] });
+        origIdx++;
+        modIdx++;
+      }
+    }
+  }
+
+  // 合并相邻的相同类型
+  const merged: Array<{ type: 'same' | 'added' | 'removed'; text: string }> = [];
+  for (const item of result) {
+    if (merged.length > 0 && merged[merged.length - 1].type === item.type) {
+      merged[merged.length - 1].text += item.text;
+    } else {
+      merged.push({ ...item });
+    }
+  }
+
+  return merged;
+}
 
 // Icons
 const TrashIcon = () => (
@@ -49,6 +128,18 @@ const ChevronRightIcon = () => (
 const CopyIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
+const CompareIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
@@ -99,6 +190,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
   const { t } = useTranslation();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [compareRecord, setCompareRecord] = useState<HistoryRecord | null>(null);
   const { showToast } = useToast();
 
   // Copy text to clipboard
@@ -207,16 +299,30 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                                 {t('memory.words', { count: record.wordCount })}
                               </span>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopy(record.content);
-                              }}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                              title={t('memory.copied')}
-                            >
-                              <CopyIcon />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {record.rawContent && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCompareRecord(record);
+                                  }}
+                                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                                  title={t('memory.compareOriginal')}
+                                >
+                                  <CompareIcon />
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(record.content);
+                                }}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                                title={t('memory.copy')}
+                              >
+                                <CopyIcon />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -273,7 +379,7 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
       </div>
 
       {/* Clear Confirmation Modal */}
-      {showClearConfirm && (
+      {showClearConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-scale-in">
             <div className="text-center">
@@ -300,7 +406,92 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Compare Modal */}
+      {compareRecord && compareRecord.rawContent && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-4xl w-full mx-4 shadow-xl animate-scale-in max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">{t('memory.compareTitle')}</h3>
+              <button
+                onClick={() => setCompareRecord(null)}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Original Text */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-700">{t('memory.originalText')}</h4>
+                    <button
+                      onClick={() => handleCopy(compareRecord.rawContent!)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <CopyIcon />
+                      {t('memory.copy')}
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
+                    {compareRecord.rawContent}
+                  </div>
+                </div>
+
+                {/* Polished Text */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-700">{t('memory.polishedText')}</h4>
+                    <button
+                      onClick={() => handleCopy(compareRecord.content)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <CopyIcon />
+                      {t('memory.copy')}
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
+                    {compareRecord.content}
+                  </div>
+                </div>
+              </div>
+
+              {/* Diff Highlight Section */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('memory.diffHighlight')}</h4>
+                <div className="bg-gray-50 rounded-lg p-4 text-sm leading-relaxed">
+                  {(() => {
+                    const diff = diffText(compareRecord.rawContent, compareRecord.content);
+                    return diff.map((item, idx) => {
+                      if (item.type === 'removed') {
+                        return (
+                          <span key={idx} className="bg-red-100 text-red-700 line-through">
+                            {item.text}
+                          </span>
+                        );
+                      } else if (item.type === 'added') {
+                        return (
+                          <span key={idx} className="bg-green-100 text-green-700 font-medium">
+                            {item.text}
+                          </span>
+                        );
+                      }
+                      return <span key={idx}>{item.text}</span>;
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
