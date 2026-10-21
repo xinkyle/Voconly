@@ -46,6 +46,8 @@
       "defaultMicDesc": "Third-party microphones recommended for faster loading and better accuracy",
       "autoMic": "Auto (Follow system)",
       "logDirectory": "Log directory",
+      "modelsDirectory": "Models directory",
+      "modelsDirectoryDesc": "Restart the app after deleting models for changes to take effect",
       "openDirectory": "Open Directory",
       "loadingSystem": "Loading system settings...",
       "autostartTip": "Note: Auto-start requires adding a registry entry. It will be removed when disabled.",

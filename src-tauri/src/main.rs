@@ -2212,6 +2212,8 @@ fn main() {
             // Log management commands
             log_settings::get_log_dir_path,
             log_settings::open_log_dir,
+            log_settings::get_models_dir_path,
+            log_settings::open_models_dir,
             log_settings::get_log_level,
             log_settings::set_log_level,
             log_settings::log_from_frontend,

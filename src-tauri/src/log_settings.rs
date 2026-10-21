@@ -1,4 +1,5 @@
 use crate::paths::logs_dir;
+use crate::paths::models_dir;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -108,6 +109,46 @@ pub fn open_log_dir() -> Result<(), String> {
             .arg(&log_dir)
             .spawn()
             .map_err(|e| format!("Failed to open log directory: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// 获取模型目录路径
+#[tauri::command]
+pub fn get_models_dir_path() -> Result<String, String> {
+    let models_dir_path = models_dir()?;
+    Ok(models_dir_path.to_string_lossy().to_string())
+}
+
+/// 在文件管理器中打开模型目录
+#[tauri::command]
+pub fn open_models_dir() -> Result<(), String> {
+    let models_dir_path = models_dir()?;
+
+    // 在文件管理器中打开
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&models_dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open models directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&models_dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open models directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&models_dir_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open models directory: {}", e))?;
     }
 
     Ok(())

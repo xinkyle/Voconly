@@ -46,6 +46,8 @@
       "defaultMicDesc": "推荐使用第三方麦克风，加载更快、识别更准确",
       "autoMic": "自动（跟随系统）",
       "logDirectory": "日志目录",
+      "modelsDirectory": "模型目录",
+      "modelsDirectoryDesc": "删除模型后需重启应用才能生效",
       "openDirectory": "打开目录",
       "loadingSystem": "正在加载系统设置...",
       "autostartTip": "提示：开机自启功能需要在系统注册表中添加启动项，关闭后将自动移除。",

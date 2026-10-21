@@ -35,6 +35,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
 
   // Log directory state
   const [logDir, setLogDir] = useState<string>('');
+  const [modelsDir, setModelsDir] = useState<string>('');
 
   // Sync state when config changes
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
   useEffect(() => {
     loadMicrophones();
     loadLogDir();
+    loadModelsDir();
   }, []);
 
   const loadMicrophones = async () => {
@@ -78,11 +80,29 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
     }
   };
 
+  const loadModelsDir = async () => {
+    try {
+      const dir = await invoke<string>('get_models_dir_path');
+      setModelsDir(dir);
+    } catch (err) {
+      log.error(`Failed to get models directory: ${err}`);
+    }
+  };
+
   const handleOpenLogDir = async () => {
     try {
       await invoke('open_log_dir');
     } catch (err) {
       log.error(`Failed to open log directory: ${err}`);
+      setError(t('settings.system.openLogDirError'));
+    }
+  };
+
+  const handleOpenModelsDir = async () => {
+    try {
+      await invoke('open_models_dir');
+    } catch (err) {
+      log.error(`Failed to open models directory: ${err}`);
       setError(t('settings.system.openLogDirError'));
     }
   };
@@ -408,20 +428,42 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
 
         {/* Open log directory */}
         <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+          <div className="flex items-center min-w-0 flex-1">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-semibold text-sm text-gray-900">{t('settings.system.logDirectory')}</p>
-              <p className="text-xs text-gray-500 truncate max-w-[280px]" title={logDir}>{logDir || t('common.loading')}</p>
+              <p className="text-xs text-gray-500 truncate" title={logDir}>{logDir || t('common.loading')}</p>
             </div>
           </div>
           <button
             onClick={handleOpenLogDir}
-            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer transition-colors"
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer transition-colors flex-shrink-0 ml-3"
+          >
+            {t('settings.system.openDirectory')}
+          </button>
+        </div>
+
+        {/* Open models directory */}
+        <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-all duration-200">
+          <div className="flex items-center min-w-0 flex-1">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm text-gray-900">{t('settings.system.modelsDirectory')}</p>
+              <p className="text-xs text-gray-500 truncate" title={modelsDir}>{modelsDir || t('common.loading')}</p>
+              <p className="text-xs text-amber-600 mt-0.5">{t('settings.system.modelsDirectoryDesc')}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleOpenModelsDir}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer transition-colors flex-shrink-0 ml-3"
           >
             {t('settings.system.openDirectory')}
           </button>
