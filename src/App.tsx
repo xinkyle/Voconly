@@ -1851,8 +1851,14 @@ function App() {
                 isRecording={recorder.isRecording}
               />
             )}
-            {activeNav === 'settings' && settingsTab === 'prompt' && (
-              <SettingsPrompt />
+            {activeNav === 'settings' && settingsTab === 'prompt' && config && (
+              <SettingsPrompt
+                config={config}
+                onSave={async (newConfig) => {
+                  setConfig(newConfig);
+                  await saveConfig(newConfig);
+                }}
+              />
             )}
             {activeNav === 'settings' && settingsTab === 'system' && config && (
               <SettingsSystem

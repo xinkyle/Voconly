@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { UserPromptType, UserPromptPresets } from '../../types';
-import { getLlmPromptPresets, saveLlmPromptPresets } from '../../services/llm';
+import type { UserPromptType, UserPromptPresets, AppConfig } from '../../types';
 import { createLogger } from '../../services/log';
 import { useToast } from '../ui/Toast';
 
@@ -56,10 +55,14 @@ const addTextPlaceholder = (prompt: string): string => {
   return `${trimmed} {text}`;
 };
 
-export default function SettingsPrompt() {
+interface SettingsPromptProps {
+  config: AppConfig;
+  onSave: (config: AppConfig) => void;
+}
+
+export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // 当前选中的预设类型
@@ -81,42 +84,32 @@ export default function SettingsPrompt() {
   const [isAddingPreset, setIsAddingPreset] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
-  // 加载预设数据
+  // 从 config 加载预设数据
   useEffect(() => {
-    const loadPresets = async () => {
-      setLoading(true);
-      try {
-        const defaultPresets = getDefaultPresets(t);
-        const savedPresets = await getLlmPromptPresets();
+    const defaultPresets = getDefaultPresets(t);
+    const savedPresets = config.llmPromptPresets;
 
-        let loadedPresets: UserPromptPresets = defaultPresets;
-        if (savedPresets) {
-          loadedPresets = {
-            ...defaultPresets,
-            customPresets: savedPresets.customPresets || {},
-          };
-          // 只有非空才覆盖内置预设
-          const builtinKeys: BuiltinPresetKey[] = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'];
-          for (const key of builtinKeys) {
-            if (savedPresets[key] && savedPresets[key].trim()) {
-              loadedPresets[key] = savedPresets[key];
-            }
-          }
+    let loadedPresets: UserPromptPresets = defaultPresets;
+    if (savedPresets) {
+      loadedPresets = {
+        ...defaultPresets,
+        customPresets: savedPresets.customPresets || {},
+      };
+      // 只有非空才覆盖内置预设
+      const builtinKeys: BuiltinPresetKey[] = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'];
+      for (const key of builtinKeys) {
+        if (savedPresets[key] && savedPresets[key].trim()) {
+          loadedPresets[key] = savedPresets[key];
         }
-
-        setPresets(loadedPresets);
-
-        // 设置初始显示内容
-        const key = frontendTypeToBackendKey('LightPolish');
-        setCurrentPromptValue(removeTextPlaceholder(loadedPresets[key] || defaultPresets[key]));
-      } catch (err) {
-        log.error(`Failed to load presets: ${err}`);
-      } finally {
-        setLoading(false);
       }
-    };
-    loadPresets();
-  }, [t]);
+    }
+
+    setPresets(loadedPresets);
+
+    // 设置初始显示内容
+    const key = frontendTypeToBackendKey('LightPolish');
+    setCurrentPromptValue(removeTextPlaceholder(loadedPresets[key] || defaultPresets[key]));
+  }, [config.llmPromptPresets, t]);
 
   // 切换预设类型
   const handleTypeChange = (type: UserPromptType | string) => {
@@ -215,7 +208,14 @@ export default function SettingsPrompt() {
         customPresets: presets.customPresets || {},
       };
 
-      await saveLlmPromptPresets(presetsToSave);
+      // 创建新的 config 对象，更新 llmPromptPresets
+      const newConfig = {
+        ...config,
+        llmPromptPresets: presetsToSave,
+      };
+
+      // 通过 onSave 保存到后端，同时更新 App.tsx 中的 config 状态
+      onSave(newConfig);
       log.info('Presets saved successfully');
 
       showToast({
@@ -232,14 +232,6 @@ export default function SettingsPrompt() {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">{t('common.loading')}</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -280,7 +272,7 @@ export default function SettingsPrompt() {
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                   selectedType === presetName
                     ? 'bg-gray-900 text-white'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
                 }`}
               >
                 {presetName}
