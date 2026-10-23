@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
-import { extractShortcutFromEvent } from '../utils/keyboard';
+import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
@@ -934,6 +934,8 @@ export default function HomePanelV2({
 
   // 只显示前两个启用的场景（首页展示限制）
   const enabledScenes = localScenes.filter(s => s.enabled).slice(0, 2);
+  // 额外场景（超过前 2 个的）
+  const additionalScenes = localScenes.filter(s => s.enabled).slice(2);
 
   return (
     <div className="min-h-[400px] flex flex-col">
@@ -1245,6 +1247,23 @@ export default function HomePanelV2({
               <div className="text-sm font-medium text-gray-500 mb-1">{t('home.noEnabledScenes')}</div>
               <div className="text-xs text-gray-500">{t('home.addSceneHint')}</div>
             </div>
+          )}
+          {/* 额外场景提示 */}
+          {additionalScenes.length > 0 && (
+            <p className="mt-6 text-center text-xs text-gray-500">
+              {additionalScenes.map((scene) => {
+                const sceneName = getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets) || t('sceneList.defaultSceneName');
+                const { main } = parseShortcutForDisplay(scene.shortcut, t);
+                return (
+                  <span key={scene.id} className="inline-flex items-center gap-1.5 mx-2">
+                    <span>{sceneName}</span>
+                    <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded text-[11px] font-mono font-medium text-gray-700 bg-gray-200/80">
+                      {main}
+                    </span>
+                  </span>
+                );
+              })}
+            </p>
           )}
         </div>
       </section>
