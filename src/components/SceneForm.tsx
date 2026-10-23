@@ -69,7 +69,6 @@ export default function SceneForm({
   const { t } = useTranslation();
   const [shortcut, setShortcut] = useState(scene?.shortcut || '');
   const [promptType, setPromptType] = useState(scene?.promptType || 'lightPolish');
-  const [customPrompt, setCustomPrompt] = useState(scene?.customPrompt || '');
   const [errors, setErrors] = useState<{ shortcut?: string; conflict?: string }>({});
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [customPresets, setCustomPresets] = useState<Record<string, string>>({});
@@ -125,7 +124,6 @@ export default function SceneForm({
     if (scene) {
       setShortcut(scene.shortcut);
       setPromptType(scene.promptType || 'lightPolish');
-      setCustomPrompt(scene.customPrompt || '');
     }
   }, [scene]);
 
@@ -353,7 +351,7 @@ export default function SceneForm({
     }
 
     // 从 promptType 推导场景名称
-    const sceneName = getSceneNameFromPromptType(promptType, promptType === 'custom' ? customPrompt : undefined, t, customPresets);
+    const sceneName = getSceneNameFromPromptType(promptType, undefined, t, customPresets);
 
     const sceneData: Scene = {
       id: scene?.id || Date.now().toString(),
@@ -362,7 +360,6 @@ export default function SceneForm({
       model: scene?.model || { modelId: '', quantization: undefined },
       enabled: true, // 场景始终启用
       promptType,
-      customPrompt: promptType === 'custom' ? customPrompt : undefined,
     };
 
     onSave(sceneData);
@@ -450,37 +447,14 @@ export default function SceneForm({
                   {t(type.labelKey)}
                 </option>
               ))}
-              {Object.keys(customPresets).length > 0 && (
-                <optgroup label={t('llmConfig.promptTypes.custom')}>
-                  {Object.keys(customPresets).map((presetName) => (
-                    <option key={presetName} value={presetName}>
-                      {presetName}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              <option value="custom">{t('llmConfig.promptTypes.custom')}</option>
+              {Object.keys(customPresets).map((presetName) => (
+                <option key={presetName} value={presetName}>
+                  {presetName}
+                </option>
+              ))}
             </select>
             <p className="mt-1.5 text-xs text-gray-500">{t('sceneForm.promptTypeHint')}</p>
           </div>
-
-          {/* Custom Prompt (only show when "custom" is selected) */}
-          {promptType === 'custom' && (
-            <div>
-              <label htmlFor="customPrompt" className="block text-sm font-medium text-gray-700 mb-2">
-                {t('llmConfig.promptPlaceholder')}
-              </label>
-              <textarea
-                id="customPrompt"
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder={t('llmConfig.promptPlaceholder')}
-                rows={4}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200 resize-none"
-              />
-              <p className="mt-1.5 text-xs text-gray-500">{t('llmConfig.promptTip')}</p>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-4">
