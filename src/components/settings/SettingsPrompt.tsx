@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UserPromptType, UserPromptPresets, AppConfig } from '../../types';
 import { createLogger } from '../../services/log';
 import { useToast } from '../ui/Toast';
+import ConfirmModal from '../ui/ConfirmModal';
 
 const log = createLogger('SettingsPrompt');
+
+// 防抖延迟（毫秒）
+const DEBOUNCE_DELAY = 1000;
 
 // 内置提示词类型
 const BUILTIN_PROMPT_TYPES: UserPromptType[] = ['LightPolish', 'Translate', 'ProfessionalPolish', 'MeetingSecretary'];
@@ -63,7 +67,6 @@ interface SettingsPromptProps {
 export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
-  const [saving, setSaving] = useState(false);
 
   // 当前选中的预设类型
   const [selectedType, setSelectedType] = useState<UserPromptType | string>('LightPolish');
@@ -83,6 +86,26 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
   // 添加新预设状态
   const [isAddingPreset, setIsAddingPreset] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
+
+  // 删除确认弹窗状态
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    presetName: string;
+  }>({ isOpen: false, presetName: '' });
+
+  // 防抖保存定时器
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 追踪最新的预设值（避免闭包问题）
+  const latestPresetsRef = useRef<UserPromptPresets>(presets);
+
+  // 同步最新的 presets 到 ref
+  useEffect(() => {
+    latestPresetsRef.current = presets;
+  }, [presets]);
+
+  // 标记是否已初始化
+  const initializedRef = useRef(false);
 
   // 从 config 加载预设数据
   useEffect(() => {
@@ -106,22 +129,49 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
 
     setPresets(loadedPresets);
 
-    // 设置初始显示内容
-    const key = frontendTypeToBackendKey('LightPolish');
-    setCurrentPromptValue(removeTextPlaceholder(loadedPresets[key] || defaultPresets[key]));
+    // 仅在首次加载时初始化 currentPromptValue
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      const key = frontendTypeToBackendKey('LightPolish');
+      setCurrentPromptValue(removeTextPlaceholder(loadedPresets[key] || defaultPresets[key]));
+    }
   }, [config.llmPromptPresets, t]);
 
   // 切换预设类型
   const handleTypeChange = (type: UserPromptType | string) => {
     setSelectedType(type);
 
+    // 手动同步 currentPromptValue
     if (BUILTIN_PROMPT_TYPES.includes(type as UserPromptType)) {
       const key = frontendTypeToBackendKey(type as UserPromptType);
       setCurrentPromptValue(removeTextPlaceholder(presets[key] || ''));
     } else {
-      // 自定义预设
       const customValue = presets.customPresets?.[type] || '';
       setCurrentPromptValue(removeTextPlaceholder(customValue));
+    }
+  };
+
+  // 立即保存预设到后端
+  const savePresetsImmediately = async (newPresets: UserPromptPresets): Promise<void> => {
+    try {
+      const presetsToSave: UserPromptPresets = {
+        lightPolish: newPresets.lightPolish || '',
+        translate: newPresets.translate || '',
+        professionalPolish: newPresets.professionalPolish || '',
+        meetingSecretary: newPresets.meetingSecretary || '',
+        customPresets: newPresets.customPresets || {},
+      };
+
+      const newConfig = {
+        ...config,
+        llmPromptPresets: presetsToSave,
+      };
+
+      await onSave(newConfig);
+      log.info('Presets saved successfully');
+    } catch (err) {
+      log.error(`Failed to save presets: ${err}`);
+      throw err;
     }
   };
 
@@ -131,19 +181,54 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
 
     const valueWithPlaceholder = addTextPlaceholder(value);
 
+    // 从最新的 presets 状态计算新值
+    const currentPresets = latestPresetsRef.current;
+    let newPresets: UserPromptPresets;
+
     if (BUILTIN_PROMPT_TYPES.includes(selectedType as UserPromptType)) {
       const presetKey = frontendTypeToBackendKey(selectedType as UserPromptType);
-      setPresets(prev => ({ ...prev, [presetKey]: valueWithPlaceholder }));
+      newPresets = { ...currentPresets, [presetKey]: valueWithPlaceholder };
     } else {
-      setPresets(prev => ({
-        ...prev,
-        customPresets: { ...prev.customPresets, [selectedType]: valueWithPlaceholder }
-      }));
+      newPresets = {
+        ...currentPresets,
+        customPresets: { ...currentPresets.customPresets, [selectedType]: valueWithPlaceholder }
+      };
     }
+
+    setPresets(newPresets);
+    latestPresetsRef.current = newPresets; // 立即更新 ref
+
+    // 防抖自动保存
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        // 从 ref 读取最新值
+        await savePresetsImmediately(latestPresetsRef.current);
+        log.info('Prompt auto-saved');
+      } catch (err) {
+        log.error(`Failed to auto-save prompt: ${err}`);
+        showToast({
+          type: 'error',
+          title: t('common.error'),
+        });
+      }
+    }, DEBOUNCE_DELAY);
   };
 
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // 添加新预设
-  const handleAddPreset = () => {
+  const handleAddPreset = async () => {
     const name = newPresetName.trim();
     if (!name) return;
 
@@ -157,80 +242,86 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
       return;
     }
 
-    // 添加新预设
-    setPresets(prev => ({
-      ...prev,
-      customPresets: { ...prev.customPresets, [name]: '{text}' }
-    }));
+    try {
+      // 添加新预设
+      const newPresets = {
+        ...presets,
+        customPresets: { ...presets.customPresets, [name]: '{text}' },
+      };
 
-    // 选中新预设
-    setSelectedType(name);
-    setCurrentPromptValue('');
+      setPresets(newPresets);
 
-    setNewPresetName('');
-    setIsAddingPreset(false);
+      // 选中新预设
+      setSelectedType(name);
+      setCurrentPromptValue('');
 
-    showToast({
-      type: 'success',
-      title: t('llmConfig.presetAdded'),
-    });
+      setNewPresetName('');
+      setIsAddingPreset(false);
+
+      // 立即持久化
+      await savePresetsImmediately(newPresets);
+
+      showToast({
+        type: 'success',
+        title: t('llmConfig.presetAdded'),
+      });
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+      });
+    }
   };
 
   // 删除自定义预设
   const handleDeletePreset = (presetName: string) => {
-    setPresets(prev => {
-      const newCustomPresets = { ...prev.customPresets };
-      delete newCustomPresets[presetName];
-      return { ...prev, customPresets: newCustomPresets };
-    });
-
-    // 如果删除的是当前选中的，切换回 LightPolish
-    if (selectedType === presetName) {
-      setSelectedType('LightPolish');
-      setCurrentPromptValue(removeTextPlaceholder(presets.lightPolish));
-    }
-
-    showToast({
-      type: 'success',
-      title: t('llmConfig.presetDeleted'),
-    });
+    // 打开确认弹窗
+    setDeleteConfirm({ isOpen: true, presetName });
   };
 
-  // 保存所有预设
-  const handleSave = async () => {
-    setSaving(true);
+  // 确认删除预设
+  const handleConfirmDelete = async () => {
+    const presetName = deleteConfirm.presetName;
+
     try {
-      const presetsToSave: UserPromptPresets = {
-        lightPolish: presets.lightPolish || '',
-        translate: presets.translate || '',
-        professionalPolish: presets.professionalPolish || '',
-        meetingSecretary: presets.meetingSecretary || '',
-        customPresets: presets.customPresets || {},
-      };
+      // 保存旧状态用于回滚
+      const oldPresets = { ...presets };
 
-      // 创建新的 config 对象，更新 llmPromptPresets
-      const newConfig = {
-        ...config,
-        llmPromptPresets: presetsToSave,
+      // 1. 乐观更新 UI
+      const newPresets = {
+        ...presets,
+        customPresets: { ...presets.customPresets },
       };
+      delete newPresets.customPresets[presetName];
 
-      // 通过 onSave 保存到后端，同时更新 App.tsx 中的 config 状态
-      onSave(newConfig);
-      log.info('Presets saved successfully');
+      setPresets(newPresets);
+
+      // 2. 持久化
+      await savePresetsImmediately(newPresets);
+
+      // 如果删除的是当前选中的，切换回 LightPolish
+      if (selectedType === presetName) {
+        setSelectedType('LightPolish');
+        setCurrentPromptValue(removeTextPlaceholder(newPresets.lightPolish));
+      }
 
       showToast({
         type: 'success',
-        title: t('common.saved'),
+        title: t('llmConfig.presetDeleted'),
       });
     } catch (err) {
-      log.error(`Failed to save presets: ${err}`);
       showToast({
         type: 'error',
         title: t('common.error'),
       });
     } finally {
-      setSaving(false);
+      setDeleteConfirm({ isOpen: false, presetName: '' });
     }
+  };
+
+  // 取消删除
+  const handleCancelDelete = () => {
+    setDeleteConfirm({ isOpen: false, presetName: '' });
   };
 
   return (
@@ -349,16 +440,16 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
         </p>
       </div>
 
-      {/* Save Button */}
-      <div className="flex justify-end pt-4">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {saving ? t('common.saving') : t('common.save')}
-        </button>
-      </div>
+      {/* 删除确认弹窗 */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title={t('llmConfig.deletePresetTitle')}
+        message={t('llmConfig.deletePresetConfirm', { name: deleteConfirm.presetName })}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 }
