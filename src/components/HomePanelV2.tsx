@@ -1010,7 +1010,7 @@ export default function HomePanelV2({
 
       {/* 场景快捷键 - 主角区域 */}
       <section className="flex-1 flex flex-col justify-center">
-        <div className="-mx-4 px-4 py-10" style={{ background: 'radial-gradient(ellipse at center, rgba(243, 244, 246, 0.7) 0%, rgba(243, 244, 246, 0.4) 50%, transparent 90%)' }}>
+        <div className="-mx-4 px-4 py-10">
           <div className="text-center mb-8">
             <h2 className="text-base font-medium text-gray-700 mb-2">{t('home.shortcutTitle')}</h2>
             <p className="text-xs text-gray-500">{t('home.shortcutHint')}</p>
@@ -1269,7 +1269,7 @@ export default function HomePanelV2({
       </section>
 
       {/* 统计卡片 - 底部区域 */}
-      <section className="mt-4">
+      <section>
         <div className="flex justify-center items-stretch">
           {/* 总时长 */}
           <div className="text-center px-8 py-1">
