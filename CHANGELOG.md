@@ -1,4 +1,26 @@
 # Changelog
+## [0.5.23] - 2026-10-25
+
+### 新功能
+1. **首页额外场景展示**，当配置超过 2 个场景时，在场景卡片下方展示额外场景的名称和快捷键，采用微缩键帽风格设计，快捷键用小圆角背景高亮，呼应主卡片的键帽视觉语言。
+
+### 体验优化
+2. **首页布局间距优化**，移除场景快捷键区域的渐变背景色，移除统计卡片与上方的间距，让布局更紧凑干净。
+
+3. **新版本提示间距优化**，在 Voconly 标题和新版本提示之间增加左边距，提升视觉呼吸感。
+
+---
+
+### New Features
+1. **Additional scenes display on home page** - When more than 2 scenes are configured, additional scenes' names and shortcuts are displayed below the scene cards, using a mini keycap style design with shortcuts highlighted in small rounded backgrounds, echoing the keycap visual language of the main cards.
+
+### Improvements
+2. **Home page layout spacing optimized** - Removed the gradient background of the scene shortcut area, removed the spacing between the stats card and the content above, making the layout more compact and clean.
+
+3. **New version badge spacing optimized** - Added left margin between the Voconly title and the new version badge for better visual breathing room.
+
+===
+
 ## [0.5.22] - 2026-10-21
 
 ### 新功能
