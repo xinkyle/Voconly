@@ -1763,7 +1763,7 @@ function App() {
           {hasUpdate && (
             <button
               onClick={() => setShowUpdateDialog(true)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1 ml-2 rounded-md bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
               title={t('update.newVersionAvailable')}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
