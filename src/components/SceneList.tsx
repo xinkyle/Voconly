@@ -602,7 +602,7 @@ export default function SceneList({
                       {getSceneNameFromPromptType(scene.promptType, scene.customPrompt, t, customPresets) || t('sceneList.selectPrompt')}
                     </div>
                     {/* 提示词描述 */}
-                    {scene.promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(scene.promptType) && (
+                    {scene.promptType && ['lightPolish', 'translate', 'optimizePrompt', 'professionalPolish', 'meetingSecretary'].includes(scene.promptType) && (
                       <p className="text-xs text-gray-500 mt-0.5">
                         {t(`llmConfig.promptTypeDescs.${scene.promptType}`)}
                       </p>

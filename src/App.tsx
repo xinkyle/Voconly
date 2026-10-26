@@ -61,6 +61,7 @@ const getSceneDisplayName = (scene: Scene | null, t: (key: string) => string, cu
 const getDefaultPresets = (t: (key: string) => string): import('./types').UserPromptPresets => ({
   lightPolish: t('llmConfig.presets.lightPolish'),
   translate: t('llmConfig.presets.translate'),
+  optimizePrompt: t('llmConfig.presets.optimizePrompt'),
   professionalPolish: t('llmConfig.presets.professionalPolish'),
   meetingSecretary: t('llmConfig.presets.meetingSecretary'),
   customPresets: {},
@@ -1141,7 +1142,7 @@ function App() {
             customPresets: savedPresets?.customPresets || {},
           };
           // 逐个检查内置预设，只有非空才使用存储的值
-          const builtinKeys = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'] as const;
+          const builtinKeys = ['lightPolish', 'translate', 'optimizePrompt', 'professionalPolish', 'meetingSecretary'] as const;
           for (const key of builtinKeys) {
             if (savedPresets?.[key] && savedPresets[key].trim()) {
               mergedPresets[key] = savedPresets[key];
@@ -1154,7 +1155,7 @@ function App() {
             finalPrompt = currentScene.customPrompt;
           } else {
             const promptType = currentScene?.promptType || 'lightPolish';
-            if (promptType === 'lightPolish' || promptType === 'translate' || promptType === 'professionalPolish' || promptType === 'meetingSecretary') {
+            if (promptType === 'lightPolish' || promptType === 'translate' || promptType === 'optimizePrompt' || promptType === 'professionalPolish' || promptType === 'meetingSecretary') {
               finalPrompt = mergedPresets[promptType];
             } else {
               // 自定义预设

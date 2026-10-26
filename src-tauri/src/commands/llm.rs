@@ -44,6 +44,7 @@ fn get_preset_prompt(presets: Option<&UserPromptPresets>, preset_name: &str) -> 
     let result = match preset_name {
         "lightPolish" => presets.and_then(|p| empty_to_none(&p.light_polish)),
         "translate" => presets.and_then(|p| empty_to_none(&p.translate)),
+        "optimizePrompt" => presets.and_then(|p| empty_to_none(&p.optimize_prompt)),
         "professionalPolish" => presets.and_then(|p| empty_to_none(&p.professional_polish)),
         "meetingSecretary" => presets.and_then(|p| empty_to_none(&p.meeting_secretary)),
         custom => presets.and_then(|p| {

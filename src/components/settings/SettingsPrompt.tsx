@@ -11,12 +11,13 @@ const log = createLogger('SettingsPrompt');
 const DEBOUNCE_DELAY = 1000;
 
 // 内置提示词类型
-const BUILTIN_PROMPT_TYPES: UserPromptType[] = ['LightPolish', 'Translate', 'ProfessionalPolish', 'MeetingSecretary'];
+const BUILTIN_PROMPT_TYPES: UserPromptType[] = ['LightPolish', 'Translate', 'OptimizePrompt', 'ProfessionalPolish', 'MeetingSecretary'];
 
 // Prompt type labels
 const getPromptTypeLabel = (type: UserPromptType | string, t: (key: string) => string): string => {
   if (type === 'LightPolish') return t('llmConfig.promptTypes.lightPolish');
   if (type === 'Translate') return t('llmConfig.promptTypes.translate');
+  if (type === 'OptimizePrompt') return t('llmConfig.promptTypes.optimizePrompt');
   if (type === 'ProfessionalPolish') return t('llmConfig.promptTypes.professionalPolish');
   if (type === 'MeetingSecretary') return t('llmConfig.promptTypes.meetingSecretary');
   if (type === 'Custom') return t('llmConfig.promptTypes.custom');
@@ -24,12 +25,13 @@ const getPromptTypeLabel = (type: UserPromptType | string, t: (key: string) => s
 };
 
 // 内置预设的 key 类型
-type BuiltinPresetKey = 'lightPolish' | 'translate' | 'professionalPolish' | 'meetingSecretary';
+type BuiltinPresetKey = 'lightPolish' | 'translate' | 'optimizePrompt' | 'professionalPolish' | 'meetingSecretary';
 
 // Helper: Get default presets from i18n
 const getDefaultPresets = (t: (key: string) => string): UserPromptPresets => ({
   lightPolish: t('llmConfig.presets.lightPolish'),
   translate: t('llmConfig.presets.translate'),
+  optimizePrompt: t('llmConfig.presets.optimizePrompt'),
   professionalPolish: t('llmConfig.presets.professionalPolish'),
   meetingSecretary: t('llmConfig.presets.meetingSecretary'),
   customPresets: {},
@@ -40,6 +42,7 @@ const frontendTypeToBackendKey = (type: UserPromptType): BuiltinPresetKey => {
   switch (type) {
     case 'LightPolish': return 'lightPolish';
     case 'Translate': return 'translate';
+    case 'OptimizePrompt': return 'optimizePrompt';
     case 'ProfessionalPolish': return 'professionalPolish';
     case 'MeetingSecretary': return 'meetingSecretary';
     default: return 'lightPolish';
@@ -75,6 +78,7 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
   const [presets, setPresets] = useState<UserPromptPresets>({
     lightPolish: '',
     translate: '',
+    optimizePrompt: '',
     professionalPolish: '',
     meetingSecretary: '',
     customPresets: {},
@@ -119,7 +123,7 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
         customPresets: savedPresets.customPresets || {},
       };
       // 只有非空才覆盖内置预设
-      const builtinKeys: BuiltinPresetKey[] = ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'];
+      const builtinKeys: BuiltinPresetKey[] = ['lightPolish', 'translate', 'optimizePrompt', 'professionalPolish', 'meetingSecretary'];
       for (const key of builtinKeys) {
         if (savedPresets[key] && savedPresets[key].trim()) {
           loadedPresets[key] = savedPresets[key];
@@ -157,6 +161,7 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
       const presetsToSave: UserPromptPresets = {
         lightPolish: newPresets.lightPolish || '',
         translate: newPresets.translate || '',
+        optimizePrompt: newPresets.optimizePrompt || '',
         professionalPolish: newPresets.professionalPolish || '',
         meetingSecretary: newPresets.meetingSecretary || '',
         customPresets: newPresets.customPresets || {},
@@ -284,9 +289,6 @@ export default function SettingsPrompt({ config, onSave }: SettingsPromptProps) 
     const presetName = deleteConfirm.presetName;
 
     try {
-      // 保存旧状态用于回滚
-      const oldPresets = { ...presets };
-
       // 1. 乐观更新 UI
       const newPresets = {
         ...presets,

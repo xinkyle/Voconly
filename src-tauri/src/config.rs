@@ -743,8 +743,11 @@ pub fn load_config() -> Result<LoadConfigResult, String> {
     // 数据迁移：补全全局 LLM 配置（从 llm_providers 中选择第一个启用的）
     let migrated_llm_config = migrate_global_llm_config(&mut config);
 
+    // 数据迁移：添加新场景（optimizePrompt）
+    let migrated_scenes = migrate_add_optimize_prompt_scene(&mut config);
+
     // 如果发生了迁移，保存配置文件
-    if migrated_model_refs || migrated_prompt_types || migrated_llm_config {
+    if migrated_model_refs || migrated_prompt_types || migrated_llm_config || migrated_scenes {
         log::info!("[Config] Migration occurred, saving updated config");
         let config_content = serde_json::to_string_pretty(&config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
@@ -853,8 +856,9 @@ fn migrate_scene_prompt_types(config: &mut AppConfig) -> bool {
                 // 没找到匹配的 profile，根据场景名称设置默认值
                 let default_type = match scene.name.as_str() {
                     "轻度润色" => "lightPolish",
-                    "专业润色" => "professionalPolish",
                     "翻译" => "translate",
+                    "优化提示词" => "optimizePrompt",
+                    "专业润色" => "professionalPolish",
                     _ => "lightPolish",
                 };
                 scene.prompt_type = default_type.to_string();
@@ -916,6 +920,43 @@ fn migrate_global_llm_config(config: &mut AppConfig) -> bool {
         }
     }
     migrated
+}
+
+/// 添加新场景：优化提示词
+///
+/// 检查配置中是否已有 prompt_type 为 "optimizePrompt" 的场景，
+/// 如果没有，自动添加到场景列表末尾。
+///
+/// 返回 `true` 表示发生了迁移，`false` 表示无变化
+fn migrate_add_optimize_prompt_scene(config: &mut AppConfig) -> bool {
+    // 检查是否已有 optimizePrompt 场景
+    let has_optimize = config.scenes.iter().any(|s| s.prompt_type == "optimizePrompt");
+
+    if has_optimize {
+        log::info!("[Config] 'optimizePrompt' scene already exists, skipping migration");
+        return false;
+    }
+
+    // 生成新场景 ID（使用场景数量 + 1）
+    let new_id = (config.scenes.len() + 1).to_string();
+
+    // 添加新场景
+    let new_scene = Scene {
+        id: new_id,
+        name: "优化提示词".to_string(),
+        shortcut: String::new(), // 快捷键留空，让用户自己设置
+        model: ModelRef::new(String::new()),
+        model_id: None,
+        enabled: true,
+        load_strategy: LoadStrategy::Lazy { idle_timeout: 300 },
+        auto_type: true,
+        prompt_type: "optimizePrompt".to_string(),
+        custom_prompt: None,
+    };
+
+    config.scenes.push(new_scene);
+    log::info!("[Config] Added 'optimizePrompt' scene to config");
+    true
 }
 
 /// Save configuration to file (internal helper function)

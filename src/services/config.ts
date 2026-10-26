@@ -69,6 +69,7 @@ interface RustUserDictionary {
 interface RustUserPromptPresets {
   lightPolish: string;
   translate: string;
+  optimizePrompt: string;
   professionalPolish: string;
   meetingSecretary: string;
   customPresets?: Record<string, string>;

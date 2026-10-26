@@ -21,6 +21,7 @@ interface SceneFormProps {
 const BUILTIN_PROMPT_TYPES = [
   { id: 'lightPolish', labelKey: 'llmConfig.promptTypes.lightPolish' },
   { id: 'translate', labelKey: 'llmConfig.promptTypes.translate' },
+  { id: 'optimizePrompt', labelKey: 'llmConfig.promptTypes.optimizePrompt' },
   { id: 'professionalPolish', labelKey: 'llmConfig.promptTypes.professionalPolish' },
   { id: 'meetingSecretary', labelKey: 'llmConfig.promptTypes.meetingSecretary' },
 ];

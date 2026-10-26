@@ -1233,7 +1233,7 @@ export default function HomePanelV2({
                     </div>
 
                     {/* 场景描述 */}
-                    {hasLlm && promptType && ['lightPolish', 'translate', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
+                    {hasLlm && promptType && ['lightPolish', 'translate', 'optimizePrompt', 'professionalPolish', 'meetingSecretary'].includes(promptType) && (
                       <div className="text-xs text-gray-500 mt-1.5 line-clamp-1">
                         {t(`llmConfig.promptTypeDescs.${promptType}`)}
                       </div>

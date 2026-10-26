@@ -379,6 +379,9 @@ pub struct UserPromptPresets {
     pub light_polish: String,
     /// 预设：翻译
     pub translate: String,
+    /// 预设：优化提示词（新增字段，使用 default 实现向后兼容）
+    #[serde(default)]
+    pub optimize_prompt: String,
     /// 预设：专业润色
     pub professional_polish: String,
     /// 预设：会议秘书
@@ -395,6 +398,7 @@ impl Default for UserPromptPresets {
         Self {
             light_polish: String::new(),
             translate: String::new(),
+            optimize_prompt: String::new(),
             professional_polish: String::new(),
             meeting_secretary: String::new(),
             custom_presets: IndexMap::new(),

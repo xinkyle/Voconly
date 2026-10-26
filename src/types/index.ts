@@ -308,7 +308,7 @@ export interface LlmConfig {
 }
 
 // 用户提示词类型（前端显示用）
-export type UserPromptType = 'LightPolish' | 'Translate' | 'ProfessionalPolish' | 'MeetingSecretary' | 'Custom';
+export type UserPromptType = 'LightPolish' | 'Translate' | 'OptimizePrompt' | 'ProfessionalPolish' | 'MeetingSecretary' | 'Custom';
 
 // LLM Profile - 场景级配置
 export interface LlmProfile {
@@ -329,6 +329,7 @@ export interface LlmProfile {
 export interface UserPromptPresets {
   lightPolish: string;
   translate: string;
+  optimizePrompt: string;
   professionalPolish: string;
   meetingSecretary: string;
   /** 用户自定义预设（key 为分类名称，value 为提示词模板） */
