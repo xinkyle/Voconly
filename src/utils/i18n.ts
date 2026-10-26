@@ -8,6 +8,7 @@
 export const BUILTIN_PROMPT_TYPE_LABELS: Record<string, string> = {
   lightPolish: 'llmConfig.promptTypes.lightPolish',
   translate: 'llmConfig.promptTypes.translate',
+  optimizePrompt: 'llmConfig.promptTypes.optimizePrompt',
   professionalPolish: 'llmConfig.promptTypes.professionalPolish',
   meetingSecretary: 'llmConfig.promptTypes.meetingSecretary',
 };
