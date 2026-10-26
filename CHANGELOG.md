@@ -1,4 +1,44 @@
 # Changelog
+## [0.5.24] - 2026-10-27
+
+### 新功能
+1. 新增优化提示词预设场景，支持将语音转录的口语化文本优化为高质量提示词，包含深度拆解真实意图和补全用户视角两个核心能力。
+
+2. 系统设置增加模型目录显示和打开按钮，方便用户直接访问模型存储位置，删除模型后需重启应用才能生效。
+
+### 体验优化
+3. 场景提示词设置页现在显示五个预设选项，包括新增的优化提示词场景。
+
+4. 添加或编辑场景时的提示词类型下拉列表现在包含优化提示词选项。
+
+5. 提示词修改后自动保存，无需手动点击保存按钮，提升操作流畅度。
+
+6. 简化场景配置流程，移除场景配置中的自定义提示词输入框，自定义预设从分组显示改为平铺显示，提示词统一在场景提示词管理页面管理。
+
+### 问题修复
+7. 修复保存场景后自定义预设丢失的问题，确保预设数据同步更新。
+
+---
+
+### New Features
+1. Added Optimize Prompt preset scene, supporting optimization of colloquial text from speech transcription into high-quality prompts, with two core capabilities: deeply deconstructing real intent and completing perspectives users are unaware of.
+
+2. Added models directory display and open button in system settings, allowing users to directly access the model storage location. Note: Application restart required after deleting models for changes to take effect.
+
+### Improvements
+3. Scene prompt settings page now displays five preset options, including the new optimize prompt scene.
+
+4. Prompt type dropdown in add/edit scene now includes the optimize prompt option.
+
+5. Prompts are now auto-saved after modification, eliminating the need to manually click save button, improving operation smoothness.
+
+6. Simplified scene configuration process by removing the custom prompt input box from scene configuration, custom presets changed from grouped display to flat display, prompts are now managed uniformly in the scene prompt management page.
+
+### Bug Fixes
+7. Fixed the issue where custom presets were lost after saving scenes, ensuring preset data is synchronized and updated.
+
+===
+
 ## [0.5.23] - 2026-10-25
 
 ### 新功能
