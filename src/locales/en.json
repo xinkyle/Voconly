@@ -63,8 +63,8 @@
       "asrIdleTimeout10min": "10 minutes",
       "asrIdleTimeout15min": "15 minutes",
       "asrIdleTimeout30min": "30 minutes",
-      "outputScript": "Output Script",
-      "outputScriptDesc": "Text script for transcription results",
+      "outputScript": "Chinese Output Script",
+      "outputScriptDesc": "Transcription results output in Simplified Chinese by default, switch to Traditional Chinese if needed",
       "outputScriptZhCN": "Simplified Chinese",
       "outputScriptZhTW": "Traditional Chinese"
     },
