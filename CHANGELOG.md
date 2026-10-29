@@ -1,5 +1,23 @@
 # Changelog
-## [0.5.24] - 2026-10-27
+## [0.5.24] - 2026-10-29
+
+### 问题修复
+1. 修复部分 Windows 系统上运行时出现 VCRUNTIME140_1.dll 缺失错误的问题，将 Visual C++ Runtime 打包进安装程序，支持离线安装。
+
+### 体验优化
+2. 优化转录结果输出为中文简体还是繁体的切换提示语，提升用户理解度。
+
+---
+
+### Bug Fixes
+1. Fixed VCRUNTIME140_1.dll missing error on some Windows systems by bundling Visual C++ Runtime in the installer, now supports offline installation.
+
+### Improvements
+2. Improved the prompt text for switching between Simplified and Traditional Chinese output, enhancing user understanding.
+
+===
+
+## [0.5.23] - 2026-10-27
 
 ### 新功能
 1. 新增优化提示词预设场景，支持将语音转录的口语化文本优化为高质量提示词，包含深度拆解真实意图和补全用户视角两个核心能力。
