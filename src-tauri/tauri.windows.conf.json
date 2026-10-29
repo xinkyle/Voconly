@@ -1,6 +1,8 @@
 {
   "bundle": {
     "resources": {
+      "resources/models/*": "resources/models/",
+      "resources/vc_redist.x64.exe": "resources/",
       "transcribe-libs": "."
     }
   }
