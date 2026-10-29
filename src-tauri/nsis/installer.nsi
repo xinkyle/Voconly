@@ -541,40 +541,6 @@ Section "Visual C++ Runtime"
   ${EndIf}
 
   ${If} $0 != "1"
-    ; VC++ Runtime not found, download and install
-    ; Skip if updating
-    ${If} $UpdateMode <> 1
-      DetailPrint "Downloading Visual C++ Runtime..."
-      NSISdl::download "https://aka.ms/vs/17/release/vc_redist.x64.exe" "$TEMP\vc_redist.x64.exe"
-      Pop $R0
-      ${If} $R0 == "success"
-        DetailPrint "Installing Visual C++ Runtime..."
-        ExecWait '"$TEMP\vc_redist.x64.exe" /install /passive /norestart' $R1
-        ${If} $R1 = 0
-          DetailPrint "Visual C++ Runtime installed successfully"
-        ${Else}
-          DetailPrint "Visual C++ Runtime installation failed (exit code: $R1)"
-          ; Don't abort, let user continue if they have older version installed
-        ${EndIf}
-        Delete "$TEMP\vc_redist.x64.exe"
-      ${Else}
-        DetailPrint "Visual C++ Runtime download failed: $R0"
-        ; Don't abort, let user continue
-      ${EndIf}
-    ${EndIf}
-  ${EndIf}
-SectionEnd
-
-Section "Visual C++ Runtime"
-  ; Check if Visual C++ Runtime is already installed and skip this section
-  ; Check for VC++ 2015-2022 x64
-  ReadRegDword $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  ${If} $0 == ""
-    ; Check in WOW6432Node for 32-bit registry view on 64-bit Windows
-    ReadRegDword $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  ${EndIf}
-
-  ${If} $0 != "1"
     ; VC++ Runtime not found, install from embedded package
     ; Skip if updating
     ${If} $UpdateMode <> 1
