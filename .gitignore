@@ -35,6 +35,9 @@ dist/
 *.dll
 *.pdb
 
+# 例外：允许 VC++ Runtime 打包进安装程序
+!src-tauri/resources/vc_redist.x64.exe
+
 # Tauri updater 生成的版本信息文件（发布时自动生成）
 /latest.json
 

@@ -28,7 +28,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "resources/models/*": "resources/models/"
+      "resources/models/*": "resources/models/",
+      "resources/vc_redist.x64.exe": "resources/"
     },
     "macOS": {
       "entitlements": "./entitlements.plist"
