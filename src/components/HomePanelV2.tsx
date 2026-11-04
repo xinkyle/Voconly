@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Scene, GlobalModelConfig, ProviderWithConfig } from '../types';
 import { getFullModelId } from '../types';
 import type { DownloadProgress } from '../services/downloader';
-import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
+import { extractShortcutFromEvent, parseShortcutForDisplay, formatShortcut } from '../utils/keyboard';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { getAsrModelList, type AsrModelWithStatus, parseModelId, QUANT_LABELS } from '../services/config';
 import { switchAsrModel, isModelLoaded } from '../services/whisper';
@@ -614,10 +614,12 @@ export default function HomePanelV2({
     pressedModifiersRef.current = [];
 
     setListeningSceneId(sceneId);
+    listeningSceneIdRef.current = sceneId;
 
     // 10秒后自动取消（给用户更多时间录制组合键）
     listeningTimeoutRef.current = setTimeout(() => {
       setListeningSceneId(null);
+      listeningSceneIdRef.current = null;
       setPressedModifiers([]);
       pressedModifiersRef.current = [];
       setPausedRef.current?.(false);
@@ -682,180 +684,126 @@ export default function HomePanelV2({
     return e.key;
   };
 
-  // 键盘事件监听 - 用于捕获快捷键（支持组合键）
+  // 一轮录入只在全部按键松开后确认，释放修饰键不会覆盖完整组合键。
   useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      const currentListeningId = listeningSceneIdRef.current;
-      if (!currentListeningId) return;
+    const heldKeys = new Set<string>();
+    let captureSceneId: string | null = null;
+    let candidate = '';
+    let finishing = false;
 
-      e.preventDefault();
-      e.stopPropagation();
+    const resetCapture = () => {
+      heldKeys.clear();
+      candidate = '';
+      pressedModifiersRef.current = [];
+      setPressedModifiers([]);
+    };
 
-      // Escape 取消录制
-      if (e.key === 'Escape') {
-        setListeningSceneId(null);
-        listeningSceneIdRef.current = null;
-        setPressedModifiers([]);
-        pressedModifiersRef.current = [];
-        if (listeningTimeoutRef.current) {
-          clearTimeout(listeningTimeoutRef.current);
-        }
-        setPausedRef.current?.(false);
-        return;
-      }
-
-      // 检测修饰键按下 - 只记录，不触发完成
-      if (isModifierKey(e.key)) {
-        const modKey = normalizeModifierName(e);
-        if (!pressedModifiersRef.current.includes(modKey)) {
-          pressedModifiersRef.current = [...pressedModifiersRef.current, modKey];
-          setPressedModifiers([...pressedModifiersRef.current]);
-        }
-        return; // 继续监听，等待非修饰键
-      }
-
-      // 非修饰键按下 - 生成快捷键
-      const mainKey = extractShortcutFromEvent(e);
-      if (!mainKey) return;
-
-      // 组合快捷键：修饰键 + 主键
-      let newShortcut = mainKey;
-      if (pressedModifiersRef.current.length > 0) {
-        newShortcut = [...pressedModifiersRef.current, mainKey].join('+');
-      }
-
-      const currentScenes = localScenesRef.current;
-      const scene = currentScenes.find(s => s.id === currentListeningId);
-      if (!scene || scene.shortcut === newShortcut) {
-        setListeningSceneId(null);
-        listeningSceneIdRef.current = null;
-        setPressedModifiers([]);
-        pressedModifiersRef.current = [];
-        if (listeningTimeoutRef.current) {
-          clearTimeout(listeningTimeoutRef.current);
-        }
-        setPausedRef.current?.(false);
-        return;
-      }
-
-      // 尝试注册
-      const tryRegister = tryRegisterShortcutRef.current;
-      if (tryRegister) {
-        const result = await tryRegister(newShortcut, scene.id);
-        if (!result.success) {
+    const finishCapture = async (sceneId: string, shortcut: string) => {
+      finishing = true;
+      if (listeningTimeoutRef.current) clearTimeout(listeningTimeoutRef.current);
+      const scene = localScenesRef.current.find(s => s.id === sceneId);
+      try {
+        // 相同的快捷键是一次有效确认，无需重新注册或保存。
+        if (!scene || scene.shortcut === shortcut) return;
+        const result = await tryRegisterShortcutRef.current?.(shortcut, scene.id);
+        if (result && !result.success) {
           setShortcutError({
-            shortcut: newShortcut,
+            shortcut,
             errorType: (result.errorType as 'unsupported' | 'occupied' | 'unknown') || 'unknown',
             errorMessage: result.error || '',
           });
-          setListeningSceneId(null);
-          listeningSceneIdRef.current = null;
-          setPressedModifiers([]);
-          pressedModifiersRef.current = [];
-          if (listeningTimeoutRef.current) {
-            clearTimeout(listeningTimeoutRef.current);
-          }
-          setPausedRef.current?.(false);
           return;
         }
+        const newScenes = localScenesRef.current.map(s =>
+          s.id === sceneId ? { ...s, shortcut } : s);
+        setLocalScenes(newScenes);
+        localScenesRef.current = newScenes;
+        onScenesSaveRef.current?.(newScenes);
+      } catch (error) {
+        log.error(`Failed to save shortcut: ${error}`);
+        setShortcutError({ shortcut, errorType: 'unknown', errorMessage: String(error) });
+      } finally {
+        listeningSceneIdRef.current = null;
+        setListeningSceneId(null);
+        resetCapture();
+        finishing = false;
+        setPausedRef.current?.(false);
       }
-
-      const updatedScene = { ...scene, shortcut: newShortcut };
-      const newScenes = currentScenes.map(s => (s.id === currentListeningId ? updatedScene : s));
-      setLocalScenes(newScenes);
-      localScenesRef.current = newScenes;
-      setListeningSceneId(null);
-      listeningSceneIdRef.current = null;
-      setPressedModifiers([]);
-      pressedModifiersRef.current = [];
-
-      if (listeningTimeoutRef.current) {
-        clearTimeout(listeningTimeoutRef.current);
-      }
-
-      if (onScenesSaveRef.current) {
-        onScenesSaveRef.current(newScenes);
-      }
-
-      setPausedRef.current?.(false);
     };
 
-    const handleKeyUp = async (e: KeyboardEvent) => {
-      const currentListeningId = listeningSceneIdRef.current;
-      if (!currentListeningId) return;
-
-      // 修饰键释放时，从列表中移除
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const sceneId = listeningSceneIdRef.current;
+      if (!sceneId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (finishing) return;
+      if (captureSceneId !== sceneId || heldKeys.size === 0) {
+        resetCapture();
+        captureSceneId = sceneId;
+      }
+      if (e.key === 'Escape') {
+        cancelCapture();
+        return;
+      }
+      if (e.repeat) return;
+      heldKeys.add(e.code || e.key);
       if (isModifierKey(e.key)) {
-        const modKey = normalizeModifierName(e);
-
-        // 保存松开前的修饰键列表（用于生成快捷键）
-        const modifiersBeforeRelease = [...pressedModifiersRef.current];
-
-        // 从列表中移除当前松开的键
-        pressedModifiersRef.current = pressedModifiersRef.current.filter(k => k !== modKey);
-        setPressedModifiers([...pressedModifiersRef.current]);
-
-        // 如果所有修饰键都松开了，且之前有修饰键被按下，就设置快捷键
-        // 例如：只按了右 Alt 松开 → 设置 "RightAlt"
-        //       按了 Ctrl+Shift 松开 → 设置组合
-        if (modifiersBeforeRelease.length > 0 && pressedModifiersRef.current.length === 0) {
-          // 取消超时
-          if (listeningTimeoutRef.current) {
-            clearTimeout(listeningTimeoutRef.current);
-          }
-
-          // 生成快捷键：使用松开前的修饰键列表
-          const shortcutToSet = modifiersBeforeRelease.length === 1
-            ? modifiersBeforeRelease[0]
-            : modifiersBeforeRelease.join('+');
-
-          const currentScenes = localScenesRef.current;
-          const scene = currentScenes.find(s => s.id === currentListeningId);
-
-          if (scene && scene.shortcut !== shortcutToSet) {
-            // 尝试注册
-            const tryRegister = tryRegisterShortcutRef.current;
-            if (tryRegister) {
-              const result = await tryRegister(shortcutToSet, scene.id);
-              if (!result.success) {
-                setShortcutError({
-                  shortcut: shortcutToSet,
-                  errorType: (result.errorType as 'unsupported' | 'occupied' | 'unknown') || 'unknown',
-                  errorMessage: result.error || '',
-                });
-                setListeningSceneId(null);
-                listeningSceneIdRef.current = null;
-                setPressedModifiers([]);
-                pressedModifiersRef.current = [];
-                setPausedRef.current?.(false);
-                return;
-              }
-            }
-
-            const updatedScene = { ...scene, shortcut: shortcutToSet };
-            const newScenes = currentScenes.map(s => (s.id === currentListeningId ? updatedScene : s));
-            setLocalScenes(newScenes);
-            localScenesRef.current = newScenes;
-
-            if (onScenesSaveRef.current) {
-              onScenesSaveRef.current(newScenes);
-            }
-          }
-
-          setListeningSceneId(null);
-          listeningSceneIdRef.current = null;
-          setPressedModifiers([]);
-          pressedModifiersRef.current = [];
-          setPausedRef.current?.(false);
+        const modifier = normalizeModifierName(e);
+        if (!pressedModifiersRef.current.includes(modifier)) {
+          pressedModifiersRef.current = [...pressedModifiersRef.current, modifier];
+          setPressedModifiers([...pressedModifiersRef.current]);
         }
+        if (!candidate || candidate.split('+').every(k =>
+          /^(Left|Right)(Ctrl|Shift|Alt|Windows|Option|Cmd)$/.test(k))) {
+          candidate = pressedModifiersRef.current.join('+');
+        }
+      } else {
+        const mainKey = extractShortcutFromEvent(e);
+        if (mainKey) {
+          candidate = [...pressedModifiersRef.current, mainKey].join('+');
+          setPressedModifiers(candidate.split('+'));
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const sceneId = listeningSceneIdRef.current;
+      if (!sceneId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (finishing || captureSceneId !== sceneId) return;
+      heldKeys.delete(e.code || e.key);
+      if (heldKeys.size === 0 && candidate) {
+        void finishCapture(sceneId, candidate);
+      }
+    };
+
+    const cancelCapture = () => {
+      if (finishing || !listeningSceneIdRef.current) return;
+      if (listeningTimeoutRef.current) clearTimeout(listeningTimeoutRef.current);
+      listeningSceneIdRef.current = null;
+      setListeningSceneId(null);
+      captureSceneId = null;
+      resetCapture();
+      setPausedRef.current?.(false);
+    };
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('[data-shortcut-capture]')) {
+        cancelCapture();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('blur', cancelCapture);
+    window.addEventListener('mousedown', handleOutsideClick);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('blur', cancelCapture);
+      window.removeEventListener('mousedown', handleOutsideClick);
+      if (listeningTimeoutRef.current) clearTimeout(listeningTimeoutRef.current);
+      setPausedRef.current?.(false);
     };
   }, []);
 
@@ -1147,6 +1095,7 @@ export default function HomePanelV2({
                   >
                     {/* 键帽样式快捷键 */}
                     <div
+                      data-shortcut-capture
                       className="relative mb-5 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1173,23 +1122,14 @@ export default function HomePanelV2({
                           <div className="flex flex-col items-center leading-tight">
                             <span className="text-base">
                               {pressedModifiers.length > 0 ? (
-                                // 显示按下的修饰键 + ...
-                                pressedModifiers.map(mod => {
-                                  // 简化显示：LeftCtrl -> Ctrl, RightShift -> Shift
-                                  if (mod.startsWith('Left') || mod.startsWith('Right')) {
-                                    const base = mod.slice(4);
-                                    if (base === 'Windows') return 'Win';
-                                    if (base === 'Alt') return 'Alt';
-                                    return base;
-                                  }
-                                  return mod;
-                                }).join(' + ') + ' + '
+                                formatShortcut(pressedModifiers.join('+')) +
+                                (pressedModifiers.every(mod => /^(Left|Right)/.test(mod)) ? ' + …' : '')
                               ) : (
                                 '...'
                               )}
                             </span>
                             {pressedModifiers.length > 0 && (
-                              <span className="text-xs opacity-70 mt-0.5">等待按键...</span>
+                              <span className="text-xs opacity-70 mt-0.5">松开全部按键确认</span>
                             )}
                           </div>
                         ) : isThreeKey ? (

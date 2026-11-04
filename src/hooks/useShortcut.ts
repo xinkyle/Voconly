@@ -185,6 +185,7 @@ function convertDomEventToKeyName(e: KeyboardEvent, isMac: boolean): string | nu
  * 3. 支持双击检测：300ms 内按两次跳过 LLM
  */
 export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn {
+  const blockRuleQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { onShortcutTriggered, isRecording: externalIsRecording } = options;
   const [registeredShortcuts, setRegisteredShortcuts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -614,22 +615,21 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
 
   // 更新拦截规则：传递完整快捷键配置给 Rust 端
   const updateBlockRule = useCallback(async () => {
-    try {
-      const shortcuts = registeredShortcutsRef.current;
-
-      if (shortcuts.length > 0) {
+    // 串行更新，并在真正执行时读取最新暂停状态，避免异步恢复覆盖录入状态。
+    const update = blockRuleQueueRef.current.then(async () => {
+      try {
         const { commands } = await import('@tauri-keyhook');
-        await commands.setShortcutBlock(shortcuts);
-        log.info(`[updateBlockRule] 已设置快捷键拦截: ${shortcuts.join(', ')}`);
-      } else {
-        // 如果没有快捷键，清空拦截规则
-        const { commands } = await import('@tauri-keyhook');
-        await commands.setShortcutBlock([]);
-        log.info(`[updateBlockRule] 已清空拦截规则`);
+        if (isPausedRef.current) {
+          await commands.clearBlockRule();
+        } else {
+          await commands.setShortcutBlock([...registeredShortcutsRef.current]);
+        }
+      } catch (err) {
+        log.error(`[updateBlockRule] 设置拦截规则失败: ${err}`);
       }
-    } catch (err) {
-      log.error(`[updateBlockRule] 设置拦截规则失败: ${err}`);
-    }
+    });
+    blockRuleQueueRef.current = update;
+    await update;
   }, []);
 
   // 注册快捷键（带结果返回）
@@ -728,16 +728,23 @@ export function useShortcut(options: UseShortcutOptions = {}): UseShortcutReturn
       // 暂停：立即暂停，清空按键状态
       isPausedRef.current = true;
       pressedKeysRef.current.clear();
+      cancelPendingSingleKey();
+      pendingTriggerRef.current.forEach(entry => {
+        if (entry.timerId !== null) clearTimeout(entry.timerId);
+      });
+      pendingTriggerRef.current.clear();
+      void updateBlockRule();
       log.debug('快捷键监听已暂停');
     } else {
       // 恢复：延迟 300ms 后恢复，确保用户的按键操作完全结束
       pauseResumeTimerRef.current = setTimeout(() => {
         isPausedRef.current = false;
         pressedKeysRef.current.clear();
+        void updateBlockRule();
         log.debug('快捷键监听已恢复');
       }, 300);
     }
-  }, []);
+  }, [updateBlockRule, cancelPendingSingleKey]);
 
   // 初始化：设置事件监听和 keyhook
   useEffect(() => {
