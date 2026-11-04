@@ -1,4 +1,16 @@
 # Changelog
+## [0.5.25] - 2026-11-05
+
+### 问题修复
+1. 修复快捷键组合键设置的问题。
+
+---
+
+### Bug Fixes
+1. Fixed the issue with keyboard shortcut combination settings.
+
+===
+
 ## [0.5.24] - 2026-10-27
 
 ### 新功能
