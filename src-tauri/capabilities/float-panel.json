@@ -8,6 +8,9 @@
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:window:allow-close",
+    "core:window:allow-outer-position",
+    "core:window:allow-scale-factor",
+    "core:window:allow-set-position",
     "core:window:allow-set-focus",
     "core:window:allow-set-focusable",
     "core:webview:allow-internal-toggle-devtools"

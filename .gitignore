@@ -106,3 +106,6 @@ SEO/
 #本地脚本
 scripts/
 
+# 设计提案文档
+design-proposals/
+

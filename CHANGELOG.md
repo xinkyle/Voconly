@@ -1,4 +1,16 @@
 # Changelog
+## [0.5.26] - 2026-11-05
+
+### 新功能
+1. **药丸归位功能**，将药丸窗口的拖拽图标改为归位图标，点击后可将药丸窗口重置到屏幕底部居中位置，方便用户快速找回被拖到屏幕外的药丸。
+
+---
+
+### New Features
+1. **Panel reset feature** - Changed the drag handle icon to a reset icon, clicking it resets the pill panel to the bottom center of the screen, making it easy for users to quickly find the pill when it's dragged off-screen.
+
+===
+
 ## [0.5.25] - 2026-11-05
 
 ### 问题修复

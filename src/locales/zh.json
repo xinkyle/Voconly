@@ -664,6 +664,7 @@
     "deviceRemovedDesc": "选择的麦克风已断开，已切换为跟随系统"
   },
   "transcribe": {
+    "resetPosition": "复位药丸位置",
     "recognizing": "识别中",
     "recorded": "已记录{{count}}次",
     "learning": "学习中...",

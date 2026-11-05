@@ -312,8 +312,8 @@ body {
   flex-shrink: 0;
 }
 
-/* Cancel button - small x button */
-.cancel-button {
+/* Reset pill position */
+.reset-position-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -329,7 +329,7 @@ body {
 }
 
 /* SVG icons in buttons - explicit sizing to avoid Tailwind dependency */
-.cancel-button svg,
+.reset-position-button svg,
 .collapse-toggle-button svg {
   width: 12px;  /* w-3 equivalent */
   height: 12px; /* h-3 equivalent */
@@ -340,12 +340,12 @@ body {
   height: 16px; /* h-4 equivalent */
 }
 
-.cancel-button:hover {
-  background: rgba(255, 59, 48, 0.3);
+.reset-position-button:hover {
+  background: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.cancel-button:active {
+.reset-position-button:active {
   transform: scale(0.9);
 }
 
@@ -695,3 +695,21 @@ body {
 .confirm-button:active {
   transform: scale(0.9);
 }
+/* Quiet grip before the cancel button; the hit area is larger than the dots. */
+.panel-drag-handle {
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 24px;
+  margin-left: -4px;
+  margin-right: -2px;
+  flex-shrink: 0;
+  fill: rgba(255, 255, 255, 0.28);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.panel-drag-handle:active { cursor: grabbing; }
+.panel-drag-handle:hover { fill: rgba(255, 255, 255, 0.5); }

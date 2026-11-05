@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
+import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
+import { createPanelDrag } from '../utils/panelDrag';
 import { listen, invoke } from '../utils/tauri';
 import { subscribeToLlmProgress } from '../services/llm';
 import { estimateTranscribeTime, estimateLlmTime, initPerformanceCache, initLlmPerformanceCache } from '../services/performance';
@@ -222,6 +224,49 @@ export default function FloatPanelApp() {
   log.debug('Component rendering...');
 
   const { t } = useTranslation();
+
+  const dragRef = useRef<{
+    pointerId: number;
+    controller: ReturnType<typeof createPanelDrag>;
+  } | null>(null);
+
+  const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || dragRef.current) return;
+    event.preventDefault();
+    // Keep receiving movement/release outside the grip, without focusing it.
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const panel = getCurrentWindow();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      controller: createPanelDrag({ x: event.screenX, y: event.screenY }, {
+        readOrigin: async () => {
+          const [position, scale] = await Promise.all([panel.outerPosition(), panel.scaleFactor()]);
+          return position.toLogical(scale);
+        },
+        moveWindow: position => panel.setPosition(new LogicalPosition(position.x, position.y)),
+        save: () => invoke('save_float_panel_position'),
+      }),
+    };
+  };
+
+  const handleDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.controller.move({ x: event.screenX, y: event.screenY })
+      .catch(e => log.error(`Failed to move panel: ${e}`));
+  };
+
+  const handleDragEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    // Cancel/lost-capture events may have no meaningful screen coordinates.
+    const finalPoint = event.type === 'pointerup' ? { x: event.screenX, y: event.screenY } : undefined;
+    drag.controller.finish(finalPoint).catch(e => log.error(`Failed to finish panel drag: ${e}`));
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   const [state, setState] = useState<FloatPanelState>({
     visible: false,
@@ -1380,26 +1425,10 @@ export default function FloatPanelApp() {
     };
   }, [state.status, state.isTranscribing, state.visible, state.skipLlm]);
 
-  // 取消录音处理
-  const handleCancelRecording = useCallback(() => {
-    log.debug('User cancelled recording');
-    // 立即开始隐藏动画，不等待后端处理
-    setIsHiding(true);
-    setTimeout(() => {
-      setState(prev => ({ ...prev, visible: false }));
-      setIsHiding(false);
-    }, 50);
-
-    // 异步调用后端取消命令，不阻塞 UI
-    invoke('cancel_recording')
-      .then(() => log.debug('Recording cancelled successfully'))
-      .catch((e) => log.error(`Failed to cancel recording: ${e}`));
-
-    // 调用后端隐藏窗口，确保 float_panel_shown 状态正确更新
-    // 这样下次显示时会重置窗口高度为药丸模式
-    invoke('hide_float_panel')
-      .then(() => log.debug('Float panel hidden via hide_float_panel'))
-      .catch((e) => log.error(`Failed to hide float panel: ${e}`));
+  // 恢复拖动前的默认位置，保留当前录音和预览状态。
+  const handleResetPosition = useCallback(() => {
+    invoke('reset_float_panel_position')
+      .catch((e) => log.error(`Failed to reset float panel position: ${e}`));
   }, []);
 
   // 预览文字自动滚动到最新
@@ -1587,14 +1616,29 @@ export default function FloatPanelApp() {
 
           <div className="float-panel-content">
             <div className="status-row">
+              <div
+                className="panel-drag-handle"
+                onPointerDown={handleDragStart}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+                onPointerCancel={handleDragEnd}
+                onLostPointerCapture={handleDragEnd}
+              >
+                <svg width="6" height="12" viewBox="0 0 6 12" aria-hidden="true">
+                  <circle cx="1" cy="2" r="1" /><circle cx="5" cy="2" r="1" />
+                  <circle cx="1" cy="6" r="1" /><circle cx="5" cy="6" r="1" />
+                  <circle cx="1" cy="10" r="1" /><circle cx="5" cy="10" r="1" />
+                </svg>
+              </div>
               {showCancelButton && (
                 <button
-                  onClick={handleCancelRecording}
-                  className="cancel-button"
-                  title={t('transcribe.cancelRecording')}
+                  onClick={handleResetPosition}
+                  className="reset-position-button"
+                  title={t('transcribe.resetPosition')}
+                  aria-label={t('transcribe.resetPosition')}
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a9 9 0 1 1 2.64 8.36M3 4v6h6" />
                   </svg>
                 </button>
               )}

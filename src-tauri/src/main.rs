@@ -839,6 +839,49 @@ fn force_overlay_topmost(window: &WebviewWindow) {
     });
 }
 
+// Store the bottom edge so expanding the preview never moves the pill itself.
+#[derive(Serialize, Deserialize)]
+struct FloatPanelPosition {
+    x: i32,
+    bottom: i32,
+}
+
+fn float_panel_position_path() -> Result<PathBuf, String> {
+    Ok(config::get_config_path()?.with_file_name("float-panel-position.json"))
+}
+
+fn load_float_panel_position() -> Option<FloatPanelPosition> {
+    let bytes = std::fs::read(float_panel_position_path().ok()?).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+#[tauri::command]
+fn save_float_panel_position(app: AppHandle) -> Result<(), String> {
+    let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let saved = FloatPanelPosition { x: position.x, bottom: position.y + size.height as i32 };
+    let path = float_panel_position_path()?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(path, serde_json::to_vec(&saved).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())
+}
+
+/// Restore the original bottom-center placement without interrupting recording.
+#[tauri::command]
+fn reset_float_panel_position(app: AppHandle) -> Result<(), String> {
+    let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
+    let monitor = window.primary_monitor().map_err(|e| e.to_string())?
+        .ok_or("Primary monitor not found")?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let x = monitor.position().x + (monitor.size().width as i32 - size.width as i32) / 2;
+    let y = monitor.position().y + monitor.size().height as i32 - 80 - size.height as i32;
+    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    save_float_panel_position(app)
+}
+
 /// Show the float panel at the bottom center of the screen
 #[tauri::command]
 async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), String> {
@@ -903,9 +946,13 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
                 let window_width_physical = (window_width_logical * scale_factor) as i32;
                 let window_height_physical = (window_height_logical * scale_factor) as i32;
 
-                // 计算窗口位置：底部居中，距任务栏固定间距
-                let x = (monitor_size.width as i32 - window_width_physical) / 2;
-                let y = monitor_size.height as i32 - window_height_physical - 80;
+                // 恢复拖动后的位置；未拖动时沿用默认底部位置。
+                let saved = load_float_panel_position();
+                let x = saved.as_ref().map(|p| p.x).unwrap_or_else(||
+                    monitor.position().x + (monitor_size.width as i32 - window_width_physical) / 2);
+                let bottom = saved.map(|p| p.bottom).unwrap_or(
+                    monitor.position().y + monitor_size.height as i32 - 80);
+                let y = bottom - window_height_physical;
 
                 // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
                 let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
@@ -1074,9 +1121,14 @@ async fn set_float_panel_height(
             let window_width_physical = (window_width_logical * scale_factor) as i32;
             let target_height_physical = (target_height_logical * scale_factor) as i32;
 
-            // 计算窗口位置：底部居中，距任务栏固定间距
-            let x = (monitor_size.width as i32 - window_width_physical) / 2;
-            let y = monitor_size.height as i32 - target_height_physical - 80;
+            // 保持胶囊底边不变，只让预览区域向上展开。
+            let current = float_window.outer_position().ok().zip(float_window.outer_size().ok());
+            let (x, bottom) = current.map(|(position, size)|
+                (position.x, position.y + size.height as i32)).unwrap_or_else(|| (
+                    monitor.position().x + (monitor_size.width as i32 - window_width_physical) / 2,
+                    monitor.position().y + monitor_size.height as i32 - 80,
+                ));
+            let y = bottom - target_height_physical;
 
             // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
             let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
@@ -2129,6 +2181,8 @@ fn main() {
             show_float_panel,
             hide_float_panel,
             set_float_panel_height,
+            save_float_panel_position,
+            reset_float_panel_position,
             update_tray_menu,
             enable_autostart,
             disable_autostart,

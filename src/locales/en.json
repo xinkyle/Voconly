@@ -648,6 +648,7 @@
     "deviceRemovedDesc": "Selected microphone has been disconnected, switched to follow system"
   },
   "transcribe": {
+    "resetPosition": "Reset pill position",
     "recognizing": "Recognizing",
     "recorded": "Recorded {{count}} times",
     "learning": "Learning...",
