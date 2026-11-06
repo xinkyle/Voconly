@@ -219,21 +219,21 @@ body {
 
 /* 状态区域 - 原药丸内容 */
 .status-area {
-  flex-shrink: 0;
-  padding: 6px 14px; /* 压缩 padding，保持紧凑 */
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  border-radius: 0 0 16px 16px;
+  flex-shrink:0;
+  padding:0 10px;
+  height:38px;
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  position:relative;
+  overflow:hidden;
+  border-radius:0 0 16px 16px;
 }
 
 /* 融合状态时调整圆角和间距 */
 .status-area.fused {
-  border-radius: 0;
-  padding: 7px 14px; /* 略微增加，让文字更居中 */
+  border-radius:0;
+  padding:0 10px;
 }
 
 /* 独立状态区域（无预览时）- 保持原药丸样式 */
@@ -272,7 +272,7 @@ body {
   /* 【修复 macOS 进度条抖动】移除 transition，RAF 已提供流畅动画 */
   transition: none;
   z-index: 2;
-}你觉得这个进度条是显眼点还是不显眼点好啊？我觉得就吃一点就好了，是不是？
+}
 
 /* Progress background animation - fills from 0% to 100% */
 .progress-background {
@@ -296,36 +296,38 @@ body {
 }
 
 .float-panel-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: auto;
-  position: relative;
-  z-index: 1;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  min-width:0;
+  position:relative;
+  z-index:3;
 }
 
 /* Status row - inline with waveform */
 .status-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:1;
+  min-width:0;
 }
 
 /* Reset pill position */
 .reset-position-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-  padding: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:22px;
+  border-radius:6px;
+  background:transparent;
+  color:rgba(255,255,255,0.48);
+  cursor:pointer;
+  transition:background 0.15s ease, color 0.15s ease;
+  flex-shrink:0;
+  padding:0;
 }
 
 /* SVG icons in buttons - explicit sizing to avoid Tailwind dependency */
@@ -351,19 +353,18 @@ body {
 
 /* 折叠/展开按钮 */
 .collapse-toggle-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-  padding: 0;
-  margin-left: 4px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:22px;
+  border-radius:6px;
+  background:transparent;
+  color:rgba(255,255,255,0.48);
+  cursor:pointer;
+  transition:background 0.15s ease, color 0.15s ease;
+  flex-shrink:0;
+  padding:0;
 }
 
 .collapse-toggle-button:hover {
@@ -389,19 +390,19 @@ body {
 
 /* 预览文字数量徽章 */
 .preview-count-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 14px;
-  padding: 0 4px;
-  border-radius: 7px;
-  background: rgba(52, 199, 89, 0.2);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 10px;
-  font-weight: 500;
-  margin-left: 4px;
-  flex-shrink: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:20px;
+  height:18px;
+  padding:0 3px;
+  border-radius:5px;
+  background:rgba(255,255,255,0.06);
+  color:rgba(255,255,255,0.65);
+  font-size:10px;
+  font-variant-numeric:tabular-nums;
+  font-weight:500;
+  flex-shrink:0;
 }
 
 /* 字数为0时的样式（更低调） */
@@ -411,11 +412,10 @@ body {
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 0;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  flex-shrink:0;
 }
 
 .status-dot.recording {
@@ -454,12 +454,14 @@ body {
 }
 
 .status-text {
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: -0.1px;
-  white-space: nowrap;
-  line-height: 1;
+  color:rgba(255,255,255,0.9);
+  font-size:12px;
+  font-weight:500;
+  letter-spacing:0.1px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  line-height:18px;
 }
 
 /* 【新设计】灰色文字 - 系统未就绪 */
@@ -492,27 +494,28 @@ body {
 
 /* Waveform - inline */
 .waveform-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 20px;
-  margin-left: 4px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  width:22px;
+  height:20px;
+  flex-shrink:0;
+  margin-right:2px;
 }
 
 .wave-bar {
-  width: 3px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.6);
-  transform: scaleY(1);
-  transition: transform 0.1s ease-out;
-  will-change: transform;
+  width:2px;
+  height:4px;
+  border-radius:2px;
+  background:rgba(255,255,255,0.35);
+  transform:scaleY(1);
+  transition:background 0.15s ease;
 }
 
 .wave-bar.active {
-  background: rgba(255, 255, 255, 0.9);
-  animation: waveScaleAnimation 0.5s ease-in-out infinite;
+  background:rgba(255,255,255,0.75);
+  animation:waveScaleAnimation 0.75s ease-in-out infinite;
 }
 
 /* 【新设计】灰色波浪条 - 系统不可用 */
@@ -697,19 +700,66 @@ body {
 }
 /* Quiet grip before the cancel button; the hit area is larger than the dots. */
 .panel-drag-handle {
-  touch-action: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 24px;
-  margin-left: -4px;
-  margin-right: -2px;
-  flex-shrink: 0;
-  fill: rgba(255, 255, 255, 0.28);
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
+  touch-action:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:10px;
+  height:26px;
+  flex-shrink:0;
+  fill:rgba(255,255,255,0.22);
+  cursor:grab;
+  user-select:none;
+  -webkit-user-select:none;
 }
 .panel-drag-handle:active { cursor: grabbing; }
 .panel-drag-handle:hover { fill: rgba(255, 255, 255, 0.5); }
+
+/* Keep controls separate from the recording signal. */
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
+}
+.panel-actions button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wave-bar.active, .status-dot { animation: none; }
+}
+
+/* After recording, center the status as a single group. */
+.centered-status {
+  justify-content: center;
+}
+.centered-status > .status-row {
+  flex: 0 1 auto;
+  justify-content: center;
+}
+.centered-status .status-text {
+  text-align: center;
+}
+.centered-status > .panel-drag-handle {
+  position: absolute;
+  left: 0;
+}
+/* Equal side columns keep both lines of an error message centered. */
+.status-area.error .status-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  width: 100%;
+  align-items: center;
+}
+.status-area.error .status-dot {
+  justify-self: center;
+}
+.status-area.error .error-text-container {
+  text-align: center;
+}
+.status-area.error .confirm-button {
+  margin-left: 0;
+}

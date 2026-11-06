@@ -1515,7 +1515,7 @@ export default function FloatPanelApp() {
   const showWaveform = state.status === 'recording';
   const waveformActive = voiceDetected && state.status === 'recording';
   const showProgress = state.status === 'transcribing';
-  const showCancelButton = state.status === 'recording';
+  const showRecordingControls = state.status === 'recording';
 
   // 【关键日志】渲染状态检查
   log.debug(`[RENDER] status=${state.status}, isTranscribing=${state.isTranscribing}, showProgress=${showProgress}, progress=${progress}`);
@@ -1554,7 +1554,7 @@ export default function FloatPanelApp() {
       <div className="float-panel-container" key="llm-error-container">
         <div className={`float-panel-wrapper error-state ${isHiding ? 'animate-slide-out' : 'animate-slide-in'}`}>
           <div className="status-area error">
-            <div className="float-panel-content">
+            <div className="float-panel-content centered-status">
               <div className="status-row" key="llm-error-status-row">
                 <span className="status-dot error" />
                 <div className="error-text-container">
@@ -1614,8 +1614,7 @@ export default function FloatPanelApp() {
             />
           )}
 
-          <div className="float-panel-content">
-            <div className="status-row">
+          <div className={`float-panel-content ${state.status !== 'recording' ? 'centered-status' : ''}`}>
               {/* 拖拽区域 - 转录状态下隐藏 */}
               {state.status !== 'transcribing' && (
                 <div
@@ -1634,7 +1633,14 @@ export default function FloatPanelApp() {
                   </svg>
                 </div>
               )}
-              {showCancelButton && (
+            <div className="status-row">
+              <span className={`status-dot ${actualDotClass}`} />
+              <span className={`status-text ${statusTextClass}`} title={statusConfig.text}>{statusConfig.text}</span>
+            </div>
+            {showWaveform && <Waveform isActive={waveformActive} isUnavailable={isWaveformUnavailable} />}
+            {showRecordingControls && (
+              <div className="panel-actions">
+              {showRecordingControls && (
                 <button
                   onClick={handleResetPosition}
                   className="reset-position-button"
@@ -1648,10 +1654,11 @@ export default function FloatPanelApp() {
               )}
 
               {/* 折叠/展开按钮 - 录音时始终显示，无内容时禁用 */}
-              {showCancelButton && (
+              {showRecordingControls && (
                 <button
                   onClick={togglePreviewCollapsed}
                   className="collapse-toggle-button"
+                  aria-label={previewCollapsed ? t('transcribe.expandPreview') : t('transcribe.collapsePreview')}
                   disabled={!hasPreviewContent}
                   title={hasPreviewContent
                     ? (previewCollapsed ? t('transcribe.expandPreview') : t('transcribe.collapsePreview'))
@@ -1669,17 +1676,14 @@ export default function FloatPanelApp() {
               )}
 
               {/* 字数徽章 - 录音时始终显示，无内容时显示 0 */}
-              {showCancelButton && (
+              {showRecordingControls && (
                 <span className={`preview-count-badge ${!hasPreviewContent ? 'empty' : ''}`}>
                   {countWords(previewText)}
                 </span>
               )}
 
-              <span className={`status-dot ${actualDotClass}`} />
-              <span className={`status-text ${statusTextClass}`}>{statusConfig.text}</span>
-            </div>
-
-            {showWaveform && <Waveform isActive={waveformActive} isUnavailable={isWaveformUnavailable} />}
+              </div>
+            )}
           </div>
         </div>
         )}
