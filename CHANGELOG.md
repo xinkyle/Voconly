@@ -2,7 +2,7 @@
 ## [0.5.27] - 2026-11-06
 
 ### 问题修复
-1. 修复 Ollama 新版本不支持 keep_alive 参数值为 -1 的问题，将"永久保持"改为 87600h（约10年），并自动迁移旧配置。
+1. 修复 Ollama 新版本不支持 keep_alive 参数值为负数的问题，将永久保持改为 87600h 约10年，并自动迁移旧配置。
 
 ### 体验优化
 2. 浮动面板拖拽区域添加悬停提示，方便用户了解拖拽功能。
@@ -12,7 +12,7 @@
 ---
 
 ### Bug Fixes
-1. Fixed Ollama new version not supporting keep_alive value -1, changed "keep forever" to 87600h (about 10 years), and automatically migrates old configurations.
+1. Fixed Ollama new version not supporting keep_alive negative value, changed keep forever to 87600h about 10 years, and automatically migrates old configurations.
 
 ### Improvements
 2. Added hover tooltip on float panel drag handle, helping users understand the drag feature.
