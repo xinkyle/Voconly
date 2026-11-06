@@ -649,6 +649,7 @@
   },
   "transcribe": {
     "resetPosition": "Reset pill position",
+    "dragToMove": "Hold to drag",
     "recognizing": "Recognizing",
     "recorded": "Recorded {{count}} times",
     "learning": "Learning...",

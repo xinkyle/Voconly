@@ -383,7 +383,7 @@ export default function ProviderConfigModal({
                         <option value="2m">{t('provider.keepAliveOptions.short')}</option>
                         <option value="5m">{t('provider.keepAliveOptions.medium')}</option>
                         <option value="10m">{t('provider.keepAliveOptions.long')}</option>
-                        <option value="-1">{t('provider.keepAliveOptions.always')}</option>
+                        <option value="87600h">{t('provider.keepAliveOptions.always')}</option>
                       </select>
                       <p className="mt-1 text-xs text-gray-500">
                         {t('provider.keepAliveDescription')}

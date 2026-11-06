@@ -1616,20 +1616,24 @@ export default function FloatPanelApp() {
 
           <div className="float-panel-content">
             <div className="status-row">
-              <div
-                className="panel-drag-handle"
-                onPointerDown={handleDragStart}
-                onPointerMove={handleDragMove}
-                onPointerUp={handleDragEnd}
-                onPointerCancel={handleDragEnd}
-                onLostPointerCapture={handleDragEnd}
-              >
-                <svg width="6" height="12" viewBox="0 0 6 12" aria-hidden="true">
-                  <circle cx="1" cy="2" r="1" /><circle cx="5" cy="2" r="1" />
-                  <circle cx="1" cy="6" r="1" /><circle cx="5" cy="6" r="1" />
-                  <circle cx="1" cy="10" r="1" /><circle cx="5" cy="10" r="1" />
-                </svg>
-              </div>
+              {/* 拖拽区域 - 转录状态下隐藏 */}
+              {state.status !== 'transcribing' && (
+                <div
+                  className="panel-drag-handle"
+                  title={t('transcribe.dragToMove')}
+                  onPointerDown={handleDragStart}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={handleDragEnd}
+                  onPointerCancel={handleDragEnd}
+                  onLostPointerCapture={handleDragEnd}
+                >
+                  <svg width="6" height="12" viewBox="0 0 6 12" aria-hidden="true">
+                    <circle cx="1" cy="2" r="1" /><circle cx="5" cy="2" r="1" />
+                    <circle cx="1" cy="6" r="1" /><circle cx="5" cy="6" r="1" />
+                    <circle cx="1" cy="10" r="1" /><circle cx="5" cy="10" r="1" />
+                  </svg>
+                </div>
+              )}
               {showCancelButton && (
                 <button
                   onClick={handleResetPosition}

@@ -55,7 +55,7 @@ pub struct LlmProviderInstance {
     /// - "0" 或 0：用完即卸载
     /// - "5m"：保持5分钟（默认）
     /// - "10m"：保持10分钟
-    /// - "-1"：永久保持
+    /// - "87600h"：永久保持（约10年，新版本 Ollama 不支持 -1）
     #[serde(default = "default_keep_alive")]
     pub keep_alive: String,
 }

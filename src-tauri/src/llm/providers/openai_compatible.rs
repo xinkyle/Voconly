@@ -295,6 +295,9 @@ impl LlmProvider for OpenAiCompatibleProvider {
             let num_gpu = -1; // 自动检测 GPU
             let keep_alive = if self.instance.keep_alive.is_empty() {
                 "5m".to_string()
+            } else if self.instance.keep_alive == "-1" {
+                // 旧版本的 "-1" 表示永久保持，新版本 Ollama 不支持，转换为约10年
+                "87600h".to_string()
             } else {
                 self.instance.keep_alive.clone()
             };
