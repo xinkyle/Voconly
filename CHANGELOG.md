@@ -7,6 +7,7 @@
 ### 体验优化
 2. 浮动面板拖拽区域添加悬停提示"按住拖拽移动"，方便用户了解拖拽功能。
 3. 转录状态下自动隐藏拖拽图标，避免用户在不可拖拽时产生困惑。
+4. 重新设计药丸显示风格，视觉效果更具美感。
 
 ---
 
@@ -16,6 +17,7 @@
 ### Improvements
 2. Added hover tooltip "Hold to drag" on float panel drag handle, helping users understand the drag feature.
 3. Automatically hide drag icon during transcription state, avoiding confusion when dragging is disabled.
+4. Redesigned pill display style for a more aesthetically pleasing look.
 
 ===
 
