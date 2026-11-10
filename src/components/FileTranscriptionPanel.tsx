@@ -385,7 +385,7 @@ export default function FileTranscriptionPanel({ active, config, onConfigChange,
                           </div>
                           <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-500 mr-2">{record.aiStatus === 'error' ? t('file.ai.failed') : record.processedText ? t('file.ai.completed') : t('file.ai.original')}</span>
-                          <button className="px-2 py-1 text-xs rounded hover:bg-gray-100" onClick={() => setViewingId(record.id)}>{t('file.ai.view')}</button>
+                          <button className="px-2 py-1.5 text-xs rounded hover:bg-gray-100" onClick={() => setViewingId(record.id)}>{t('file.ai.view')}</button>
                           <FileExportButton record={record} disabled={busy} />
                           <button
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"

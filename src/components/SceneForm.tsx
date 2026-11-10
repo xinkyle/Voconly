@@ -5,6 +5,7 @@ import { getLlmPromptPresets } from '../services/llm';
 import { createLogger } from '../services/log';
 import { getSceneNameFromPromptType } from '../utils/i18n';
 import { extractShortcutFromEvent, parseShortcutForDisplay } from '../utils/keyboard';
+import Select from './ui/Select';
 
 const log = createLogger('SceneForm');
 
@@ -434,26 +435,23 @@ export default function SceneForm({
 
           {/* Prompt Type Selection */}
           <div>
-            <label htmlFor="promptType" className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('llmConfig.scenePrompt')}
             </label>
-            <select
-              id="promptType"
+            <Select
               value={promptType}
-              onChange={(e) => setPromptType(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200"
-            >
-              {BUILTIN_PROMPT_TYPES.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {t(type.labelKey)}
-                </option>
-              ))}
-              {Object.keys(customPresets).map((presetName) => (
-                <option key={presetName} value={presetName}>
-                  {presetName}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setPromptType(value)}
+              options={[
+                ...BUILTIN_PROMPT_TYPES.map((type) => ({
+                  id: type.id,
+                  name: t(type.labelKey),
+                })),
+                ...Object.keys(customPresets).map((presetName) => ({
+                  id: presetName,
+                  name: presetName,
+                })),
+              ]}
+            />
             <p className="mt-1.5 text-xs text-gray-500">{t('sceneForm.promptTypeHint')}</p>
           </div>
 

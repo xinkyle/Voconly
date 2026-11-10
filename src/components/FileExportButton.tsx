@@ -36,7 +36,7 @@ export default function FileExportButton({ record, disabled = false }: { record:
   };
   return <>
     <button ref={trigger} type="button" disabled={disabled || saving || !content.text.trim()} onClick={() => setOpen(true)}
-      className="px-2 py-1 text-xs rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">{t('file.export.action')}</button>
+      className="px-2 py-1.5 text-xs rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed">{t('file.export.action')}</button>
     {open && createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4" onClick={event => { event.stopPropagation(); close(); }}
       onKeyDown={event => {
         event.stopPropagation();
