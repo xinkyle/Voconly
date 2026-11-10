@@ -74,31 +74,54 @@ export default function FileResultDialog({ record, busy, canProcess, onProcess, 
     {dialog}
     {showProcessConfirm && createPortal(
       <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShowProcessConfirm(false)}>
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-scale-in" onClick={e => e.stopPropagation()}>
-          <div className="text-center">
-            <h3 className="text-base font-semibold text-gray-900 mb-2">
-              {record.processedText ? t('file.ai.confirmReprocess') : t('file.ai.confirmProcess')}
-            </h3>
-            <p className="text-sm text-gray-600 mb-6">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 animate-scale-in" onClick={e => e.stopPropagation()}>
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-center gap-3">
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <h3 className="text-base font-semibold text-gray-900">
+                {record.processedText ? t('file.ai.confirmReprocess') : t('file.ai.confirmProcess')}
+              </h3>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-6 py-5">
+            <p className="text-sm text-gray-600 leading-relaxed">
               {record.processedText ? t('file.ai.confirmReprocessDesc') : t('file.ai.confirmProcessDesc')}
             </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowProcessConfirm(false)}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                {t('memory.cancel')}
-              </button>
-              <button
-                onClick={() => {
-                  setShowProcessConfirm(false);
-                  onProcess();
-                }}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                {t('memory.confirm')}
-              </button>
-            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+            <button
+              onClick={() => setShowProcessConfirm(false)}
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 active:scale-95"
+            >
+              {t('memory.cancel')}
+            </button>
+            <button
+              onClick={() => {
+                setShowProcessConfirm(false);
+                onProcess();
+              }}
+              autoFocus
+              className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 active:scale-95"
+            >
+              {t('memory.confirm')}
+            </button>
           </div>
         </div>
       </div>,
