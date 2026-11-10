@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { createPortal } from 'react-dom';
 import FileUploadArea from './FileUploadArea';
 import type { FileTranscriptionRecord, AppConfig } from '../types';
-import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord } from '../services/fileTranscription';
+import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord, deleteFileTranscription, clearFileTranscriptionHistory } from '../services/fileTranscription';
 import { loadConfig } from '../services/config';
 import { useToast } from './ui/Toast';
 
@@ -22,6 +23,8 @@ export default function FileTranscriptionPanel() {
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<FileTranscriptionRecord | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // 进度状态
   const [progress, setProgress] = useState<{
@@ -279,6 +282,21 @@ export default function FileTranscriptionPanel() {
         </div>
       ) : (
         <div>
+          {/* Header with clear button */}
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-gray-500">{t('memory.totalRecords', { count: records.length })}</span>
+            <button
+              onClick={() => records.length > 0 && setShowClearConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={records.length === 0}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              {t('memory.clear')}
+            </button>
+          </div>
+
           {records.length === 0 ? (
             <div className="text-center py-16 bg-gray-50 rounded-xl">
               <p className="text-gray-600">{t('file.history.noRecords')}</p>
@@ -311,6 +329,7 @@ export default function FileTranscriptionPanel() {
                               {record.wordCount} 字
                             </span>
                           </div>
+                          <div className="flex items-center gap-1">
                           <button
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                             onClick={(e) => {
@@ -323,6 +342,19 @@ export default function FileTranscriptionPanel() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                           </button>
+                          <button
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(record);
+                            }}
+                            title={t('memory.delete') || '删除'}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                         </div>
                       </div>
                     </div>
@@ -379,6 +411,85 @@ export default function FileTranscriptionPanel() {
             </>
           )}
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-scale-in">
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">{t('memory.confirmDelete')}</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {t('memory.confirmDeleteDesc')}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  {t('memory.cancel')}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (deleteTarget) {
+                      await deleteFileTranscription(deleteTarget.id);
+                      setRecords(prev => prev.filter(r => r.id !== deleteTarget.id));
+                      setDeleteTarget(null);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  {t('memory.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Clear Confirmation Modal */}
+      {showClearConfirm && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-scale-in">
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">{t('memory.confirmClear')}</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {t('memory.confirmClearDesc')}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  {t('memory.cancel')}
+                </button>
+                <button
+                  onClick={async () => {
+                    await clearFileTranscriptionHistory();
+                    setRecords([]);
+                    setShowClearConfirm(false);
+                    setCurrentPage(1);
+                  }}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  {t('memory.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
