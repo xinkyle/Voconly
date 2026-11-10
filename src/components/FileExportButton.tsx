@@ -6,7 +6,11 @@ import { exportFileRecord, getExportContent } from '../services/fileExport';
 import type { ExportFormat } from '../services/fileExport';
 import { useToast } from './ui/Toast';
 
-export default function FileExportButton({ record, disabled = false }: { record: FileTranscriptionRecord; disabled?: boolean }) {
+export default function FileExportButton({ record, disabled = false, contentType }: {
+  record: FileTranscriptionRecord;
+  disabled?: boolean;
+  contentType?: 'original' | 'ai'; // 指定导出内容类型，不传则使用默认逻辑
+}) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -14,14 +18,14 @@ export default function FileExportButton({ record, disabled = false }: { record:
   const inFlight = useRef(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const titleId = useId();
-  const content = getExportContent(record);
+  const content = getExportContent(record, contentType);
   const close = () => { if (!inFlight.current) { setOpen(false); trigger.current?.focus(); } };
   const handleExport = async (format: ExportFormat) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setSaving(true);
     try {
-      const path = await exportFileRecord(record, format);
+      const path = await exportFileRecord(record, format, contentType);
       if (path) {
         setOpen(false);
         trigger.current?.focus();

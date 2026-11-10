@@ -319,7 +319,11 @@
       "recent": "最近转录",
       "process": "AI 处理",
       "reprocess": "重新处理",
-      "reprocessHint": "使用文件页当前选择的模型和处理方式，从转录原文重新处理；成功后更新 AI 结果。"
+      "reprocessHint": "使用文件页当前选择的模型和处理方式，从转录原文重新处理；成功后更新 AI 结果。",
+      "confirmProcess": "确认进行 AI 处理？",
+      "confirmProcessDesc": "将使用当前选择的模型和处理方式对转录原文进行处理。",
+      "confirmReprocess": "确认重新处理？",
+      "confirmReprocessDesc": "将使用当前选择的模型和处理方式重新处理，并覆盖已有的 AI 结果。"
     },
     "tabs": {
       "pending": "待转录",

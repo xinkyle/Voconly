@@ -319,7 +319,11 @@
       "recent": "Latest transcription",
       "process": "Process with AI",
       "reprocess": "Process again",
-      "reprocessHint": "Processes the original transcript with the model and preset currently selected on this page. A successful result replaces the previous AI result."
+      "reprocessHint": "Processes the original transcript with the model and preset currently selected on this page. A successful result replaces the previous AI result.",
+      "confirmProcess": "Process with AI?",
+      "confirmProcessDesc": "Will process the original transcript with the currently selected model and preset.",
+      "confirmReprocess": "Process again?",
+      "confirmReprocessDesc": "Will reprocess using the currently selected model and preset, overwriting the existing AI result."
     },
     "tabs": {
       "pending": "Pending",

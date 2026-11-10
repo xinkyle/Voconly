@@ -7,7 +7,18 @@ interface ExportIO {
   write: (path: string, bytes: Uint8Array) => Promise<void>;
 }
 
-export function getExportContent(record: ExportRecord): { text: string; source: 'ai' | 'previousAi' | 'original' } {
+export function getExportContent(record: ExportRecord, type?: 'original' | 'ai'): { text: string; source: 'ai' | 'previousAi' | 'original' } {
+  // 如果指定了类型，直接返回对应内容
+  if (type === 'original') {
+    return { text: record.transcriptText, source: 'original' };
+  }
+  if (type === 'ai') {
+    if (!record.processedText?.trim()) {
+      return { text: '', source: 'original' };
+    }
+    return { text: record.processedText, source: record.aiStatus === 'error' ? 'previousAi' : 'ai' };
+  }
+  // 默认逻辑：优先 AI 结果，没有就用原文
   return record.processedText?.trim()
     ? { text: record.processedText, source: record.aiStatus === 'error' ? 'previousAi' : 'ai' }
     : { text: record.transcriptText, source: 'original' };
@@ -21,8 +32,8 @@ export function getExportFilename(filename: string, format: ExportFormat): strin
   return `${stem}.${format}`;
 }
 
-export async function exportFileRecord(record: ExportRecord, format: ExportFormat, io?: ExportIO): Promise<string | null> {
-  const content = getExportContent(record);
+export async function exportFileRecord(record: ExportRecord, format: ExportFormat, contentType?: 'original' | 'ai', io?: ExportIO): Promise<string | null> {
+  const content = getExportContent(record, contentType);
   if (!content.text.trim()) throw new Error('EMPTY_EXPORT');
   const operations = io || {
     save: (options: Parameters<ExportIO['save']>[0]) => import('@tauri-apps/plugin-dialog').then(api => api.save(options)),
