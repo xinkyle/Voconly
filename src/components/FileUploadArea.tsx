@@ -17,6 +17,8 @@ interface FileUploadAreaProps {
   selectedFile?: { path: string; name: string; size: number; duration?: number } | null;
   onStartTranscription?: () => void;
   isTranscribing?: boolean;
+  startLabel?: string;
+  busyLabel?: string;
 }
 
 export default function FileUploadArea({
@@ -24,7 +26,9 @@ export default function FileUploadArea({
   disabled,
   selectedFile,
   onStartTranscription,
-  isTranscribing
+  isTranscribing,
+  startLabel,
+  busyLabel,
 }: FileUploadAreaProps) {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
@@ -52,7 +56,7 @@ export default function FileUploadArea({
           case 'leave':
             setIsDragging(false);
             break;
-          case 'drop':
+          case 'drop': {
             setIsDragging(false);
             const paths = event.payload.paths;
             if (paths && paths.length > 0) {
@@ -64,6 +68,7 @@ export default function FileUploadArea({
               });
             }
             break;
+          }
         }
       });
     };
@@ -202,10 +207,10 @@ export default function FileUploadArea({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              {t('file.selected.transcribing')}
+              {busyLabel || t('file.selected.transcribing')}
             </span>
           ) : selectedFile ? (
-            t('file.selected.start')
+            startLabel || t('file.selected.start')
           ) : (
             t('file.dropzone.select')
           )}

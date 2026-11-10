@@ -1956,7 +1956,15 @@ function App() {
             )}
             {/* Keep FileTranscriptionPanel always mounted to preserve transcription progress on tab switch */}
             <div className={activeNav === 'file' ? '' : 'hidden'}>
-              <FileTranscriptionPanel />
+              <FileTranscriptionPanel
+                active={activeNav === 'file'}
+                config={config}
+                onConfigChange={setConfig}
+                downloadStates={downloadStates}
+                onDownload={handleDownload}
+                onDownloadCancel={handleDownloadCancel}
+                onQuantPrefChange={handleQuantPrefChange}
+              />
             </div>
           </div>
         </main>

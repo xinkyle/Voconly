@@ -1091,6 +1091,7 @@ mod global_model_config_tests {
                 model: "qwen2.5:7b".to_string(),
                 max_tokens: 2048,
                 temperature: 0.7,
+                enabled: Some(true),
             },
         };
 
@@ -1121,6 +1122,7 @@ mod global_model_config_tests {
                     model: "gpt-4".to_string(),
                     max_tokens: 1024,
                     temperature: 0.5,
+                    enabled: Some(true),
                 },
             },
             ..Default::default()

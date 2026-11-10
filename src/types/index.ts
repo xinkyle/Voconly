@@ -396,6 +396,11 @@ export interface FileTranscriptionRecord {
   wordCount: number;
   timestamp: number;
   asrModelId: string;
+  processedText?: string;
+  aiStatus?: 'completed' | 'error';
+  aiError?: string;
+  aiModelId?: string;
+  aiPromptName?: string;
 }
 
 /**

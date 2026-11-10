@@ -146,6 +146,11 @@ export async function processTextForScene(
   return invoke<LlmResponse>('llm_process_text_for_scene', { sceneId, text, prompt });
 }
 
+/** File processing shares providers and prompts without depending on a realtime scene. */
+export async function processFileText(text: string, prompt: string): Promise<LlmResponse> {
+  return invoke<LlmResponse>('llm_process_file_text', { text, prompt });
+}
+
 /**
  * 按场景处理文本（带进度事件）
  * 通过监听 llm-progress 事件获取实时进度

@@ -2232,6 +2232,7 @@ fn main() {
             commands::llm::llm_list_models,
             commands::llm::llm_process_text,
             commands::llm::llm_process_text_for_scene,
+            commands::llm::llm_process_file_text,
             commands::llm::llm_process_text_for_scene_with_progress,
             commands::llm::get_llm_profile,
             commands::llm::save_llm_profile,

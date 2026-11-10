@@ -256,8 +256,40 @@ pub async fn llm_process_text_for_scene(
     text: String,
     prompt: Option<String>,
 ) -> Result<LlmResponse, String> {
+    process_text_with_shared_config(services, llm_performance, Some(scene_id), text, prompt).await
+}
+
+/// File processing uses shared providers and presets without requiring a realtime scene.
+/// No realtime progress events are emitted by this command.
+#[tauri::command]
+pub async fn llm_process_file_text(
+    services: State<'_, AppServices>,
+    llm_performance: State<'_, LlmPerformanceState>,
+    text: String,
+    prompt: String,
+) -> Result<LlmResponse, String> {
+    if prompt.trim().is_empty() {
+        return Err("Prompt must not be empty".to_string());
+    }
+    let output_script = services.config.lock().unwrap().output_script.clone();
+    let mut result = process_text_with_shared_config(
+        services, llm_performance, None, text, Some(prompt),
+    ).await?;
+    if output_script == "zh-TW" && result.success && contains_chinese(&result.text) {
+        result.text = to_traditional_chinese(&result.text);
+    }
+    Ok(result)
+}
+
+async fn process_text_with_shared_config(
+    services: State<'_, AppServices>,
+    llm_performance: State<'_, LlmPerformanceState>,
+    scene_id: Option<String>,
+    text: String,
+    prompt: Option<String>,
+) -> Result<LlmResponse, String> {
     info!(
-        "[LLM] Processing text for scene: {}, {} chars",
+        "[LLM] Processing text for scene: {:?}, {} chars",
         scene_id,
         text.chars().count()
     );
@@ -267,30 +299,26 @@ pub async fn llm_process_text_for_scene(
         let config = services.config.lock().unwrap();
 
         // 获取场景配置（用于获取提示词）
-        let scene = config
-            .scenes
-            .iter()
-            .find(|s| s.id == scene_id);
-
-        let scene = match scene {
-            Some(s) => s,
-            None => {
-                info!("[LLM] Scene {} not found", scene_id);
-                return Ok(LlmResponse {
+        // File calls supply an explicit prompt and do not need a realtime scene.
+        let (prompt_type, custom_prompt) = if let Some(ref id) = scene_id {
+            match config.scenes.iter().find(|s| s.id == *id) {
+                Some(scene) => (scene.prompt_type.clone(), scene.custom_prompt.clone()),
+                None => return Ok(LlmResponse {
                     success: false,
                     text: text.clone(),
                     error: Some("Scene not found".to_string()),
                     tokens_used: None,
-                });
+                }),
             }
+        } else {
+            (String::new(), None)
         };
 
-        // 检查是否配置了全局 LLM
         let global_llm = &config.global_model_config.llm;
 
         // 如果没有配置 provider_id 或 model，返回错误
         if global_llm.provider_id.is_empty() || global_llm.model.is_empty() {
-            info!("[LLM] Global LLM not configured for scene {}", scene_id);
+            info!("[LLM] Global LLM not configured for scene {:?}", scene_id);
             return Ok(LlmResponse {
                 success: false,
                 text: text.clone(),
@@ -301,8 +329,8 @@ pub async fn llm_process_text_for_scene(
 
         (
             global_llm.clone(),
-            scene.prompt_type.clone(),
-            scene.custom_prompt.clone(),
+            prompt_type,
+            custom_prompt,
             global_llm.provider_id.clone(),
         )
     };

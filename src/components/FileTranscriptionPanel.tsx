@@ -1,19 +1,43 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import FileUploadArea from './FileUploadArea';
 import type { FileTranscriptionRecord, AppConfig } from '../types';
 import { loadFileTranscriptionHistory, transcribeAudioFile, createFileTranscriptionRecord, deleteFileTranscription, clearFileTranscriptionHistory } from '../services/fileTranscription';
 import { loadConfig } from '../services/config';
+import FileModelControls from './FileModelControls';
+import FileProcessingSelect from './FileProcessingSelect';
+import FileResultDialog from './FileResultDialog';
+import { processFileRecord } from '../services/fileAiWorkflow';
+import { processFileText } from '../services/llm';
+import { getPromptOptions, resolvePrompt } from '../utils/promptPresets';
+import type { DownloadProgress } from '../services/downloader';
+import type { Model } from '../types';
+import { getFullModelId } from '../types';
+import { saveFileTranscription } from '../services/fileTranscription';
 import { useToast } from './ui/Toast';
 
 type TabType = 'pending' | 'history';
-type TranscriptionStatus = 'idle' | 'transcribing' | 'completed' | 'error';
+type TranscriptionStatus = 'idle' | 'transcribing' | 'processing' | 'completed' | 'error';
+
+interface Props {
+  active: boolean;
+  config: AppConfig | null;
+  onConfigChange: (config: AppConfig) => void;
+  downloadStates?: Record<string, { downloading: boolean; progress?: DownloadProgress }>;
+  onDownload?: (model: Model) => void;
+  onDownloadCancel?: (modelId: string) => void;
+  onQuantPrefChange?: (modelId: string, quant: string) => void | Promise<void>;
+}
+
+function readPreference(key: string, fallback: string) {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
 
 // 每页显示条数
 const PAGE_SIZE = 10;
 
-export default function FileTranscriptionPanel() {
+export default function FileTranscriptionPanel({ active, config, onConfigChange, ...modelProps }: Props) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
@@ -21,7 +45,24 @@ export default function FileTranscriptionPanel() {
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number; duration: number } | null>(null);
   const [status, setStatus] = useState<TranscriptionStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [autoProcess, setAutoProcess] = useState(() => readPreference('file-ai-enabled', 'false') === 'true');
+  const [promptId, setPromptId] = useState(() => readPreference('file-ai-prompt', 'lightPolish'));
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [modelBusy, setModelBusy] = useState(false);
+  const running = useRef(false);
+  const busy = status === 'transcribing' || status === 'processing' || modelBusy;
+  const promptOptions = getPromptOptions(config?.llmPromptPresets, t);
+  const promptExists = promptOptions.some(option => option.id === promptId);
+  const hasLlm = !!(config?.globalModelConfig.llm.providerId && config.globalModelConfig.llm.model);
+  const canProcess = hasLlm && promptExists;
+  const viewingRecord = records.find(record => record.id === viewingId);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('file-ai-enabled', String(autoProcess));
+      localStorage.setItem('file-ai-prompt', promptId);
+    } catch { /* Keep session preferences if storage is unavailable. */ }
+  }, [autoProcess, promptId]);
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<FileTranscriptionRecord | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -35,12 +76,6 @@ export default function FileTranscriptionPanel() {
 
   // 加载配置和历史记录
   useEffect(() => {
-    loadConfig()
-      .then(cfg => {
-        setConfig(cfg);
-      })
-      .catch(err => console.error('Failed to load config:', err));
-
     loadFileTranscriptionHistory()
       .then(setRecords)
       .catch(err => console.error('Failed to load history:', err));
@@ -81,84 +116,80 @@ export default function FileTranscriptionPanel() {
     setProgress({ current: 0, total: 0, percent: 0 });
   };
 
+  const applyAi = async (record: FileTranscriptionRecord, latest: AppConfig) => {
+    const prompt = resolvePrompt(promptId, latest.llmPromptPresets, t);
+    if (!prompt) throw new Error(t('file.ai.missingPrompt'));
+    if (!latest.globalModelConfig.llm.providerId || !latest.globalModelConfig.llm.model) {
+      throw new Error(t('file.ai.notConfigured'));
+    }
+    setStatus('processing');
+    const updated = await processFileRecord(record, {
+      prompt, name: getPromptOptions(latest.llmPromptPresets, t).find(option => option.id === promptId)?.name || promptId,
+      model: latest.globalModelConfig.llm.model,
+    }, { process: processFileText, save: saveFileTranscription });
+    setRecords(previous => previous.map(item => item.id === updated.id ? updated : item));
+    if (updated.aiStatus === 'error') {
+      showToast({ type: 'warning', title: t('file.ai.failedPreserved'), description: updated.aiError?.startsWith('CONTEXT_TOO_LONG:') ? t('file.ai.tooLong') : updated.aiError });
+    } else {
+      showToast({ type: 'success', title: t('file.ai.completed') });
+    }
+  };
+
+  const handleProcessRecord = async (record: FileTranscriptionRecord) => {
+    if (running.current || modelBusy) return;
+    running.current = true;
+    setError(null);
+    setStatus('processing');
+    try {
+      await applyAi(record, await loadConfig());
+      setStatus('completed');
+    } catch (err) {
+      setError(String(err));
+      setStatus('error');
+      showToast({ type: 'error', title: t('common.error'), description: String(err) });
+    } finally { running.current = false; }
+  };
+
   const handleStartTranscription = async () => {
-    if (!selectedFile || status === 'transcribing') return;
-
-    console.log('[FileTranscription] Button clicked, starting transcription...');
-
+    if (!selectedFile || running.current || modelBusy) return;
+    running.current = true;
     setStatus('transcribing');
     setError(null);
     setProgress({ current: 0, total: 0, percent: 0 });
-
+    let originalSaved = false;
     try {
-      // 使用第一个启用的场景ID，或默认场景
-      const sceneId = config?.scenes?.find(s => s.enabled)?.id || config?.scenes?.[0]?.id || 'default';
-
-      console.log('[FileTranscription] Calling transcribeAudioFile...', { filePath: selectedFile.path, sceneId });
-
-      // 调用转录（会自动转换非 WAV 格式，并判断是否需要分割）
-      const result = await transcribeAudioFile(
-        selectedFile.path,
-        sceneId,
-        undefined,
-        {
-          fileSize: selectedFile.size,
-          audioDuration: selectedFile.duration,
-          onProgress: (current, total, percent) => {
-            setProgress({ current, total, percent });
-          },
-        }
-      );
-
-      console.log('[FileTranscription] Transcription complete:', { textLength: result.text.length, duration: result.duration });
-
-      // 获取ASR模型ID
-      const asrModelId = config?.globalModelConfig?.asrModel?.modelId || 'unknown';
-
-      // 创建并保存记录
-      const record = await createFileTranscriptionRecord(
-        selectedFile.path,
-        selectedFile.name,
-        selectedFile.size,
-        result.text,
-        result.duration,
-        asrModelId
-      );
-
-      // 更新记录列表
-      setRecords([record, ...records]);
-
-      // 显示成功提示
-      showToast({
-        type: 'success',
-        title: '转录完成',
-        description: `${selectedFile.name} (${formatDuration(result.duration)})`,
-      });
-
-      // 重置状态
-      setStatus('completed');
-      setSelectedFile(null);
-      setProgress({ current: 0, total: 0, percent: 0 });
-      setCurrentPage(1); // 重置到第一页显示最新记录
-
-    } catch (err) {
-      console.error('Transcription failed:', err);
-
-      // 提供更友好的错误信息
-      let errorMessage = '转录失败';
-      if (err instanceof Error) {
-        // 移除 ffmpeg 相关的错误提示
-        // 现在使用 symphonia，不再需要 ffmpeg
-        errorMessage = err.message;
+      const latest = await loadConfig();
+      if (autoProcess && (!resolvePrompt(promptId, latest.llmPromptPresets, t) || !latest.globalModelConfig.llm.model || !latest.globalModelConfig.llm.providerId)) {
+        throw new Error(t('file.ai.checkSettings'));
       }
-
-      setError(errorMessage);
+      const result = await transcribeAudioFile(selectedFile.path, '__file_transcription__', undefined, {
+        fileSize: selectedFile.size, audioDuration: selectedFile.duration,
+        onProgress: (current, total, percent) => setProgress({ current, total, percent }),
+      });
+      const record = await createFileTranscriptionRecord(selectedFile.path, selectedFile.name, selectedFile.size,
+        result.text, result.duration, getFullModelId(latest.globalModelConfig.asrModel));
+      originalSaved = true;
+      setRecords(previous => [record, ...previous].slice(0, 100));
+      setViewingId(record.id);
+      setSelectedFile(null);
+      setCurrentPage(1);
+      if (autoProcess && result.text.trim()) {
+        await applyAi(record, await loadConfig());
+      } else {
+        showToast({ type: 'success', title: t('file.ai.transcribed') });
+      }
+      setStatus('completed');
+    } catch (err) {
+      const message = `${originalSaved ? t('file.ai.failedPreserved') + ' ' : ''}${err instanceof Error ? err.message : String(err)}`;
+      setError(message);
       setStatus('error');
+      showToast({ type: 'error', title: t('common.error'), description: message });
+    } finally {
+      running.current = false;
       setProgress({ current: 0, total: 0, percent: 0 });
     }
   };
 
-  // 格式化时长显示
   const formatDuration = (seconds: number): string => {
     const rounded = Math.round(seconds);
     if (rounded < 60) {
@@ -176,6 +207,24 @@ export default function FileTranscriptionPanel() {
         <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('file.title')}</h1>
       </div>
 
+      <FileModelControls config={config} onConfigChange={onConfigChange} disabled={busy} aiEnabled={autoProcess} onBusyChange={setModelBusy} {...modelProps}>
+        <FileProcessingSelect value={autoProcess ? promptId : ''} disabled={busy || !config}
+          label={t('file.ai.prompt')} title={t('file.ai.sharedPrompts')}
+          options={[
+            { id: '', name: t('file.ai.transcribeOnly') },
+            ...(autoProcess && !promptExists ? [{ id: promptId, name: t('file.ai.missingPrompt') }] : []),
+            ...promptOptions.map(option => ({ id: option.id, name: t('file.ai.processingOption', { name: option.name }) })),
+          ]}
+          onChange={selected => {
+              setAutoProcess(!!selected);
+              // Turning automatic processing off preserves the last preset for manual processing.
+              if (selected) setPromptId(selected);
+          }} />
+      </FileModelControls>
+      {autoProcess && (!hasLlm || !promptExists) && <p role="alert" className="text-xs text-amber-700">
+        {!hasLlm ? t('file.ai.notConfigured') : t('file.ai.missingPrompt')}
+      </p>}
+      {status === 'processing' && <p role="status" className="text-sm text-center text-gray-600">{t('file.ai.processing')}</p>}
       {/* 进度显示 - 移到 tabs 外部 */}
       {status === 'transcribing' && (
         <div className="max-w-2xl mx-auto mb-4">
@@ -240,14 +289,17 @@ export default function FileTranscriptionPanel() {
               onFileSelected={handleFileSelected}
               selectedFile={selectedFile}
               onStartTranscription={handleStartTranscription}
-              isTranscribing={status === 'transcribing'}
+              isTranscribing={busy}
+              disabled={!active || busy || !config}
+              startLabel={autoProcess ? t('file.ai.startWithAi') : undefined}
+              busyLabel={status === 'processing' ? t('file.ai.processing') : undefined}
             />
           </div>
 
           {/* 最近一条转录记录 */}
           {records.length > 0 && (
             <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <div className="text-xs text-gray-500 mb-2">最近转录</div>
+              <div className="flex justify-between text-xs text-gray-500 mb-2"><span>{t('file.ai.recent')}</span><button className="underline" onClick={() => setViewingId(records[0].id)}>{t('file.ai.view')}</button></div>
               <div className="flex items-start gap-3">
                 <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -259,7 +311,7 @@ export default function FileTranscriptionPanel() {
                       <span className="text-xs text-gray-500">{formatDuration(records[0].duration)}</span>
                       <button
                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                        onClick={() => handleCopy(records[0].transcriptText)}
+                        onClick={() => handleCopy(records[0].processedText || records[0].transcriptText)}
                         title={t('common.copy') || '复制'}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,7 +320,7 @@ export default function FileTranscriptionPanel() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{records[0].transcriptText.substring(0, 100)}...</p>
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{(records[0].processedText || records[0].transcriptText).substring(0, 100)}...</p>
                 </div>
               </div>
             </div>
@@ -288,7 +340,7 @@ export default function FileTranscriptionPanel() {
             <button
               onClick={() => records.length > 0 && setShowClearConfirm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-              disabled={records.length === 0}
+              disabled={records.length === 0 || busy}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -311,7 +363,7 @@ export default function FileTranscriptionPanel() {
                       {/* 文件名 */}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{record.filename}</p>
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{record.transcriptText.substring(0, 100)}...</p>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{(record.processedText || record.transcriptText).substring(0, 100)}...</p>
 
                         {/* Meta info */}
                         <div className="flex items-center justify-between mt-2">
@@ -330,11 +382,13 @@ export default function FileTranscriptionPanel() {
                             </span>
                           </div>
                           <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500 mr-2">{record.aiStatus === 'error' ? t('file.ai.failed') : record.processedText ? t('file.ai.completed') : t('file.ai.original')}</span>
+                          <button className="px-2 py-1 text-xs rounded hover:bg-gray-100" onClick={() => setViewingId(record.id)}>{t('file.ai.view')}</button>
                           <button
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCopy(record.transcriptText);
+                              handleCopy(record.processedText || record.transcriptText);
                             }}
                             title={t('common.copy') || '复制'}
                           >
@@ -346,8 +400,9 @@ export default function FileTranscriptionPanel() {
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDeleteTarget(record);
+                              if (!busy) setDeleteTarget(record);
                             }}
+                            disabled={busy}
                             title={t('memory.delete') || '删除'}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -413,6 +468,8 @@ export default function FileTranscriptionPanel() {
         </div>
       )}
 
+      {active && viewingRecord && <FileResultDialog key={viewingRecord.id} record={viewingRecord} busy={busy} canProcess={canProcess && !!viewingRecord.transcriptText.trim()}
+        onClose={() => setViewingId(null)} onCopy={handleCopy} onProcess={() => handleProcessRecord(viewingRecord)} />}
       {/* Delete Confirmation Modal */}
       {deleteTarget && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">

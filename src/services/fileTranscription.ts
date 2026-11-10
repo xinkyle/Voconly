@@ -139,7 +139,10 @@ export async function saveFileTranscription(record: FileTranscriptionRecord): Pr
 
     // 更新缓存
     if (historyCache !== null) {
-      historyCache = [record, ...historyCache].slice(0, 100);
+      const exists = historyCache.some(item => item.id === record.id);
+      historyCache = exists
+        ? historyCache.map(item => item.id === record.id ? record : item)
+        : [record, ...historyCache].slice(0, 100);
     }
   } catch (error) {
     log.error(`Failed to save file transcription: ${error}`);
