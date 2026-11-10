@@ -1,4 +1,26 @@
 # Changelog
+## [0.5.29] - 2026-11-10
+
+### 新功能
+1. **文件转录AI处理功能**，支持对转录后的文本进行AI改写和优化处理，可选择不同的AI模型和提示词预设。
+2. **文件转录导出功能**，支持将转录结果导出为TXT和Word格式，方便用户保存和分享。
+3. 文件转录界面增加重新处理按钮，支持对已转录的内容重新使用AI处理。
+
+### 体验优化
+4. 优化文件转录相关界面展示和交互体验。
+
+---
+
+### New Features
+1. **File transcription AI processing feature**, supporting AI rewriting and optimization of transcribed text with different AI models and prompt presets.
+2. **File transcription export feature**, supporting export of transcription results to TXT and Word formats for easy saving and sharing.
+3. Added reprocess button in file transcription interface, supporting re-processing of transcribed content with AI.
+
+### Improvements
+4. Optimized file transcription interface display and interaction experience.
+
+===
+
 ## [0.5.28] - 2026-11-09
 
 ### 新功能
