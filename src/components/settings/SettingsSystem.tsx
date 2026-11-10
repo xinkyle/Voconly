@@ -5,6 +5,7 @@ import { getMicrophones, requestMicrophonePermission } from '../../services/audi
 import { invoke } from '../../utils/tauri';
 import { createLogger } from '../../services/log';
 import type { AppConfig, MicrophoneDevice, PreviewHeight } from '../../types';
+import Select from '../ui/Select';
 
 type OutputScript = 'zh-CN' | 'zh-TW';
 
@@ -281,14 +282,15 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               <p className="text-xs text-gray-500">{t('settings.system.languageDesc')}</p>
             </div>
           </div>
-          <select
+          <Select
             value={i18n.language}
-            onChange={(e) => i18n.changeLanguage(e.target.value)}
-            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
-          >
-            <option value="zh">{t('settings.system.languageZh')}</option>
-            <option value="en">{t('settings.system.languageEn')}</option>
-          </select>
+            onChange={(value) => i18n.changeLanguage(value)}
+            size="small"
+            options={[
+              { id: 'zh', name: t('settings.system.languageZh') },
+              { id: 'en', name: t('settings.system.languageEn') },
+            ]}
+          />
         </div>
 
         {/* Output Script setting - only show when UI language is Chinese */}
@@ -305,14 +307,15 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
                 <p className="text-xs text-gray-500">{t('settings.system.outputScriptDesc')}</p>
               </div>
             </div>
-            <select
+            <Select
               value={outputScript}
-              onChange={(e) => handleOutputScriptChange(e.target.value as OutputScript)}
-              className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
-            >
-              <option value="zh-CN">{t('settings.system.outputScriptZhCN')}</option>
-              <option value="zh-TW">{t('settings.system.outputScriptZhTW')}</option>
-            </select>
+              onChange={(value) => handleOutputScriptChange(value as OutputScript)}
+              size="small"
+              options={[
+                { id: 'zh-CN', name: t('settings.system.outputScriptZhCN') },
+                { id: 'zh-TW', name: t('settings.system.outputScriptZhTW') },
+              ]}
+            />
           </div>
         )}
 
@@ -358,19 +361,20 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               <p className="text-xs text-gray-500">{t('settings.system.asrIdleTimeoutDesc')}</p>
             </div>
           </div>
-          <select
-            value={asrIdleTimeout === 0 ? 0 : Math.floor(asrIdleTimeout / 60)}
-            onChange={(e) => handleAsrIdleTimeoutChange(parseInt(e.target.value))}
-            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
-          >
-            <option value={0}>{t('settings.system.asrIdleTimeoutDisabled')}</option>
-            <option value={1}>{t('settings.system.asrIdleTimeout1min')}</option>
-            <option value={3}>{t('settings.system.asrIdleTimeout3min')}</option>
-            <option value={5}>{t('settings.system.asrIdleTimeout5min')}</option>
-            <option value={10}>{t('settings.system.asrIdleTimeout10min')}</option>
-            <option value={15}>{t('settings.system.asrIdleTimeout15min')}</option>
-            <option value={30}>{t('settings.system.asrIdleTimeout30min')}</option>
-          </select>
+          <Select
+            value={String(asrIdleTimeout === 0 ? 0 : Math.floor(asrIdleTimeout / 60))}
+            onChange={(value) => handleAsrIdleTimeoutChange(parseInt(value))}
+            size="small"
+            options={[
+              { id: '0', name: t('settings.system.asrIdleTimeoutDisabled') },
+              { id: '1', name: t('settings.system.asrIdleTimeout1min') },
+              { id: '3', name: t('settings.system.asrIdleTimeout3min') },
+              { id: '5', name: t('settings.system.asrIdleTimeout5min') },
+              { id: '10', name: t('settings.system.asrIdleTimeout10min') },
+              { id: '15', name: t('settings.system.asrIdleTimeout15min') },
+              { id: '30', name: t('settings.system.asrIdleTimeout30min') },
+            ]}
+          />
         </div>
 
         {/* Preview height setting */}
@@ -386,15 +390,16 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               <p className="text-xs text-gray-500">{t('settings.system.previewHeightDesc')}</p>
             </div>
           </div>
-          <select
+          <Select
             value={previewHeight}
-            onChange={(e) => handlePreviewHeightChange(e.target.value as PreviewHeight)}
-            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer"
-          >
-            <option value="high">{t('settings.system.previewHeightHigh')}</option>
-            <option value="medium">{t('settings.system.previewHeightMedium')}</option>
-            <option value="low">{t('settings.system.previewHeightLow')}</option>
-          </select>
+            onChange={(value) => handlePreviewHeightChange(value as PreviewHeight)}
+            size="small"
+            options={[
+              { id: 'high', name: t('settings.system.previewHeightHigh') },
+              { id: 'medium', name: t('settings.system.previewHeightMedium') },
+              { id: 'low', name: t('settings.system.previewHeightLow') },
+            ]}
+          />
         </div>
 
         {/* Microphone setting */}
@@ -410,19 +415,19 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               <p className="text-xs text-gray-500">{t('settings.system.defaultMicDesc')}</p>
             </div>
           </div>
-          <select
+          <Select
             value={selectedMic}
-            onChange={(e) => handleMicrophoneChange(e.target.value)}
+            onChange={(value) => handleMicrophoneChange(value)}
             disabled={micLoading}
-            className="px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 focus:ring-2 focus:ring-gray-900 cursor-pointer w-auto min-w-[140px] max-w-[420px]"
-          >
-            <option value="">{t('settings.system.autoMic')}</option>
-            {microphones.map((mic) => (
-              <option key={mic.deviceId} value={mic.deviceId}>
-                {mic.label}
-              </option>
-            ))}
-          </select>
+            size="small"
+            options={[
+              { id: '', name: t('settings.system.autoMic') },
+              ...microphones.map((mic) => ({
+                id: mic.deviceId,
+                name: mic.label,
+              })),
+            ]}
+          />
         </div>
 
 

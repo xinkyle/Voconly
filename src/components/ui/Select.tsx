@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react';
  * A custom select component with rounded corners for both trigger and dropdown options.
  * Unlike native <select>, the dropdown options can be styled with rounded corners.
  */
-export default function Select({ value, options, disabled, placeholder, onChange }: {
+export default function Select({ value, options, disabled, placeholder, size = 'default', onChange }: {
   value: string;
   options: { id: string; name: string }[];
   disabled?: boolean;
   placeholder?: string;
+  size?: 'default' | 'small';
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -29,20 +30,29 @@ export default function Select({ value, options, disabled, placeholder, onChange
   }, [expanded]);
 
   return (
-    <div ref={root} className="relative" onBlur={event => {
+    <div ref={root} className={`relative ${size === 'small' ? '' : 'w-full'}`} onBlur={event => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
     }}>
       <button ref={trigger} type="button" disabled={disabled}
         aria-haspopup="listbox" aria-expanded={expanded}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-left hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+        className={
+          size === 'small'
+            ? 'px-3 py-1.5 bg-gray-100 border-0 rounded-lg text-xs font-medium text-gray-900 hover:bg-gray-200 focus:ring-2 focus:ring-gray-900 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
+            : 'w-full flex items-center justify-between gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-left hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
+        }
         onClick={() => setOpen(!open)} onKeyDown={event => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); }
         }}>
-        <span className={selected ? 'text-gray-900' : 'text-gray-400'}>{selected?.name || placeholder || '请选择'}</span>
-        <span aria-hidden="true" className="text-gray-400 text-[10px]">{expanded ? '▲' : '▼'}</span>
+        <span className={selected ? '' : 'text-gray-400'}>{selected?.name || placeholder || '请选择'}</span>
+        {size !== 'small' && <span aria-hidden="true" className="text-gray-400 text-[10px]">{expanded ? '▲' : '▼'}</span>}
+        {size === 'small' && <span aria-hidden="true" className="text-gray-400 text-[10px] ml-1">{expanded ? '▲' : '▼'}</span>}
       </button>
       {expanded && <div ref={list} role="listbox"
-        className="absolute left-0 right-0 z-50 mt-1 max-h-72 overflow-y-auto p-2 space-y-1 bg-white border border-gray-200 rounded-xl shadow-lg"
+        className={
+          size === 'small'
+            ? 'absolute right-0 z-[100] mt-1 min-w-max max-h-72 overflow-y-auto p-1.5 space-y-0.5 bg-white border border-gray-200 rounded-lg shadow-lg'
+            : 'absolute left-0 right-0 z-[100] mt-1 max-h-72 overflow-y-auto p-2 space-y-1 bg-white border border-gray-200 rounded-xl shadow-lg'
+        }
         onKeyDown={event => {
           if (event.key === 'Escape') { event.preventDefault(); setOpen(false); trigger.current?.focus(); }
           const items = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') || []);
@@ -56,9 +66,13 @@ export default function Select({ value, options, disabled, placeholder, onChange
         }}>
         {options.map(option => <button key={option.id} type="button" role="option" aria-selected={option.id === value}
           tabIndex={option.id === value ? 0 : -1}
-          className={`relative flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 ${option.id === value ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-100'}`}
+          className={
+            size === 'small'
+              ? `relative flex items-center w-full px-3 py-1.5 rounded text-xs text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 ${option.id === value ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-100'}`
+              : `relative flex items-center gap-2 w-full px-4 py-2.5 rounded-lg text-sm text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 ${option.id === value ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-100'}`
+          }
           onClick={() => { onChange(option.id); setOpen(false); trigger.current?.focus(); }}>
-          {option.id === value && (
+          {option.id === value && size !== 'small' && (
             <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>

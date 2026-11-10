@@ -6,6 +6,7 @@ import {
   fetchProviderModels,
 } from '../services/llm';
 import { createLogger } from '../services/log';
+import Select from './ui/Select';
 
 const log = createLogger('ProviderConfigModal');
 
@@ -235,7 +236,7 @@ export default function ProviderConfigModal({
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div>
@@ -326,17 +327,14 @@ export default function ProviderConfigModal({
                   )}
                 </div>
                 {availableModels.length > 0 ? (
-                  <select
+                  <Select
                     value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                  >
-                    {availableModels.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedModel(value)}
+                    options={availableModels.map((model) => ({
+                      id: model,
+                      name: model,
+                    }))}
+                  />
                 ) : (
                   <div className="text-sm text-gray-500 py-2">
                     {testing ? t('common.loading') : t('provider.noModelsFound')}
@@ -374,17 +372,17 @@ export default function ProviderConfigModal({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         {t('provider.keepAlive')}
                       </label>
-                      <select
+                      <Select
                         value={keepAlive}
-                        onChange={(e) => setKeepAlive(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500"
-                      >
-                        <option value="0">{t('provider.keepAliveOptions.immediate')}</option>
-                        <option value="2m">{t('provider.keepAliveOptions.short')}</option>
-                        <option value="5m">{t('provider.keepAliveOptions.medium')}</option>
-                        <option value="10m">{t('provider.keepAliveOptions.long')}</option>
-                        <option value="87600h">{t('provider.keepAliveOptions.always')}</option>
-                      </select>
+                        onChange={(value) => setKeepAlive(value)}
+                        options={[
+                          { id: '0', name: t('provider.keepAliveOptions.immediate') },
+                          { id: '2m', name: t('provider.keepAliveOptions.short') },
+                          { id: '5m', name: t('provider.keepAliveOptions.medium') },
+                          { id: '10m', name: t('provider.keepAliveOptions.long') },
+                          { id: '87600h', name: t('provider.keepAliveOptions.always') },
+                        ]}
+                      />
                       <p className="mt-1 text-xs text-gray-500">
                         {t('provider.keepAliveDescription')}
                       </p>
@@ -423,7 +421,7 @@ export default function ProviderConfigModal({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
