@@ -280,6 +280,18 @@
   },
   "file": {
     "title": "文件转录",
+    "export": {
+      "action": "导出",
+      "title": "导出记录",
+      "saving": "正在导出…",
+      "saved": "导出成功",
+      "failed": "导出失败",
+      "source": {
+        "ai": "导出内容：AI 处理结果",
+        "previousAi": "导出内容：上次成功的 AI 结果（最近一次处理失败）",
+        "original": "导出内容：转录原文"
+      }
+    },
     "ai": {
       "asrModel": "语音模型",
       "aiService": "AI 服务",
@@ -420,6 +432,7 @@
     "save": "保存",
     "saved": "已保存",
     "saving": "保存中...",
+    "copy": "复制",
     "delete": "删除",
     "deleting": "删除中...",
     "edit": "编辑",

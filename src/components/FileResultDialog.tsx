@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { FileTranscriptionRecord } from '../types';
+import FileExportButton from './FileExportButton';
 
 export default function FileResultDialog({ record, busy, canProcess, onProcess, onCopy, onClose }: {
   record: FileTranscriptionRecord;
@@ -36,7 +37,15 @@ export default function FileResultDialog({ record, busy, canProcess, onProcess, 
           <button disabled={busy || !canProcess} onClick={onProcess} className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm disabled:opacity-40">
             {busy ? t('file.ai.processing') : record.processedText ? t('file.ai.reprocess') : t('file.ai.process')}
           </button>
-          <button onClick={() => onCopy(text)} disabled={!text} className="px-4 py-2 rounded-lg bg-gray-100 text-sm disabled:opacity-40">{t('common.copy')}</button>
+          <div className="flex items-center gap-2">
+            <FileExportButton record={record} disabled={busy} />
+            <button type="button" onClick={() => onCopy(text)} disabled={!text} title={t('common.copy')} aria-label={t('common.copy')}
+              className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">
+              <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
         </div>
         <p className="text-xs text-gray-500 mt-3">{t('file.ai.reprocessHint')}</p>
       </section>

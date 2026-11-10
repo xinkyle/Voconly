@@ -8,6 +8,7 @@ import { loadConfig } from '../services/config';
 import FileModelControls from './FileModelControls';
 import FileProcessingSelect from './FileProcessingSelect';
 import FileResultDialog from './FileResultDialog';
+import FileExportButton from './FileExportButton';
 import { processFileRecord } from '../services/fileAiWorkflow';
 import { processFileText } from '../services/llm';
 import { getPromptOptions, resolvePrompt } from '../utils/promptPresets';
@@ -309,6 +310,7 @@ export default function FileTranscriptionPanel({ active, config, onConfigChange,
                     <p className="font-medium text-gray-900 truncate">{records[0].filename}</p>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-xs text-gray-500">{formatDuration(records[0].duration)}</span>
+                      <FileExportButton record={records[0]} disabled={busy} />
                       <button
                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         onClick={() => handleCopy(records[0].processedText || records[0].transcriptText)}
@@ -384,6 +386,7 @@ export default function FileTranscriptionPanel({ active, config, onConfigChange,
                           <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-500 mr-2">{record.aiStatus === 'error' ? t('file.ai.failed') : record.processedText ? t('file.ai.completed') : t('file.ai.original')}</span>
                           <button className="px-2 py-1 text-xs rounded hover:bg-gray-100" onClick={() => setViewingId(record.id)}>{t('file.ai.view')}</button>
+                          <FileExportButton record={record} disabled={busy} />
                           <button
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                             onClick={(e) => {

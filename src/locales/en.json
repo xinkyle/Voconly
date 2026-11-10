@@ -280,6 +280,18 @@
   },
   "file": {
     "title": "File Transcription",
+    "export": {
+      "action": "Export",
+      "title": "Export record",
+      "saving": "Exporting…",
+      "saved": "Export complete",
+      "failed": "Export failed",
+      "source": {
+        "ai": "Content: AI result",
+        "previousAi": "Content: Last successful AI result (latest processing failed)",
+        "original": "Content: Original transcript"
+      }
+    },
     "ai": {
       "asrModel": "Speech model",
       "aiService": "AI service",
@@ -420,6 +432,7 @@
     "save": "Save",
     "saved": "Saved",
     "saving": "Saving...",
+    "copy": "Copy",
     "delete": "Delete",
     "deleting": "Deleting...",
     "edit": "Edit",
