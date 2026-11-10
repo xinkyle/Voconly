@@ -273,7 +273,10 @@
     "originalText": "原始文本",
     "polishedText": "润色后文本",
     "diffHighlight": "差异对比",
-    "copy": "复制"
+    "copy": "复制",
+    "delete": "删除",
+    "confirmDelete": "确认删除？",
+    "confirmDeleteDesc": "这将删除该条历史记录，此操作不可恢复。"
   },
   "file": {
     "title": "文件转录",

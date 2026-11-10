@@ -32,7 +32,7 @@ import {
 } from './services/performance';
 import { typeTextSafe } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
-import { addHistoryRecord, loadHistory, clearHistory } from './services/history';
+import { addHistoryRecord, loadHistory, clearHistory, deleteHistoryRecord } from './services/history';
 import { checkModelExists } from './services/downloader';
 import { switchAsrModel } from './services/whisper';
 import { processTextForSceneWithProgress } from './services/llm';
@@ -1947,6 +1947,10 @@ function App() {
                 onClear={async () => {
                   await clearHistory();
                   setHistory([]);
+                }}
+                onDelete={async (id: string) => {
+                  await deleteHistoryRecord(id);
+                  setHistory(prev => prev.filter(r => r.id !== id));
                 }}
               />
             )}

@@ -11,6 +11,7 @@ const log = createLogger('MemoryPanel');
 interface MemoryPanelProps {
   records: HistoryRecord[];
   onClear: () => void;
+  onDelete: (id: string) => void;
 }
 
 // 每页显示条数
@@ -186,9 +187,10 @@ function formatTime(timestamp: number): string {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 
-export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
+export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelProps) {
   const { t } = useTranslation();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<HistoryRecord | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [compareRecord, setCompareRecord] = useState<HistoryRecord | null>(null);
   const { showToast } = useToast();
@@ -322,6 +324,16 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                               >
                                 <CopyIcon />
                               </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget(record);
+                                }}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title={t('memory.delete')}
+                              >
+                                <TrashIcon />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -399,6 +411,41 @@ export default function MemoryPanel({ records, onClear }: MemoryPanelProps) {
                 </button>
                 <button
                   onClick={handleClear}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  {t('memory.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Single Record Confirmation Modal */}
+      {deleteTarget && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-scale-in">
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <TrashIcon />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">{t('memory.confirmDelete')}</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {t('memory.confirmDeleteDesc')}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  {t('memory.cancel')}
+                </button>
+                <button
+                  onClick={() => {
+                    onDelete(deleteTarget.id);
+                    setDeleteTarget(null);
+                  }}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                 >
                   {t('memory.confirm')}

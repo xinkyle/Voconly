@@ -273,7 +273,10 @@
     "originalText": "Original Text",
     "polishedText": "Polished Text",
     "diffHighlight": "Difference Highlight",
-    "copy": "Copy"
+    "copy": "Copy",
+    "delete": "Delete",
+    "confirmDelete": "Confirm delete?",
+    "confirmDeleteDesc": "This will delete this record. This action cannot be undone."
   },
   "file": {
     "title": "File Transcription",
