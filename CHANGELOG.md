@@ -1,4 +1,18 @@
 # Changelog
+## [0.5.28] - 2026-11-09
+
+### 新功能
+1. 历史记录增加单条删除按钮，支持删除单条记录并弹出确认对话框。
+2. 文件转录历史记录增加删除功能，支持单条删除和清空所有记录。
+
+---
+
+### New Features
+1. Added delete button for individual history records with confirmation dialog.
+2. Added delete functionality for file transcription history with single record deletion and clear all option.
+
+===
+
 ## [0.5.27] - 2026-11-06
 
 ### 问题修复
