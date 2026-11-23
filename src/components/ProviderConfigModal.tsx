@@ -35,6 +35,7 @@ export default function ProviderConfigModal({
 
   // Form state
   const [apiKey, setApiKey] = useState(existingInstance?.apiKey || '');
+  const [baseUrl, setBaseUrl] = useState(existingInstance?.baseUrl || meta.baseUrl || '');
   const [selectedModel, setSelectedModel] = useState(existingInstance?.defaultModel || '');
 
   // Ollama 特有配置
@@ -158,11 +159,13 @@ export default function ProviderConfigModal({
     setTestError(null);
     setAvailableModels([]);
 
+    // 使用用户输入的 baseUrl 或默认值
+    const baseUrlToUse = meta.allowBaseUrlEdit ? baseUrl : meta.baseUrl;
+
     try {
-      const baseUrl = meta.baseUrl;
       const result = await checkProviderConnection(
         meta.id,
-        baseUrl,
+        baseUrlToUse,
         (meta.requiresApiKey || meta.id === 'custom') ? apiKey : undefined
       );
 
@@ -206,7 +209,7 @@ export default function ProviderConfigModal({
       const instance: LlmProviderInstance = {
         metaId: meta.id,
         enabled: true,
-        baseUrl: meta.baseUrl,
+        baseUrl: meta.allowBaseUrlEdit ? baseUrl : meta.baseUrl,
         apiKey: apiKey || undefined,
         defaultModel: selectedModel,
         // Ollama 特有配置
@@ -256,6 +259,31 @@ export default function ProviderConfigModal({
 
           {/* Form */}
           <div className="px-6 py-4 space-y-4">
+            {/* Base URL - 仅当允许编辑时显示 */}
+            {meta.allowBaseUrlEdit && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('provider.baseUrl')}
+                </label>
+                <input
+                  type="url"
+                  value={baseUrl}
+                  onChange={(e) => {
+                    setBaseUrl(e.target.value);
+                    setTestResult(null);
+                    setTestError(null);
+                    setAvailableModels([]);
+                    setSelectedModel('');
+                  }}
+                  placeholder={meta.id === 'custom' ? 'https://api.example.com/v1' : meta.baseUrl}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('provider.baseUrlHint')}
+                </p>
+              </div>
+            )}
+
             {/* API Key */}
             {(meta.requiresApiKey || meta.id === 'custom') && (
               <div>

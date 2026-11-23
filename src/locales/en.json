@@ -456,8 +456,8 @@
   "provider": {
     "configure": "Configure {{name}}",
     "configureApi": "Configure {{name}} API",
-    "apiAddress": "API Address",
-    "apiAddressNotEditable": "This provider does not support custom API address",
+    "apiAddress": "API AddrBase URL",
+    "baseUrlHint": "Enter API endpoint URL, e.g. http://127.0.0.1:3425/v1",
     "apiKey": "API Key",
     "apiKeyOptional": "API Key (Optional)",
     "apiKeyPlaceholder": "Enter API Key",
