@@ -1,4 +1,24 @@
 # Changelog
+## [0.5.30] - 2026-11-24
+
+### 新功能
+1. **历史记录搜索功能**，支持在历史记录中快速搜索已保存的转录内容。
+2. **自定义 Provider Base URL 设置**，在 Customer Provider 中开放 Base URL 配置，用户可自行选择服务端点。
+
+### 问题修复
+3. 修复药丸窗口位置问题，让药丸跟随主窗口所在显示器显示，避免多显示器场景下的位置混乱。
+
+---
+
+### New Features
+1. **History search feature** - Support quick search of saved transcription content in history records.
+2. **Custom Provider Base URL setting** - Added Base URL configuration in Customer Provider, allowing users to customize service endpoints.
+
+### Bug Fixes
+3. Fixed pill window position issue - The pill now follows the monitor where the main window is located, avoiding position confusion in multi-monitor scenarios.
+
+===
+
 ## [0.5.29] - 2026-11-10
 
 ### 新功能
