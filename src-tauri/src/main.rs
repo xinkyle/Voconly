@@ -14,7 +14,9 @@ use tauri::{
     menu::{Menu, MenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     webview::WebviewWindowBuilder,
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow,
+    window::Monitor,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalRect, PhysicalSize, Runtime,
+    WebviewWindow,
 };
 
 use arboard::Clipboard;
@@ -846,6 +848,130 @@ struct FloatPanelPosition {
     bottom: i32,
 }
 
+const FLOAT_PANEL_WIDTH: f64 = 480.0;
+const FLOAT_PANEL_HEIGHT: f64 = 40.0;
+const FLOAT_PANEL_BOTTOM_OFFSET: i32 = 80;
+
+fn float_panel_target_monitor(app: &AppHandle, panel: &WebviewWindow) -> Option<Monitor> {
+    app.get_webview_window("main")
+        .and_then(|main| main.current_monitor().ok().flatten())
+        .or_else(|| panel.primary_monitor().ok().flatten())
+}
+
+fn float_panel_origin(
+    work_area: &PhysicalRect<i32, u32>,
+    size: PhysicalSize<u32>,
+    default_bottom: i32,
+    saved: Option<FloatPanelPosition>,
+) -> PhysicalPosition<i32> {
+    let left = work_area.position.x;
+    let top = work_area.position.y;
+    let right = left + work_area.size.width as i32;
+    let bottom = top + work_area.size.height as i32;
+    let width = size.width as i32;
+    let height = size.height as i32;
+
+    if let Some(saved) = saved {
+        let y = saved.bottom.saturating_sub(height);
+        if (left..=right - width).contains(&saved.x) && (top..=bottom - height).contains(&y) {
+            return PhysicalPosition::new(saved.x, y);
+        }
+    }
+
+    let x = left + (right - left - width).max(0) / 2;
+    let y = (default_bottom.min(bottom) - height).max(top);
+    PhysicalPosition::new(x, y)
+}
+
+fn set_float_panel_bounds(
+    panel: &WebviewWindow,
+    position: PhysicalPosition<i32>,
+    size: LogicalSize<f64>,
+    scale: f64,
+    shrink_first: bool,
+) -> tauri::Result<()> {
+    let (position, size): (tauri::Position, tauri::Size) = if cfg!(target_os = "macos") {
+        // Convert to Cocoa points using the destination monitor's scale.
+        (position.to_logical::<f64>(scale).into(), size.into())
+    } else {
+        (position.into(), size.to_physical::<u32>(scale).into())
+    };
+
+    // Shrink before moving the frame down so it doesn't spill onto a screen below.
+    if shrink_first {
+        panel.set_size(size)?;
+        panel.set_position(position)
+    } else {
+        panel.set_position(position)?;
+        panel.set_size(size)
+    }
+}
+
+fn place_float_panel(
+    panel: &WebviewWindow,
+    monitor: &Monitor,
+    size: LogicalSize<f64>,
+    saved: Option<FloatPanelPosition>,
+) -> tauri::Result<FloatPanelPosition> {
+    let scale = monitor.scale_factor();
+    let physical_size = size.to_physical::<u32>(scale);
+    let default_bottom =
+        monitor.position().y + monitor.size().height as i32 - FLOAT_PANEL_BOTTOM_OFFSET;
+    let position = float_panel_origin(monitor.work_area(), physical_size, default_bottom, saved);
+
+    set_float_panel_bounds(panel, position, size, scale, false)?;
+    Ok(FloatPanelPosition {
+        x: position.x,
+        bottom: position.y + physical_size.height as i32,
+    })
+}
+
+#[cfg(test)]
+mod float_panel_position_tests {
+    use super::*;
+
+    #[test]
+    fn ignores_saved_position_on_another_monitor() {
+        let work_area = PhysicalRect {
+            position: PhysicalPosition::new(-2560, -1440),
+            size: PhysicalSize::new(2560, 1360),
+        };
+        let pill_size = LogicalSize::new(480.0, 40.0).to_physical::<u32>(1.5);
+        let saved = FloatPanelPosition { x: 720, bottom: 1000 };
+
+        let position = float_panel_origin(&work_area, pill_size, -80, Some(saved));
+
+        assert_eq!(position, PhysicalPosition::new(-1640, -140));
+    }
+
+    #[test]
+    fn restores_saved_bottom_edge_on_target_monitor() {
+        let work_area = PhysicalRect {
+            position: PhysicalPosition::new(1920, 0),
+            size: PhysicalSize::new(1920, 1040),
+        };
+        let pill_size = LogicalSize::new(480.0, 40.0).to_physical::<u32>(1.25);
+        let saved = FloatPanelPosition { x: 2040, bottom: 900 };
+
+        let position = float_panel_origin(&work_area, pill_size, 1000, Some(saved));
+
+        assert_eq!(position, PhysicalPosition::new(2040, 850));
+    }
+
+    #[test]
+    fn keeps_default_bottom_above_taskbar() {
+        let work_area = PhysicalRect {
+            position: PhysicalPosition::new(0, 0),
+            size: PhysicalSize::new(1920, 960),
+        };
+        let pill_size = PhysicalSize::new(480, 40);
+
+        let position = float_panel_origin(&work_area, pill_size, 1000, None);
+
+        assert_eq!(position, PhysicalPosition::new(720, 920));
+    }
+}
+
 fn float_panel_position_path() -> Result<PathBuf, String> {
     Ok(config::get_config_path()?.with_file_name("float-panel-position.json"))
 }
@@ -860,7 +986,13 @@ fn save_float_panel_position(app: AppHandle) -> Result<(), String> {
     let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
     let position = window.outer_position().map_err(|e| e.to_string())?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
-    let saved = FloatPanelPosition { x: position.x, bottom: position.y + size.height as i32 };
+    write_float_panel_position(FloatPanelPosition {
+        x: position.x,
+        bottom: position.y + size.height as i32,
+    })
+}
+
+fn write_float_panel_position(saved: FloatPanelPosition) -> Result<(), String> {
     let path = float_panel_position_path()?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -873,13 +1005,14 @@ fn save_float_panel_position(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn reset_float_panel_position(app: AppHandle) -> Result<(), String> {
     let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
-    let monitor = window.primary_monitor().map_err(|e| e.to_string())?
-        .ok_or("Primary monitor not found")?;
-    let size = window.outer_size().map_err(|e| e.to_string())?;
-    let x = monitor.position().x + (monitor.size().width as i32 - size.width as i32) / 2;
-    let y = monitor.position().y + monitor.size().height as i32 - 80 - size.height as i32;
-    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    save_float_panel_position(app)
+    let monitor = float_panel_target_monitor(&app, &window).ok_or("Display monitor not found")?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let size = window
+        .outer_size()
+        .map_err(|e| e.to_string())?
+        .to_logical::<f64>(scale);
+    let position = place_float_panel(&window, &monitor, size, None).map_err(|e| e.to_string())?;
+    write_float_panel_position(position)
 }
 
 /// Show the float panel at the bottom center of the screen
@@ -932,40 +1065,15 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
 
     // 只在首次显示时设置药丸高度，已显示时保持当前高度
     if !already_shown {
-        if let Ok(monitor) = float_window.primary_monitor() {
-            if let Some(monitor) = monitor {
-                let monitor_size = monitor.size();
-                let scale_factor = monitor.scale_factor();
-
-                // 初始显示：药丸模式（仅显示状态栏）
-                // 使用逻辑像素，统一所有平台的视觉大小
-                let window_width_logical = 480.0; // 窗口宽度
-                let window_height_logical = 40.0; // 药丸高度：40 逻辑像素（与 set_float_panel_height 保持一致）
-
-                // 转换为物理像素用于定位计算
-                let window_width_physical = (window_width_logical * scale_factor) as i32;
-                let window_height_physical = (window_height_logical * scale_factor) as i32;
-
-                // 恢复拖动后的位置；未拖动时沿用默认底部位置。
-                let saved = load_float_panel_position();
-                let x = saved.as_ref().map(|p| p.x).unwrap_or_else(||
-                    monitor.position().x + (monitor_size.width as i32 - window_width_physical) / 2);
-                let bottom = saved.map(|p| p.bottom).unwrap_or(
-                    monitor.position().y + monitor_size.height as i32 - 80);
-                let y = bottom - window_height_physical;
-
-                // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
-                let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
-                    window_width_logical,
-                    window_height_logical,
-                )));
-                let _ = float_window.set_position(PhysicalPosition::new(x, y));
-
-                info!(
-                    "Float panel positioned at: x={}, y={}, height={}px (logical), scale_factor={}",
-                    x, y, window_height_logical, scale_factor
-                );
-            }
+        let size = LogicalSize::new(FLOAT_PANEL_WIDTH, FLOAT_PANEL_HEIGHT);
+        let placement = if let Some(monitor) = float_panel_target_monitor(&app, &float_window) {
+            place_float_panel(&float_window, &monitor, size, load_float_panel_position()).map(|_| ())
+        } else {
+            float_window.set_size(size)
+        };
+        if let Err(error) = placement {
+            warn!("Failed to position float panel before showing: {error}");
+            let _ = float_window.set_size(size);
         }
 
         // 【关键修复】使用 Windows API 显示窗口但不激活（不抢焦点）
@@ -999,8 +1107,22 @@ async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), 
             force_overlay_topmost(&float_window);
         }
 
-        // 非 Windows 平台使用标准 show()
-        #[cfg(not(windows))]
+        #[cfg(target_os = "macos")]
+        {
+            let window = float_window.clone();
+            // Tao queues the frame changes on the main dispatch queue. Show after those changes.
+            float_window
+                .run_on_main_thread(move || {
+                    dispatch2::DispatchQueue::main().exec_async(move || {
+                        if let Err(error) = window.show() {
+                            warn!("Failed to show float panel: {error}");
+                        }
+                    });
+                })
+                .map_err(|e| format!("Failed to schedule float panel show: {e}"))?;
+        }
+
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             float_window
                 .show()
@@ -1097,54 +1219,47 @@ async fn set_float_panel_height(
         .get_webview_window("float-panel")
         .ok_or("Float panel window not found")?;
 
-    if let Ok(monitor) = float_window.primary_monitor() {
-        if let Some(monitor) = monitor {
-            let monitor_size = monitor.size();
-            let scale_factor = monitor.scale_factor();
-
-            // 使用逻辑像素设置窗口大小，统一所有平台的视觉高度
-            let window_width_logical = 480.0; // 窗口宽度
-
-            // 根据高度档位设置不同的展开高度（逻辑像素）
-            // 压缩到原来的 2/3，所有平台呈现相同的视觉高度
-            let target_height_logical = if expanded {
-                match preview_height.as_deref() {
-                    Some("low") => 100.0,    // 低：约3行文字
-                    Some("medium") => 160.0, // 中：约5行文字
-                    _ => 280.0,              // 高（默认）：约10行文字
-                }
-            } else {
-                40.0 // 药丸高度：40 逻辑像素
-            };
-
-            // 转换为物理像素用于定位计算
-            let window_width_physical = (window_width_logical * scale_factor) as i32;
-            let target_height_physical = (target_height_logical * scale_factor) as i32;
-
-            // 保持胶囊底边不变，只让预览区域向上展开。
-            let current = float_window.outer_position().ok().zip(float_window.outer_size().ok());
-            let (x, bottom) = current.map(|(position, size)|
-                (position.x, position.y + size.height as i32)).unwrap_or_else(|| (
-                    monitor.position().x + (monitor_size.width as i32 - window_width_physical) / 2,
-                    monitor.position().y + monitor_size.height as i32 - 80,
-                ));
-            let y = bottom - target_height_physical;
-
-            // 使用逻辑像素设置窗口大小（Tauri 会自动处理 DPI 缩放）
-            let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
-                window_width_logical,
-                target_height_logical,
-            )));
-            let _ = float_window.set_position(PhysicalPosition::new(x, y));
-
-            info!(
-                "Float panel height set to: {}px logical ({}px physical at scale_factor={}), expanded={}, preview_height={:?}",
-                target_height_logical, target_height_physical, scale_factor, expanded, preview_height
-            );
+    let target_height = if expanded {
+        match preview_height.as_deref() {
+            Some("low") => 100.0,
+            Some("medium") => 160.0,
+            _ => 280.0,
         }
-    }
+    } else {
+        FLOAT_PANEL_HEIGHT
+    };
+    let size = LogicalSize::new(FLOAT_PANEL_WIDTH, target_height);
+    let monitor = float_window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| float_panel_target_monitor(&app, &float_window));
+    let Some(monitor) = monitor else {
+        return float_window.set_size(size).map_err(|e| e.to_string());
+    };
 
-    Ok(())
+    // Keep the bottom edge fixed on the panel's own screen while expanding the preview.
+    let current = float_window
+        .outer_position()
+        .ok()
+        .zip(float_window.outer_size().ok());
+    if let Some((position, old_size)) = current {
+        let scale = monitor.scale_factor();
+        let new_height = size.to_physical::<u32>(scale).height;
+        let y = position.y + old_size.height as i32 - new_height as i32;
+        set_float_panel_bounds(
+            &float_window,
+            PhysicalPosition::new(position.x, y),
+            size,
+            scale,
+            new_height < old_size.height,
+        )
+        .map_err(|e| e.to_string())
+    } else {
+        place_float_panel(&float_window, &monitor, size, None)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Open the model folder in file explorer
@@ -2393,7 +2508,7 @@ fn main() {
                 tauri::WebviewUrl::App("float.html".into()),
             )
             .title("Voconly 悬浮窗")
-            .inner_size(480.0, 40.0) // 药丸：480px 宽 × 40px 高
+            .inner_size(FLOAT_PANEL_WIDTH, FLOAT_PANEL_HEIGHT)
             .resizable(false)
             .decorations(false)
             .always_on_top(true)
