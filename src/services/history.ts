@@ -30,6 +30,20 @@ function fromRustRecord(record: RustHistoryRecord): HistoryRecord {
   };
 }
 
+export interface HistorySearchResult {
+  records: HistoryRecord[];
+  total: number;
+}
+
+export async function searchHistory(query: string, page: number, pageSize: number): Promise<HistorySearchResult> {
+  const { records, total } = await invoke<{ records: RustHistoryRecord[]; total: number }>('search_history', {
+    query,
+    page,
+    pageSize,
+  });
+  return { records: records.map(fromRustRecord), total };
+}
+
 /**
  * 加载历史记录（默认加载第一页，100条）
  */

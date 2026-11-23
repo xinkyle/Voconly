@@ -55,7 +55,7 @@ mod utils; // Crash report module for enhanced crash tracking
 use config::{config_exists, get_model_storage_path, load_config, save_config, AppConfig, AppServices};
 use history::{
     add_history_record, clear_history, delete_history_record, get_archive_stats, get_full_stats,
-    get_history_count, load_history, load_history_paged, rebuild_stats, save_history,
+    get_history_count, load_history, load_history_paged, rebuild_stats, save_history, search_history,
 };
 use paths::resolve_resource_path;
 use utils::downloader::{
@@ -2204,6 +2204,7 @@ fn main() {
             get_float_panel_position,
             load_history,
             load_history_paged,
+            search_history,
             get_history_count,
             save_history,
             get_archive_stats,

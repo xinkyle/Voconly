@@ -1,9 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Search, X } from 'lucide-react';
 import type { HistoryRecord } from '../types';
 import { useToast } from './ui/Toast';
 import { createLogger } from '../services/log';
+import { searchHistory, type HistorySearchResult } from '../services/history';
 
 // 创建日志记录器
 const log = createLogger('MemoryPanel');
@@ -12,6 +14,13 @@ interface MemoryPanelProps {
   records: HistoryRecord[];
   onClear: () => void;
   onDelete: (id: string) => void;
+}
+
+interface SearchResponse {
+  query: string;
+  page: number;
+  history: HistoryRecord[];
+  result: HistorySearchResult | null;
 }
 
 // 每页显示条数
@@ -193,7 +202,68 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
   const [deleteTarget, setDeleteTarget] = useState<HistoryRecord | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [compareRecord, setCompareRecord] = useState<HistoryRecord | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchResponse, setSearchResponse] = useState<SearchResponse | null>(null);
+  const searchFieldId = useId();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
   const { showToast } = useToast();
+  const query = searchInput.trim();
+  const activeSearch = searchResponse?.query === query &&
+    searchResponse.page === currentPage && searchResponse.history === records
+    ? searchResponse
+    : null;
+  const searchResult = activeSearch?.result;
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus({ preventScroll: true });
+    }
+  }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (!query) return;
+
+    let cancelled = false;
+    const request = { query, page: currentPage, history: records };
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await searchHistory(query, currentPage, PAGE_SIZE);
+        if (cancelled) return;
+
+        const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+        if (currentPage > lastPage) {
+          setCurrentPage(lastPage);
+        } else {
+          setSearchResponse({ ...request, result });
+        }
+      } catch (error) {
+        if (cancelled) return;
+        log.error(`Failed to search history: ${error}`);
+        setSearchResponse({ ...request, result: null });
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, currentPage, records]);
+
+  const updateSearchInput = (value: string) => {
+    setSearchInput(value);
+    if (value.trim() !== query) {
+      setCurrentPage(1);
+      setSearchResponse(null);
+    }
+  };
+
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    updateSearchInput('');
+    searchToggleRef.current?.focus({ preventScroll: true });
+  };
 
   // Copy text to clipboard
   const handleCopy = async (text: string) => {
@@ -209,26 +279,31 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
   };
 
   // Pagination logic
-  const totalPages = Math.ceil(records.length / PAGE_SIZE);
+  const totalRecords = query ? searchResult?.total ?? 0 : records.length;
+  const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
   const paginatedRecords = useMemo(() => {
+    if (query) return searchResult?.records ?? [];
+
     const start = (currentPage - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
     return records.slice(start, end);
-  }, [records, currentPage]);
+  }, [query, searchResult, records, currentPage]);
 
   // Group paginated records by date
   const groupedRecords = useMemo(() => groupByDate(paginatedRecords, t), [paginatedRecords, t]);
 
-  // Reset to first page when records change
+  // Keep the current history page valid after a deletion.
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
+    const lastPage = Math.max(1, totalPages);
+    if (!query && currentPage > lastPage) {
+      setCurrentPage(lastPage);
     }
-  }, [currentPage, totalPages]);
+  }, [query, currentPage, totalPages]);
 
   const handleClear = () => {
     onClear();
     setShowClearConfirm(false);
+    updateSearchInput('');
     setCurrentPage(1);
   };
 
@@ -236,23 +311,99 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
     <div className="space-y-6">
       {/* Page Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">{t('memory.title')}</h1>
-          <button
-            onClick={() => records.length > 0 && setShowClearConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            disabled={records.length === 0}
-          >
-            <TrashIcon />
-            {t('memory.clear')}
-          </button>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="shrink-0 text-xl font-semibold text-gray-900">{t('memory.title')}</h1>
+          <div className="flex min-w-0 items-center gap-1">
+            <div
+              role="search"
+              className="flex min-w-0 items-center"
+              onKeyDown={event => {
+                if (isSearchOpen && event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  closeSearch();
+                }
+              }}
+            >
+              <div
+                id={searchFieldId}
+                aria-hidden={!isSearchOpen}
+                className={`relative min-w-0 overflow-hidden transition-[width,opacity,margin-right] duration-200 ease-out motion-reduce:transition-none ${
+                  isSearchOpen ? 'mr-1 w-56 opacity-100' : 'w-0 opacity-0'
+                }`}
+              >
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  aria-label={t('memory.search')}
+                  placeholder={t('memory.searchPlaceholder')}
+                  value={searchInput}
+                  disabled={!isSearchOpen}
+                  onChange={event => updateSearchInput(event.target.value)}
+                  className={`h-8 w-full rounded-lg border border-gray-200 bg-white pl-2.5 text-sm text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden ${
+                    searchInput ? 'pr-8' : 'pr-2.5'
+                  }`}
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    aria-label={t('memory.clearSearch')}
+                    title={t('memory.clearSearch')}
+                    onClick={() => {
+                      updateSearchInput('');
+                      searchInputRef.current?.focus({ preventScroll: true });
+                    }}
+                    className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <X aria-hidden="true" className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                ref={searchToggleRef}
+                type="button"
+                aria-label={t(isSearchOpen ? 'memory.closeSearch' : 'memory.search')}
+                title={t(isSearchOpen ? 'memory.closeSearch' : 'memory.search')}
+                aria-expanded={isSearchOpen}
+                aria-controls={searchFieldId}
+                onClick={() => {
+                  if (isSearchOpen) closeSearch();
+                  else setIsSearchOpen(true);
+                }}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 hover:text-gray-900 ${
+                  isSearchOpen ? 'bg-gray-100 text-gray-900' : 'text-gray-600'
+                }`}
+              >
+                <Search aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+              disabled={records.length === 0 && totalRecords === 0}
+            >
+              <TrashIcon />
+              {t('memory.clear')}
+            </button>
+          </div>
         </div>
-        <p className="text-sm text-gray-600">{t('memory.subtitle')}</p>
+        <p className="mt-1 text-sm text-gray-600">{t('memory.subtitle')}</p>
       </div>
 
       {/* History List */}
       <div className="space-y-4">
-        {Object.entries(groupedRecords).length === 0 ? (
+        {query && (
+          <p role="status" className="text-sm text-gray-500">
+            {!activeSearch
+              ? t('memory.searching')
+              : !searchResult
+                ? t('memory.searchFailed')
+                : searchResult.total === 0
+                  ? t('memory.noSearchResults')
+                  : t('memory.searchResults', { count: totalRecords })}
+          </p>
+        )}
+        {!query && paginatedRecords.length === 0 && (
           <div className="text-center py-16 bg-gray-50 rounded-xl">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,7 +413,8 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
             <p className="text-gray-600">{t('memory.noRecords')}</p>
             <p className="text-sm text-gray-500 mt-1">{t('memory.noRecordsHint')}</p>
           </div>
-        ) : (
+        )}
+        {paginatedRecords.length > 0 && (
           <>
             {Object.entries(groupedRecords).map(([date, dateRecords]) => (
               <div key={date} className="space-y-2">
@@ -356,21 +508,27 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
                   <ChevronLeftIcon />
                 </button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${
-                        currentPage === page
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
+                {query ? (
+                  <span className="px-2 text-sm text-gray-600">
+                    {t('memory.pageOf', { page: currentPage, total: totalPages })}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
@@ -381,9 +539,11 @@ export default function MemoryPanel({ records, onClear, onDelete }: MemoryPanelP
                   <ChevronRightIcon />
                 </button>
 
-                <span className="ml-4 text-sm text-gray-500">
-                  {t('memory.totalRecords', { count: records.length })}
-                </span>
+                {!query && (
+                  <span className="ml-4 text-sm text-gray-500">
+                    {t('memory.totalRecords', { count: totalRecords })}
+                  </span>
+                )}
               </div>
             )}
           </>

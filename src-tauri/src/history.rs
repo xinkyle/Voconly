@@ -1,6 +1,6 @@
 use crate::paths::history_db_path;
 use log::{info, warn};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -16,6 +16,23 @@ pub struct HistoryRecord {
     pub word_count: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_content: Option<String>,
+}
+
+fn history_record_from_row(row: &Row<'_>) -> rusqlite::Result<HistoryRecord> {
+    Ok(HistoryRecord {
+        id: row.get(0)?,
+        timestamp: row.get(1)?,
+        content: row.get(2)?,
+        duration: row.get(3)?,
+        word_count: row.get(4)?,
+        raw_content: row.get(5)?,
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct HistorySearchResult {
+    records: Vec<HistoryRecord>,
+    total: u64,
 }
 
 /// 归档统计信息
@@ -132,22 +149,78 @@ pub fn load_history_paged(page: u32, page_size: u32) -> Result<Vec<HistoryRecord
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
     let records: Vec<_> = stmt
-        .query_map(params![page_size, offset], |row| {
-            Ok(HistoryRecord {
-                id: row.get(0)?,
-                timestamp: row.get(1)?,
-                content: row.get(2)?,
-                duration: row.get(3)?,
-                word_count: row.get(4)?,
-                raw_content: row.get(5)?,
-            })
-        })
+        .query_map(params![page_size, offset], history_record_from_row)
         .map_err(|e| format!("Failed to query history: {}", e))?
         .filter_map(|r| r.ok())
         .collect();
 
     info!("Loaded {} history records", records.len());
     Ok(records)
+}
+
+/// 搜索全部历史记录中的转录结果和原文
+#[tauri::command]
+pub async fn search_history(
+    query: String,
+    page: u32,
+    page_size: u32,
+) -> Result<HistorySearchResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut conn = get_db_connection()?;
+        query_history_search(&mut conn, &query, page, page_size)
+            .map_err(|error| format!("Failed to search history: {error}"))
+    })
+    .await
+    .map_err(|error| format!("History search task failed: {error}"))?
+}
+
+fn query_history_search(
+    conn: &mut Connection,
+    query: &str,
+    page: u32,
+    page_size: u32,
+) -> rusqlite::Result<HistorySearchResult> {
+    const MATCHES: &str = r"content LIKE ?1 ESCAPE '\' OR raw_content LIKE ?1 ESCAPE '\'";
+
+    let keywords = query
+        .split_whitespace()
+        .map(|word| {
+            word.replace('\\', r"\\")
+                .replace('%', r"\%")
+                .replace('_', r"\_")
+        })
+        .collect::<Vec<_>>()
+        .join("%");
+    if keywords.is_empty() {
+        return Ok(HistorySearchResult {
+            records: Vec::new(),
+            total: 0,
+        });
+    }
+
+    let pattern = format!("%{keywords}%");
+    let limit = page_size.clamp(1, 100);
+    let offset = i64::from(page.saturating_sub(1)) * i64::from(limit);
+
+    // Keep the count and page consistent if a record changes during the search.
+    let tx = conn.transaction()?;
+    let total = tx.query_row(
+        &format!("SELECT COUNT(*) FROM history WHERE {MATCHES}"),
+        [&pattern],
+        |row| row.get(0),
+    )?;
+    let mut stmt = tx.prepare(&format!(
+        "SELECT id, timestamp, content, duration, word_count, raw_content
+         FROM history
+         WHERE {MATCHES}
+         ORDER BY timestamp DESC, id DESC
+         LIMIT ?2 OFFSET ?3"
+    ))?;
+    let records = stmt
+        .query_map(params![pattern, limit, offset], history_record_from_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(HistorySearchResult { records, total })
 }
 
 /// 获取总记录数
@@ -356,4 +429,62 @@ fn rand_number() -> u32 {
 fn get_today_date_string() -> String {
     let now = chrono::Local::now();
     now.format("%Y-%m-%d").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_search_matches_older_records_and_paginates_by_timestamp() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        init_db_schema(&conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO history (id, timestamp, content, duration, word_count, raw_content) VALUES
+                ('original', 1, '整理后的内容', 2, 5, '会议讨论了 Budget'),
+                ('processed', 2, '会议确认了 BUDGET', 2, 5, NULL),
+                ('unrelated', 3, '会议纪要', 2, 4, '其他')",
+        )
+        .unwrap();
+        for timestamp in 4..=105 {
+            conn.execute(
+                "INSERT INTO history (id, timestamp, content, duration, word_count)
+                 VALUES (?1, ?1, '其他记录', 2, 4)",
+                [timestamp],
+            )
+            .unwrap();
+        }
+
+        let first = query_history_search(&mut conn, "  会议  budget  ", 1, 1).unwrap();
+        assert_eq!(first.total, 2);
+        assert_eq!(first.records[0].id, "processed");
+
+        let second = query_history_search(&mut conn, "会议 budget", 2, 1).unwrap();
+        assert_eq!(second.total, 2);
+        assert_eq!(second.records[0].id, "original");
+        assert_eq!(
+            second.records[0].raw_content.as_deref(),
+            Some("会议讨论了 Budget")
+        );
+    }
+
+    #[test]
+    fn history_search_treats_sql_wildcards_as_literal_text() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        init_db_schema(&conn).unwrap();
+        conn.execute_batch(
+            r"INSERT INTO history (id, timestamp, content, duration, word_count) VALUES
+                ('literal', 1, '进度 10%_\ready', 2, 5),
+                ('similar', 2, '进度 100 ready', 2, 5)",
+        )
+        .unwrap();
+
+        let result = query_history_search(&mut conn, r"%_\", 1, 10).unwrap();
+        assert_eq!(result.total, 1);
+        assert_eq!(result.records[0].id, "literal");
+
+        let empty = query_history_search(&mut conn, "没有匹配", 1, 10).unwrap();
+        assert_eq!(empty.total, 0);
+        assert!(empty.records.is_empty());
+    }
 }
