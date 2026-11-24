@@ -47,7 +47,7 @@ ndarray = "0.17"
 rubato = "4"
 audioadapter-buffers = "4"
 anyhow = "1"
-ort = "2.0.0-rc.15"
+ort = "2.0.0-rc.12"
 # Windows 上启用 DirectML GPU 加速 + Whisper
 zip = "2"
 
