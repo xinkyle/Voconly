@@ -163,6 +163,7 @@ export interface AppConfig {
   userDictionary?: UserDictionary;  // 用户词典
   segmentTranscribe?: boolean;  // 分段转录开关（默认 true）
   previewHeight?: PreviewHeight;  // 预览窗口高度档位（默认 low）
+  liveVoiceInput?: boolean;    // 录音期间输入已确认的文字（默认 false）
   tutorialCompleted?: boolean;    // 首次引导是否已完成
   versionInfoUrl?: string;         // 版本信息 URL（用于自动更新检查）
   /** ASR 模型闲置自动卸载时间（秒），默认 300 秒（5 分钟），设置为 0 禁用自动卸载 */
@@ -200,6 +201,7 @@ export interface FloatPanelState {
   skipLlm?: boolean;
   // 分段转录开关（用于控制 VAD 停顿时的状态指示器）
   segmentTranscribe?: boolean;
+  liveVoiceInput?: boolean;
 }
 
 // LLM 错误事件 payload

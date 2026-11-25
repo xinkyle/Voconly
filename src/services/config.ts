@@ -101,6 +101,7 @@ interface RustAppConfig {
   maxRecordingDuration?: number;
   segmentTranscribe?: boolean;
   previewHeight?: 'high' | 'medium' | 'low';
+  liveVoiceInput?: boolean;
   tutorialCompleted?: boolean;
   versionInfoUrl?: string;
   /// ASR 模型闲置自动卸载时间（秒）
@@ -268,6 +269,7 @@ function convertConfigFromRust(rust: RustAppConfig): AppConfig {
     maxRecordingDuration: rust.maxRecordingDuration,
     segmentTranscribe: rust.segmentTranscribe,
     previewHeight: rust.previewHeight,
+    liveVoiceInput: rust.liveVoiceInput ?? false,
     tutorialCompleted: rust.tutorialCompleted,
     versionInfoUrl: rust.versionInfoUrl,
     // ASR 模型闲置自动卸载时间
@@ -318,6 +320,7 @@ function convertConfigToRust(config: AppConfig): RustAppConfig {
     maxRecordingDuration: config.maxRecordingDuration,
     segmentTranscribe: config.segmentTranscribe ?? true,
     previewHeight: config.previewHeight,
+    liveVoiceInput: config.liveVoiceInput ?? false,
     tutorialCompleted: config.tutorialCompleted,
     versionInfoUrl: config.versionInfoUrl,
     // ASR 模型闲置自动卸载时间

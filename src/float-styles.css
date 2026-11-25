@@ -493,6 +493,14 @@ body {
 }
 
 /* Waveform - inline */
+.live-voice-waveform {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .waveform-container {
   display:flex;
   align-items:center;
@@ -523,6 +531,23 @@ body {
   background: rgba(128, 128, 128, 0.6);
   /* 不播放动画，保持静态 */
   animation: none;
+}
+
+.live-voice-waveform .waveform-container {
+  margin: 0;
+}
+
+.live-voice-waveform .wave-bar {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+.live-voice-waveform .wave-bar.active {
+  background: #fff;
+}
+
+.live-voice-waveform .wave-bar.unavailable {
+  background: #a1a1aa;
 }
 
 .wave-bar:nth-child(1) {

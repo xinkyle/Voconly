@@ -7,6 +7,7 @@
 
 mod capture;
 mod decoder;
+mod ordered_final_text;
 mod silero;
 mod stream_router;
 mod streaming;
@@ -18,7 +19,7 @@ pub use decoder::{get_audio_info, decode_audio_file, AudioInfo, DecoderError};
 pub use silero::SileroVad;
 pub use stream_router::{StreamCmd, StreamRouter};
 pub use streaming::{
-    drain_until_finalize, emit_streaming_text, run_stream_worker, StreamingErrorEvent,
+    drain_until_finalize, emit_streaming_text, StreamingErrorEvent,
     StreamingTextEvent, StreamingTranscription,
 };
 pub use streaming_decoder::StreamingDecoder;

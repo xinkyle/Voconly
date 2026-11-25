@@ -25,9 +25,9 @@ interface UseRecorderOptions {
   /** Callback when recording starts */
   onRecordingStarted?: () => void;
   /** Callback when recording stops with audio data (null in VAD mode since audio is processed during recording) */
-  onRecordingStopped?: (audioData: AudioData | null) => void;
+  onRecordingStopped?: (audioData: AudioData | null, liveSessionId?: number) => void | Promise<void>;
   /** Callback when an error occurs */
-  onError?: (error: string) => void;
+  onError?: (error: string, stoppedLiveSessionId?: number) => void | Promise<void>;
   /** Use VAD-based recording from Rust backend (default: true) */
   useVad?: boolean;
 }
@@ -38,9 +38,9 @@ interface UseRecorderReturn {
   /** Whether recording is in progress */
   isRecording: boolean;
   /** Start recording */
-  start: (sceneId?: string) => Promise<boolean>;
+  start: (sceneId?: string, liveSessionId?: number) => Promise<boolean>;
   /** Stop recording and get audio data */
-  stop: () => Promise<AudioData | null>;
+  stop: (liveSessionId?: number) => Promise<AudioData | null>;
   /** Cancel recording and reset state */
   cancel: () => void;
   /** Last recorded audio data */
@@ -90,7 +90,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     setError(null);
   }, []);
 
-  const start = useCallback(async (overrideSceneId?: string): Promise<boolean> => {
+  const start = useCallback(async (overrideSceneId?: string, liveSessionId?: number): Promise<boolean> => {
     clearError();
     const effectiveSceneId = overrideSceneId ?? sceneId;
     const startTime = performance.now();
@@ -101,7 +101,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
         // Use VAD-based recording from Rust backend
         console.log(`[TIMING] [Recorder] 调用 startVadRecording 前 - elapsed: ${performance.now() - startTime}ms`);
         const invokeStart = performance.now();
-        const success = await startVadRecording(effectiveSceneId);
+        const success = await startVadRecording(effectiveSceneId, liveSessionId);
         const invokeEnd = performance.now();
         console.log(`[TIMING] [Recorder] 调用 startVadRecording 后 - elapsed: ${performance.now() - startTime}ms (invoke耗时: ${invokeEnd - invokeStart}ms)`);
 
@@ -112,6 +112,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
           return false;
         }
 
+        statusRef.current = 'recording';
         setStatus('recording');
         log.debug('Recording started successfully');
         onRecordingStartedRef.current?.();
@@ -157,7 +158,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
     }
   }, [maxDuration, deviceId, sceneId, clearError, useVad]);
 
-  const stop = useCallback(async (): Promise<AudioData | null> => {
+  const stop = useCallback(async (liveSessionId?: number): Promise<AudioData | null> => {
     clearError();
 
     // Use ref to get current status (avoids closure stale state)
@@ -174,13 +175,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
         // Stop VAD recording - audio is saved asynchronously by backend
         // Frontend does not need to read the file (audio already processed during recording)
         log.debug('Stopping VAD recording...');
-        await stopVadRecording();
+        await stopVadRecording(liveSessionId);
         log.debug('VAD recording stopped (audio saved asynchronously to User Data/last_recording.wav)');
 
         // In VAD mode, audio is already processed during recording via streaming transcription
         // No need to read file or create blob
+        statusRef.current = 'idle';
         setStatus('idle');
-        onRecordingStoppedRef.current?.(null);  // Pass null - audio already processed
+        const completed = onRecordingStoppedRef.current?.(null, liveSessionId);
+        if (liveSessionId !== undefined) await completed;
         return null;
       } else {
         // Use web-based recording (legacy)
@@ -210,7 +213,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
       const errorMessage = err instanceof Error ? err.message : String(err);
       log.error(`Error in stop(): ${errorMessage}`);
       setError(errorMessage);
-      onErrorRef.current?.(errorMessage);
+      const handled = onErrorRef.current?.(errorMessage, liveSessionId);
+      if (liveSessionId !== undefined) await handled;
+      statusRef.current = 'idle';
       setStatus('idle');
       return null;
     }
@@ -219,6 +224,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderReturn
   // Cancel recording - reset state without triggering callbacks
   const cancel = useCallback((): void => {
     log.debug('cancel() called, resetting recorder state');
+    statusRef.current = 'idle';
     setStatus('idle');
     setError(null);
     // Don't trigger any callbacks - just reset state

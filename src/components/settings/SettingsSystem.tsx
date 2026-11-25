@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AudioLines } from 'lucide-react';
 import { enableAutostart, disableAutostart } from '../../services/autostart';
 import { getMicrophones, requestMicrophonePermission } from '../../services/audio';
 import { invoke } from '../../utils/tauri';
@@ -19,6 +20,8 @@ interface SettingsSystemProps {
 
 export default function SettingsSystem({ config, onSave }: SettingsSystemProps) {
   const { t, i18n } = useTranslation();
+  const liveVoiceInputId = useId();
+  const liveVoiceInput = config.liveVoiceInput ?? false;
   const [autostartEnabled, setAutostartEnabled] = useState<boolean>(config.autoStart ?? true);
   const [minimizeToTray, setMinimizeToTray] = useState<boolean>(config.minimizeToTrayOnStartup ?? true);
   const [checkUpdates, setCheckUpdates] = useState<boolean>(config.checkUpdates ?? false);
@@ -400,6 +403,38 @@ export default function SettingsSystem({ config, onSave }: SettingsSystemProps) 
               { id: 'low', name: t('settings.system.previewHeightLow') },
             ]}
           />
+        </div>
+
+        {/* Live voice input setting */}
+        <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 transition-all duration-200 ${
+          liveVoiceInput ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+        }`}>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3 shrink-0">
+              <AudioLines aria-hidden="true" className={`w-4 h-4 ${liveVoiceInput ? 'text-gray-900' : 'text-gray-500'}`} />
+            </div>
+            <div>
+              <p id={liveVoiceInputId} className="font-semibold text-sm text-gray-900">{t('settings.system.liveVoiceInput')}</p>
+              <p id={`${liveVoiceInputId}-description`} className="text-xs text-gray-500">{t('settings.system.liveVoiceInputDesc')}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={liveVoiceInput}
+            aria-labelledby={liveVoiceInputId}
+            aria-describedby={`${liveVoiceInputId}-description`}
+            onClick={() => onSave({ ...config, liveVoiceInput: !liveVoiceInput })}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 ${
+              liveVoiceInput ? 'bg-gray-700' : 'bg-gray-200'
+            } cursor-pointer`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                liveVoiceInput ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
 
         {/* Microphone setting */}

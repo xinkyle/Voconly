@@ -42,6 +42,8 @@
       "previewHeightHigh": "高",
       "previewHeightMedium": "中",
       "previewHeightLow": "低",
+      "liveVoiceInput": "实时语音输入",
+      "liveVoiceInputDesc": "录音时将识别文字输入到光标处，跳过 AI 后处理。",
       "defaultMic": "默认麦克风",
       "defaultMicDesc": "推荐使用第三方麦克风，加载更快、识别更准确",
       "autoMic": "自动（跟随系统）",
@@ -434,7 +436,9 @@
     "residentModeDisabled": "已关闭常驻模式",
     "modelNotInMemory": "模型未在内存中",
     "modelNotLoaded": "{{name}} 当前未加载到内存",
-    "modelDownloading": "「{{name}}」正在下载中，请稍后再试"
+    "modelDownloading": "「{{name}}」正在下载中，请稍后再试",
+    "liveVoiceInputInterrupted": "实时语音输入已中断",
+    "liveVoiceInputHistory": "识别结果可在历史记录中复制。"
   },
   "common": {
     "loading": "加载中...",
