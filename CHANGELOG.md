@@ -1,4 +1,24 @@
 # Changelog
+## [0.5.31] - 2026-11-26
+
+### 问题修复
+1. **修复 Windows 记事本等 Edit 控件间歇性无法自动插入文字的问题**，改用原生 Edit 消息直接插入文字，完全绕过剪贴板，彻底解决剪贴板时序竞争导致的粘贴失败。
+
+2. **修复剪贴板粘贴时序问题**，非标准 Edit 控件场景下增加剪贴板稳定检测、修饰键等待和静默时间保障，避免按键发送过快导致粘贴失败。
+
+3. **改进交付状态反馈**，区分已确认、已提交、未提交、不确定四种状态，用户可明确知道文字是否成功插入，而非误导性的成功提示。
+
+---
+
+### Bug Fixes
+1. **Fixed intermittent text insertion failure in Windows Notepad and other Edit controls** - Switched to native Edit messages for direct insertion, completely bypassing the clipboard and eliminating clipboard timing race conditions that caused paste failures.
+
+2. **Fixed clipboard paste timing issue** - For non-standard Edit controls, added clipboard stability detection, modifier key waiting, and quiet time guarantees to prevent paste failures caused by keystrokes being sent too quickly.
+
+3. **Improved delivery status feedback** - Distinguished between Confirmed, Submitted, Not Submitted, and Uncertain states, allowing users to know clearly whether text was successfully inserted instead of misleading success messages.
+
+===
+
 ## [0.5.30] - 2026-11-24
 
 ### 新功能
