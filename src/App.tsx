@@ -30,7 +30,7 @@ import {
   logOverallPerformance,
   getAllStats,
 } from './services/performance';
-import { typeTextSafe } from './services/keyboard';
+import { typeTextSafe, type InputOutcome } from './services/keyboard';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory, deleteHistoryRecord } from './services/history';
 import { checkModelExists } from './services/downloader';
@@ -979,6 +979,18 @@ function App() {
   const isWorkflowRunningRef = useRef(false);
 
   // Complete Talk Free workflow: recording -> transcription -> typing
+  const reportTextDelivery = useCallback((result: InputOutcome) => {
+    log.info(`[Text delivery] status=${result.status}, method=${result.method}, reason=${result.reason || ''}`);
+    if (result.status === 'not_submitted' || result.status === 'uncertain') {
+      if (result.reason?.includes('ACCESSIBILITY_DENIED')) return;
+      showToast({
+        type: 'warning',
+        title: t(result.status === 'uncertain' ? 'textInput.uncertain' : 'textInput.failed'),
+        description: t(result.clipboardAvailable ? 'textInput.clipboardRecovery' : 'textInput.historyRecovery'),
+      });
+    }
+  }, [showToast, t]);
+
   const runVoiceWorkflow = useCallback(async (scene: Scene, audioData?: { duration: number } | null) => {
     // Prevent duplicate workflow runs
     if (isWorkflowRunningRef.current) {
@@ -1280,11 +1292,6 @@ function App() {
       if (llmFailed || llmFailedTextTooLong) {
         // 输出原文（fallback）
         const result = await typeTextSafe(recognizedText);
-        if (result.success) {
-          log.info('[LLM Failed] Original text inserted successfully');
-        } else {
-          log.error(`[LLM Failed] Text insertion failed: ${result.error}`);
-        }
 
         // 历史记录保存
         const currentRecorder = recorderRef.current;
@@ -1300,6 +1307,7 @@ function App() {
           wordCount,
         });
         setHistory(prev => [newRecord, ...prev]);
+        reportTextDelivery(result);
         log.debug(`Saved to history: ${JSON.stringify(newRecord)}`);
 
         // 通知首页刷新统计数据
@@ -1327,30 +1335,16 @@ function App() {
       // 使用预览文字作为 recognizedText（用于历史记录）
       recognizedText = previewText;
 
+      let deliveryResult: InputOutcome;
       if (llmResult.processed && llmResult.text) {
         // 有 LLM：仅输出 LLM 结果（不输出预览原文）
-        log.info(`[Segment Transcribe] LLM processed, outputting only LLM result: "${llmResult.text}"`);
-        const result = await typeTextSafe(llmResult.text);
-        if (result.success) {
-          log.info('[Segment Transcribe] LLM text inserted successfully');
-        } else {
-          log.error(`[Segment Transcribe] LLM text insertion failed: ${result.error}`);
-          // LLM 失败时 fallback：输出预览原文
-          log.info('[Segment Transcribe] Fallback: outputting preview text instead');
-          const fallbackResult = await typeTextSafe(previewText);
-          if (!fallbackResult.success) {
-            log.error(`[Segment Transcribe] Fallback insertion also failed: ${fallbackResult.error}`);
-          }
-        }
+        log.info(`[Segment Transcribe] Delivering LLM result: ${llmResult.text.length} chars`);
+        deliveryResult = await typeTextSafe(llmResult.text);
+        // Delivery errors cannot prove nothing was inserted; never retry with raw text.
       } else {
         // 无 LLM：直接输出预览原文
-        log.info(`[Segment Transcribe] No LLM, outputting preview text: "${previewText}"`);
-        const result = await typeTextSafe(previewText);
-        if (result.success) {
-          log.info('[Segment Transcribe] Preview text inserted successfully');
-        } else {
-          log.error(`[Segment Transcribe] Preview text insertion failed: ${result.error}`);
-        }
+        log.info(`[Segment Transcribe] Delivering preview: ${previewText.length} chars`);
+        deliveryResult = await typeTextSafe(previewText);
       }
 
       // 历史记录保存（根据是否有 LLM 处理决定保存内容）
@@ -1372,6 +1366,7 @@ function App() {
       });
       stepStart = recordTime('历史记录保存', stepStart);
       setHistory(prev => [newRecord, ...prev]);
+      reportTextDelivery(deliveryResult);
       log.debug(`Saved to history: ${JSON.stringify(newRecord)}`);
 
       // 通知首页刷新统计数据
@@ -1419,7 +1414,7 @@ function App() {
       isWorkflowRunningRef.current = false;
       log.debug('Workflow completed');
     }
-  }, [showFloatPanelStatus, hideFloatPanelStatus, config]);
+  }, [showFloatPanelStatus, hideFloatPanelStatus, config, reportTextDelivery]);
 
   // Keep track of shortcut processing state
   const isProcessingShortcutRef = useRef(false);

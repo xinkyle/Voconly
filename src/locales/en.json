@@ -1,4 +1,10 @@
 {
+  "textInput": {
+    "failed": "Automatic insertion was not performed",
+    "uncertain": "Insertion could not be confirmed. Check the text field first.",
+    "clipboardRecovery": "The result is in your clipboard and history. Paste manually after checking it was not inserted.",
+    "historyRecovery": "The result is in your history and can be copied from there."
+  },
   "app": {
     "name": "Voconly",
     "loading": "Loading...",

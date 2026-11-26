@@ -1,4 +1,10 @@
 {
+  "textInput": {
+    "failed": "自动插入未执行",
+    "uncertain": "无法确认文字是否已插入，请先检查输入框",
+    "clipboardRecovery": "结果已保留在剪贴板和历史记录中；确认未插入后，可手动粘贴。",
+    "historyRecovery": "结果已保留在历史记录中，可从历史记录复制。"
+  },
   "app": {
     "name": "Voconly",
     "loading": "应用正在加载...",

@@ -19,7 +19,9 @@ use tauri::{
     WebviewWindow,
 };
 
+#[cfg(not(windows))]
 use arboard::Clipboard;
+#[cfg(target_os = "macos")]
 use enigo::{Enigo, Key, Keyboard, Settings};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_log::{Builder, RotationStrategy, Target, TargetKind};
@@ -51,6 +53,7 @@ mod paths;
 mod performance;
 mod permissions;
 mod presets;
+mod text_input;
 mod updater;
 mod utils; // Crash report module for enhanced crash tracking
 
@@ -520,8 +523,32 @@ fn check_signature_changed() -> bool {
     permissions::check_signature_changed()
 }
 
+#[cfg(windows)]
 #[tauri::command]
-async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
+async fn simulate_input(app: AppHandle, text: String) -> Result<text_input::InputOutcome, String> {
+    use text_input::{InputOutcome, InputStatus, windows::InputTarget};
+    let start = Instant::now();
+    info!("[simulate_input] START chars={}", text.chars().count());
+    let target = match InputTarget::capture() {
+        Ok(target) => target,
+        Err(reason) => {
+            warn!("[simulate_input] NOT_SUBMITTED reason={reason}");
+            return Ok(InputOutcome::new(InputStatus::NotSubmitted, "none", Some(reason), false));
+        }
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let _guard = state.clipboard_lock.lock().map_err(|error| error.to_string())?;
+        let outcome = text_input::windows::insert_text(&text, target, is_terminal_window());
+        info!("[simulate_input] END status={:?} method={} reason={:?} clipboard_available={} elapsed_ms={}",
+            outcome.status, outcome.method, outcome.reason, outcome.clipboard_available, start.elapsed().as_millis());
+        Ok(outcome)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn simulate_input(app: AppHandle, text: String) -> Result<text_input::InputOutcome, String> {
     let start_time = std::time::Instant::now();
     let thread_id = std::thread::current().id();
     info!(
@@ -630,76 +657,6 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
         info!("[simulate_input] Paste operation completed");
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
-            error!("[simulate_input] FAILED to create enigo instance: {}", e);
-            format!("Failed to create enigo instance: {}", e)
-        })?;
-
-        if is_terminal {
-            // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
-            // Ctrl+V doesn't work in these environments
-            info!("[simulate_input] Using Shift+Insert for terminal");
-
-            enigo
-                .key(Key::Shift, enigo::Direction::Press)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to press Shift: {}", e);
-                    format!("Failed to press Shift: {}", e)
-                })?;
-
-            std::thread::sleep(std::time::Duration::from_millis(30));
-
-            enigo
-                .key(Key::Insert, enigo::Direction::Click)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to click Insert: {}", e);
-                    format!("Failed to click Insert: {}", e)
-                })?;
-
-            std::thread::sleep(std::time::Duration::from_millis(30));
-
-            enigo
-                .key(Key::Shift, enigo::Direction::Release)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to release Shift: {}", e);
-                    format!("Failed to release Shift: {}", e)
-                })?;
-        } else {
-            // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
-            // This avoids the Insert key "overwrite mode" issue
-            info!("[simulate_input] Using Ctrl+V for regular application");
-
-            enigo
-                .key(Key::Control, enigo::Direction::Press)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to press Control: {}", e);
-                    format!("Failed to press Control: {}", e)
-                })?;
-
-            std::thread::sleep(std::time::Duration::from_millis(30));
-
-            enigo
-                .key(Key::Unicode('v'), enigo::Direction::Click)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to click V: {}", e);
-                    format!("Failed to click V: {}", e)
-                })?;
-
-            std::thread::sleep(std::time::Duration::from_millis(30));
-
-            enigo
-                .key(Key::Control, enigo::Direction::Release)
-                .map_err(|e| {
-                    error!("[simulate_input] FAILED to release Control: {}", e);
-                    format!("Failed to release Control: {}", e)
-                })?;
-        }
-
-        info!("[simulate_input] Paste operation completed");
-    }
-
     // 4. Restore old clipboard content after a delay
     if let Some(old_text) = old_clipboard {
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -739,10 +696,10 @@ async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
 
     let elapsed = start_time.elapsed();
     info!(
-        "[simulate_input] END - SUCCESS, total time: {}ms",
+        "[simulate_input] END - SUBMITTED (unverified), total time: {}ms",
         elapsed.as_millis()
     );
-    Ok(())
+    Ok(text_input::InputOutcome::new(text_input::InputStatus::Submitted, "keyboard", None, false))
 }
 
 #[tauri::command]
