@@ -73,7 +73,6 @@ type RecorderStatus = 'idle' | 'recording' | 'transcribing' | 'typing';
 interface FloatPanelState {
   visible: boolean;
   status: RecorderStatus;
-  liveVoiceInput?: boolean;
   sceneName?: string;
   text?: string;
   modelId?: string;
@@ -88,10 +87,6 @@ interface FloatPanelState {
   skipLlm?: boolean;
   // 分段转录开关（用于控制 VAD 停顿时的状态指示器）
   segmentTranscribe?: boolean;
-}
-
-interface FloatPanelUpdate extends FloatPanelState {
-  panelRevision: number;
 }
 
 interface VadStatus {
@@ -229,32 +224,6 @@ export default function FloatPanelApp() {
   log.debug('Component rendering...');
 
   const { t } = useTranslation();
-  const panelRef = useRef<FloatPanelUpdate | null>(null);
-  const getPreviewRevision = useCallback(() => {
-    const panel = panelRef.current;
-    return panel?.visible && !panel.liveVoiceInput ? panel.panelRevision : undefined;
-  }, []);
-  const resizePreviewAfterPaint = useCallback((
-    expanded: boolean,
-    previewHeight: string | null,
-    onResized: () => void,
-    onError: (error: unknown) => void,
-  ) => {
-    const panelRevision = getPreviewRevision();
-    if (panelRevision === undefined) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (getPreviewRevision() !== panelRevision) return;
-        invoke('set_float_panel_height', { expanded, previewHeight, panelRevision })
-          .then(() => {
-            if (getPreviewRevision() === panelRevision) onResized();
-          })
-          .catch(error => {
-            if (getPreviewRevision() === panelRevision) onError(error);
-          });
-      });
-    });
-  }, [getPreviewRevision]);
 
   const dragRef = useRef<{
     pointerId: number;
@@ -262,8 +231,7 @@ export default function FloatPanelApp() {
   } | null>(null);
 
   const handleDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    const revision = getPreviewRevision();
-    if (event.button !== 0 || dragRef.current || revision === undefined) return;
+    if (event.button !== 0 || dragRef.current) return;
     event.preventDefault();
     // Keep receiving movement/release outside the grip, without focusing it.
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -275,14 +243,8 @@ export default function FloatPanelApp() {
           const [position, scale] = await Promise.all([panel.outerPosition(), panel.scaleFactor()]);
           return position.toLogical(scale);
         },
-        moveWindow: async position => {
-          if (getPreviewRevision() === revision) {
-            await panel.setPosition(new LogicalPosition(position.x, position.y));
-          }
-        },
-        save: async () => {
-          if (getPreviewRevision() === revision) await invoke('save_float_panel_position');
-        },
+        moveWindow: position => panel.setPosition(new LogicalPosition(position.x, position.y)),
+        save: () => invoke('save_float_panel_position'),
       }),
     };
   };
@@ -361,7 +323,6 @@ export default function FloatPanelApp() {
   // 折叠：先隐藏文字 → 空预览区占位 → 窗口变小 → 隐藏预览区
   // 展开：先显示空预览区占位 → 窗口变大 → 显示文字
   const togglePreviewCollapsed = useCallback(() => {
-    if (getPreviewRevision() === undefined) return;
     const newValue = !previewCollapsed;
 
     try {
@@ -378,36 +339,48 @@ export default function FloatPanelApp() {
       log.debug(`[预览折叠] 文字已隐藏，准备收缩窗口`);
 
       // 延迟调窗口（等 React 渲染完成，文字已从 DOM 消失）
-      resizePreviewAfterPaint(false, null, () => {
-        log.debug(`[窗口高度] 窗口已变小，现在隐藏预览区`);
-        setPreviewCollapsed(true);     // 隐藏预览区
-        setShouldShowPreviewText(true); // 恢复文字显示状态（下次展开时可用）
-      }, (e) => {
-        log.error(`[窗口高度] 切换失败: ${e}`);
-        // 失败时也恢复状态
-        setPreviewCollapsed(true);
-        setShouldShowPreviewText(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          invoke('set_float_panel_height', { expanded: false, previewHeight: null })
+            .then(() => {
+              log.debug(`[窗口高度] 窗口已变小，现在隐藏预览区`);
+              setPreviewCollapsed(true);     // 隐藏预览区
+              setShouldShowPreviewText(true); // 恢复文字显示状态（下次展开时可用）
+            })
+            .catch((e) => {
+              log.error(`[窗口高度] 切换失败: ${e}`);
+              // 失败时也恢复状态
+              setPreviewCollapsed(true);
+              setShouldShowPreviewText(true);
+            });
+        });
       });
     } else {
       // 展开：先显示空预览区占位，调窗口变大，再显示文字
       setShouldShowPreviewText(false);  // 隐藏文字
       setIsExpandingWindow(true);       // 显示空预览区占位
 
-      resizePreviewAfterPaint(true, getPreviewHeight(), () => {
-        log.debug(`[窗口高度] 切换为展开模式`);
-        // 窗口变大后，显示文字并取消展开状态
-        setPreviewCollapsed(false);
-        setIsExpandingWindow(false);
-        setShouldShowPreviewText(true);
-      }, (e) => {
-        log.error(`[窗口高度] 切换失败: ${e}`);
-        // 失败时也恢复状态
-        setPreviewCollapsed(false);
-        setIsExpandingWindow(false);
-        setShouldShowPreviewText(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
+            .then(() => {
+              log.debug(`[窗口高度] 切换为展开模式`);
+              // 窗口变大后，显示文字并取消展开状态
+              setPreviewCollapsed(false);
+              setIsExpandingWindow(false);
+              setShouldShowPreviewText(true);
+            })
+            .catch((e) => {
+              log.error(`[窗口高度] 切换失败: ${e}`);
+              // 失败时也恢复状态
+              setPreviewCollapsed(false);
+              setIsExpandingWindow(false);
+              setShouldShowPreviewText(true);
+            });
+        });
       });
     }
-  }, [previewCollapsed, getPreviewRevision, resizePreviewAfterPaint]);
+  }, [previewCollapsed]);
 
   // 更新显示文本（从 segments Map 合并）
   // 注意：这个函数用于 Final 事件更新，Partial 事件有自己的展开逻辑
@@ -531,6 +504,12 @@ export default function FloatPanelApp() {
     log.debug(`[ProgressSync] progress=${progress.toFixed(2)}%`);
   }, [progress]);
 
+  // 同步 status 到 ref（用于事件处理器中检查当前状态）
+  useEffect(() => {
+    statusRef.current = state.status;
+    log.debug(`[StatusRef] Status updated: ${state.status}`);
+  }, [state.status]);
+
   // 同步 skipLlm 到 ref（用于动画中判断是否双击跳过）
   useEffect(() => {
     skipLlmRef.current = state.skipLlm || false;
@@ -602,16 +581,9 @@ export default function FloatPanelApp() {
     const unlistenPromises: Promise<(() => void)>[] = [];
 
     unlistenPromises.push(
-      listen<FloatPanelUpdate>('float-panel-update', (event) => {
+      listen<FloatPanelState>('float-panel-update', (event) => {
         log.debug(`Received float-panel-update: ${JSON.stringify(event.payload)}`);
         const newState = event.payload;
-        const newSession = newState.panelRevision !== panelRef.current?.panelRevision;
-        panelRef.current = newState;
-        statusRef.current = newState.status;
-        if (newSession) {
-          dragRef.current = null;
-          setIsMicrophoneInitializing(true);
-        }
 
         // 【调试】记录接收到的 status 值
         log.debug(`[StatusDebug] Received status: "${newState.status}" (type: ${typeof newState.status})`);
@@ -636,14 +608,13 @@ export default function FloatPanelApp() {
 
         setState(prev => {
           log.debug(`[STATE] prev.status="${prev.status}", prev.isTranscribing=${prev.isTranscribing} → new.status="${newState.status}", new.isTranscribing=${newState.isTranscribing}`);
-          if (newState.visible && newSession) {
+          if (newState.visible && !prev.visible) {
             setIsHiding(false);
             // 新录音开始时，清除所有旧状态，确保干净的初始状态
             setLlmError({ visible: false, error: '', originalTextOutput: false });
             setPreviewVisible(false);
             setPreviewText('');
             setIsExpandingWindow(false); // 重置窗口展开状态
-            setHideStatusBar(false);
             pendingTextRef.current = ''; // 清空待填充文字
             setShouldShowPreviewText(true); // 重置文字显示状态
             setProgress(0);
@@ -668,6 +639,7 @@ export default function FloatPanelApp() {
             // 【修复】新录音开始时，假设麦克风正在初始化，显示"未准备好"状态
             // 避免"准备好 → 未准备好 → 准备好"的闪烁
             // 当收到 recording-started 事件后，会切换为"准备好"
+            setIsMicrophoneInitializing(true);
             log.debug('[MicInit] 新录音开始，设置 isMicrophoneInitializing=true（假设麦克风正在初始化）');
             // 【Session ID 模式】结束当前会话，旧动画自动过期
             sessionRef.current = null;
@@ -684,7 +656,7 @@ export default function FloatPanelApp() {
           }
           // 只在真正开始新转录任务时重置进度（从其他状态变为 transcribing）
           // ASR完成后的更新事件不会触发重置，进度保持不变，仅更新预估时间
-          if (!newState.liveVoiceInput && prev.status !== 'transcribing' && newState.status === 'transcribing') {
+          if (prev.status !== 'transcribing' && newState.status === 'transcribing') {
             setProgress(0);
             progressRef.current = 0;
             llmCompleteReceivedRef.current = false;
@@ -699,16 +671,7 @@ export default function FloatPanelApp() {
     );
 
     unlistenPromises.push(
-      listen<number>('float-panel-hide', (event) => {
-        const panel = panelRef.current;
-        if (!panel || panel.panelRevision !== event.payload) return;
-        panelRef.current = { ...panel, visible: false };
-        if (panel.liveVoiceInput) {
-          setState(prev => ({ ...prev, visible: false }));
-          setVoiceDetected(false);
-          setIsMicrophoneInitializing(false);
-          return;
-        }
+      listen<void>('float-panel-hide', () => {
         const currentProgress = progressRef.current;
         const currentStatus = statusRef.current; // 使用 ref 获取最新状态
         const currentSession = sessionRef.current;
@@ -735,7 +698,6 @@ export default function FloatPanelApp() {
         const delay = currentProgress < 100 ? 70 : 100;
 
         setTimeout(() => {
-          if (panelRef.current?.panelRevision !== panel.panelRevision) return;
           log.debug(`[HIDE-EVENT] Executing hide timeout cleanup`);
           setState(prev => ({ ...prev, visible: false }));
           setIsHiding(false);
@@ -763,7 +725,6 @@ export default function FloatPanelApp() {
 
     unlistenPromises.push(
       listen<VadStatus>('vad-status', (event) => {
-        if (!panelRef.current?.visible || statusRef.current !== 'recording') return;
         console.log(`[TIMING] [FloatPanel] 收到 vad-status 事件 - at: ${Date.now()}ms, isVoice: ${event.payload.isVoice}`);
         log.debug(`Received vad-status: ${JSON.stringify(event.payload)}`);
         setVoiceDetected(event.payload.isVoice);
@@ -798,7 +759,6 @@ export default function FloatPanelApp() {
     // 监听音频缓存状态事件（短片段进入 pending_buffer）
     unlistenPromises.push(
       listen<AudioBufferStatus>('audio-buffered', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`[AudioBuffer] Received audio-buffered: ${JSON.stringify(event.payload)}`);
         setIsAudioBuffered(true);
         isAudioBufferedRef.current = true;
@@ -811,7 +771,6 @@ export default function FloatPanelApp() {
     // 监听音频释放事件（pending_buffer 被合并并发送）
     unlistenPromises.push(
       listen<AudioBufferStatus>('audio-released', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`[AudioBuffer] Received audio-released: ${JSON.stringify(event.payload)}`);
         setIsAudioBuffered(false);
         isAudioBufferedRef.current = false;
@@ -825,7 +784,6 @@ export default function FloatPanelApp() {
     // 后端 Worker 转录完成后发送此事件
     unlistenPromises.push(
       listen<{ text: string; duration: number }>('transcription-result', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`[状态指示器] Received transcription-result: ${event.payload.text.length} chars, setting isAwaitingTranscribe=false`);
         // 转录完成，立即结束等待状态，绿点变回红色
         setIsAwaitingTranscribe(false);
@@ -838,7 +796,6 @@ export default function FloatPanelApp() {
     // 监听 LLM 进度事件（只用于结束信号）
     unlistenPromises.push(
       subscribeToLlmProgress((event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`Received llm-progress: stage=${event.stage}`);
 
         if (event.stage === 'complete') {
@@ -857,7 +814,6 @@ export default function FloatPanelApp() {
     // 监听预览文字更新事件
     unlistenPromises.push(
       listen<PreviewTextPayload>('preview-text-update', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`Received preview-text-update: ${event.payload.fullText.length} chars, current status: ${statusRef.current}, previewVisible: ${previewVisibleRef.current}`);
 
         // 如果当前状态是 transcribing，说明用户已停止录音正在等待输出
@@ -891,28 +847,34 @@ export default function FloatPanelApp() {
             setIsAwaitingTranscribe(false);
 
             // 延迟调窗口（等 React 渲染完成，两帧确保 DOM 更新）
-            resizePreviewAfterPaint(true, getPreviewHeight(), () => {
-              log.debug(`[窗口高度] 窗口已变大，现在填充文字`);
-              // 窗口变大后，从暂存区填充文字到 DOM
-              const pendingText = pendingTextRef.current;
-              if (pendingText) {
-                setPreviewText(pendingText);
-                setPreviewVisible(true);
-                pendingTextRef.current = ''; // 清空暂存
-              }
-              setIsExpandingWindow(false);
-              setShouldShowPreviewText(true); // 显示文字
-            }, (e) => {
-              log.error(`[窗口高度] 自动展开失败: ${e}`);
-              // 失败时也填充文字（降级处理）
-              const pendingText = pendingTextRef.current;
-              if (pendingText) {
-                setPreviewText(pendingText);
-                setPreviewVisible(true);
-                pendingTextRef.current = '';
-              }
-              setIsExpandingWindow(false);
-              setShouldShowPreviewText(true); // 显示文字
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
+                  .then(() => {
+                    log.debug(`[窗口高度] 窗口已变大，现在填充文字`);
+                    // 窗口变大后，从暂存区填充文字到 DOM
+                    const pendingText = pendingTextRef.current;
+                    if (pendingText) {
+                      setPreviewText(pendingText);
+                      setPreviewVisible(true);
+                      pendingTextRef.current = ''; // 清空暂存
+                    }
+                    setIsExpandingWindow(false);
+                    setShouldShowPreviewText(true); // 显示文字
+                  })
+                  .catch((e) => {
+                    log.error(`[窗口高度] 自动展开失败: ${e}`);
+                    // 失败时也填充文字（降级处理）
+                    const pendingText = pendingTextRef.current;
+                    if (pendingText) {
+                      setPreviewText(pendingText);
+                      setPreviewVisible(true);
+                      pendingTextRef.current = '';
+                    }
+                    setIsExpandingWindow(false);
+                    setShouldShowPreviewText(true); // 显示文字
+                  });
+              });
             });
             // 提前返回，等窗口变大后再处理文字
             return;
@@ -983,7 +945,6 @@ export default function FloatPanelApp() {
     // 监听 LLM 错误事件
     unlistenPromises.push(
       listen<LlmErrorPayload>('llm-error', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`Received llm-error: ${event.payload.error}`);
         setLlmError({
           visible: true,
@@ -1000,7 +961,6 @@ export default function FloatPanelApp() {
     console.log('[STREAMING-DEBUG] 注册 streaming-text-update 事件监听器...');
     unlistenPromises.push(
       listen<StreamingTextEvent>('streaming-text-update', (event) => {
-        if (getPreviewRevision() === undefined) return;
         // 使用 console.log 确保日志显示
         //console.log(`[STREAMING] ✅✅✅ Received streaming-text-update: ${JSON.stringify(event.payload)}`);
         //log.info(`[STREAMING] Received streaming-text-update: ${event.payload.displayText.length} chars, isFinal=${event.payload.isFinal}`);
@@ -1022,26 +982,32 @@ export default function FloatPanelApp() {
             log.info(`[STREAMING] 窗口展开开始，文字暂存: ${event.payload.displayText.length} chars`);
 
             // 延迟调窗口（等 React 渲染完成，两帧确保 DOM 更新）
-            resizePreviewAfterPaint(true, getPreviewHeight(), () => {
-              log.info(`[STREAMING] 窗口已变大，现在填充文字`);
-              const pendingText = pendingTextRef.current;
-              if (pendingText) {
-                setPreviewText(pendingText);
-                setPreviewVisible(true);
-                pendingTextRef.current = '';
-              }
-              setIsExpandingWindow(false);
-              setShouldShowPreviewText(true);
-            }, (e) => {
-              log.error(`[STREAMING] 自动展开失败: ${e}`);
-              const pendingText = pendingTextRef.current;
-              if (pendingText) {
-                setPreviewText(pendingText);
-                setPreviewVisible(true);
-                pendingTextRef.current = '';
-              }
-              setIsExpandingWindow(false);
-              setShouldShowPreviewText(true);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
+                  .then(() => {
+                    log.info(`[STREAMING] 窗口已变大，现在填充文字`);
+                    const pendingText = pendingTextRef.current;
+                    if (pendingText) {
+                      setPreviewText(pendingText);
+                      setPreviewVisible(true);
+                      pendingTextRef.current = '';
+                    }
+                    setIsExpandingWindow(false);
+                    setShouldShowPreviewText(true);
+                  })
+                  .catch((e) => {
+                    log.error(`[STREAMING] 自动展开失败: ${e}`);
+                    const pendingText = pendingTextRef.current;
+                    if (pendingText) {
+                      setPreviewText(pendingText);
+                      setPreviewVisible(true);
+                      pendingTextRef.current = '';
+                    }
+                    setIsExpandingWindow(false);
+                    setShouldShowPreviewText(true);
+                  });
+              });
             });
             return;
           }
@@ -1060,7 +1026,6 @@ export default function FloatPanelApp() {
     // 流式错误事件
     unlistenPromises.push(
       listen<StreamingErrorEvent>('streaming-error', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.error(`Received streaming-error: ${event.payload.error}`);
         // 如果有保存的文本，显示它
         if (event.payload.savedText) {
@@ -1075,7 +1040,6 @@ export default function FloatPanelApp() {
     // Partial 识别结果事件（实时显示）
     unlistenPromises.push(
       listen<StreamingPartialEvent>('streaming-partial-update', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`[Streaming] Partial update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
 
         // 【关键修复】如果当前状态不是 recording，忽略旧会话的事件
@@ -1118,22 +1082,28 @@ export default function FloatPanelApp() {
               pendingTextRef.current = displayText;
 
               // 延迟调窗口（等 React 渲染完成，两帧确保 DOM 更新）
-              resizePreviewAfterPaint(true, getPreviewHeight(), () => {
-                log.debug(`[Streaming] 窗口已变大，现在填充文字并显示状态栏`);
-                const pendingText = pendingTextRef.current;
-                if (pendingText) {
-                  setPreviewText(pendingText);
-                  setPreviewVisible(true);
-                  pendingTextRef.current = '';
-                }
-                setIsExpandingWindow(false);
-                setShouldShowPreviewText(true);
-                // 窗口调整完成，显示状态栏
-                setHideStatusBar(false);
-              }, (e) => {
-                log.error(`[Streaming] 自动展开失败: ${e}`);
-                // 失败时也要显示状态栏
-                setHideStatusBar(false);
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  invoke('set_float_panel_height', { expanded: true, previewHeight: getPreviewHeight() })
+                    .then(() => {
+                      log.debug(`[Streaming] 窗口已变大，现在填充文字并显示状态栏`);
+                      const pendingText = pendingTextRef.current;
+                      if (pendingText) {
+                        setPreviewText(pendingText);
+                        setPreviewVisible(true);
+                        pendingTextRef.current = '';
+                      }
+                      setIsExpandingWindow(false);
+                      setShouldShowPreviewText(true);
+                      // 窗口调整完成，显示状态栏
+                      setHideStatusBar(false);
+                    })
+                    .catch((e) => {
+                      log.error(`[Streaming] 自动展开失败: ${e}`);
+                      // 失败时也要显示状态栏
+                      setHideStatusBar(false);
+                    });
+                });
               });
             }
           } else {
@@ -1151,7 +1121,6 @@ export default function FloatPanelApp() {
     // Final 识别结果事件（替代同 index 的 Partial）
     unlistenPromises.push(
       listen<StreamingFinalEvent>('streaming-final-update', (event) => {
-        if (getPreviewRevision() === undefined) return;
         log.debug(`[Streaming] Final update: index=${event.payload.segmentIndex}, version=${event.payload.version}, text="${event.payload.text}"`);
 
         // 【关键修复】如果当前状态不是 recording，忽略旧会话的事件
@@ -1183,7 +1152,6 @@ export default function FloatPanelApp() {
     unlistenPromises.push(
       listen<void>('streaming-recording-stopped', () => {
         log.debug(`[Streaming] Recording stopped, clearing segments`);
-        if (panelRef.current?.liveVoiceInput) setVoiceDetected(false);
         segmentsRef.current.clear();
       }).catch((e) => {
         log.error(`Failed to listen streaming-recording-stopped: ${e}`);
@@ -1214,7 +1182,6 @@ export default function FloatPanelApp() {
 
   // 计算预估时间 - 当 state 变化时更新（确保始终有值）
   useEffect(() => {
-    if (state.liveVoiceInput) return;
     log.debug(`[ESTIMATE] state changed: modelId=${state.modelId}, device=${state.device}, audioDuration=${state.audioDuration}, status=${state.status}, isTranscribing=${state.isTranscribing}, textLen=${state.textLen}, skipLlm=${state.skipLlm}`);
 
     if (state.modelId && state.device && state.audioDuration && state.audioDuration > 0) {
@@ -1315,12 +1282,12 @@ export default function FloatPanelApp() {
       estimatedTimeRef.current = totalTime * 1000;
       log.debug(`[ESTIMATE] Final default estimated time: ${estimatedTimeRef.current}ms (total=${totalTime}s)`);
     }
-  }, [state.modelId, state.device, state.audioDuration, state.status, state.hasLlmProfile, state.llmModelId, state.textLen, state.liveVoiceInput]);
+  }, [state.modelId, state.device, state.audioDuration, state.status, state.hasLlmProfile, state.llmModelId, state.textLen]);
 
   // 进度追踪（Session ID 模式）
   useEffect(() => {
     // 药丸不可见时，不需要追踪进度
-    if (!state.visible || state.liveVoiceInput) {
+    if (!state.visible) {
       if (sessionRef.current) {
         log.debug(`[Session] Panel hidden, ending session: id=${sessionRef.current.id}`);
         sessionRef.current = null;
@@ -1456,7 +1423,7 @@ export default function FloatPanelApp() {
     return () => {
       sessionRef.current = null;
     };
-  }, [state.status, state.isTranscribing, state.visible, state.skipLlm, state.liveVoiceInput]);
+  }, [state.status, state.isTranscribing, state.visible, state.skipLlm]);
 
   // 恢复拖动前的默认位置，保留当前录音和预览状态。
   const handleResetPosition = useCallback(() => {
@@ -1491,20 +1458,17 @@ export default function FloatPanelApp() {
   useEffect(() => {
     if (llmError.visible) {
       log.debug('[LLM Error] 收缩窗口为药丸模式');
-      resizePreviewAfterPaint(false, null,
-        () => log.debug('[LLM Error] 窗口已收缩为药丸模式'),
-        e => log.error(`[LLM Error] 收缩窗口失败: ${e}`),
-      );
+      invoke('set_float_panel_height', { expanded: false, previewHeight: null })
+        .then(() => log.debug('[LLM Error] 窗口已收缩为药丸模式'))
+        .catch((e) => log.error(`[LLM Error] 收缩窗口失败: ${e}`));
     }
-  }, [llmError.visible, resizePreviewAfterPaint]);
+  }, [llmError.visible]);
 
   // LLM 错误自动消失定时器
   const llmErrorAutoHideRef = useRef<number | null>(null);
 
   // 确认 LLM 错误处理
   const handleConfirmLlmError = useCallback(() => {
-    const revision = getPreviewRevision();
-    if (revision === undefined) return;
     log.debug('User confirmed LLM error, hiding panel');
     // 清除自动消失定时器
     if (llmErrorAutoHideRef.current) {
@@ -1513,7 +1477,6 @@ export default function FloatPanelApp() {
     }
     setIsHiding(true);
     setTimeout(() => {
-      if (getPreviewRevision() !== revision) return;
       setState(prev => ({ ...prev, visible: false }));
       setIsHiding(false);
       setLlmError({ visible: false, error: '', originalTextOutput: false });
@@ -1525,15 +1488,13 @@ export default function FloatPanelApp() {
     invoke('clear_preview_text')
       .then(() => log.debug('Backend preview text cleared'))
       .catch((e) => log.error(`Failed to clear backend preview text: ${e}`));
-  }, [getPreviewRevision]);
+  }, []);
 
   // LLM 错误自动消失：2秒后自动关闭
   useEffect(() => {
-    const revision = getPreviewRevision();
-    if (llmError.visible && revision !== undefined) {
+    if (llmError.visible) {
       log.debug('[LLM Error] 设置2秒后自动消失');
       llmErrorAutoHideRef.current = window.setTimeout(() => {
-        if (getPreviewRevision() !== revision) return;
         log.debug('[LLM Error] 自动消失触发');
         handleConfirmLlmError();
       }, 2000);
@@ -1544,18 +1505,7 @@ export default function FloatPanelApp() {
         llmErrorAutoHideRef.current = null;
       }
     };
-  }, [llmError.visible, getPreviewRevision, handleConfirmLlmError]);
-
-  if (state.liveVoiceInput) {
-    return state.visible ? (
-      <div className="live-voice-waveform" aria-hidden="true">
-        <Waveform
-          isActive={voiceDetected && state.status === 'recording'}
-          isUnavailable={isMicrophoneInitializing}
-        />
-      </div>
-    ) : null;
-  }
+  }, [llmError.visible, handleConfirmLlmError]);
 
   if (!state.visible && !llmError.visible) {
     return null;

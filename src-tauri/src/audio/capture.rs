@@ -8,12 +8,8 @@ use std::sync::{
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::ordered_final_text::OrderedFinalText;
 use super::stream_router::{StreamCmd, StreamRouter};
-use super::streaming::{
-    emit_live_voice_text, emit_recognition_error, run_stream_worker, LiveVoiceStream,
-    LIVE_FINALIZATION_INCOMPLETE,
-};
+use super::streaming::{run_stream_worker, StreamingTextEvent};
 use super::{
     SensitivityLevel, SileroVad, SmoothedVad, VadFrame, VoiceActivityDetector, WHISPER_SAMPLE_RATE,
 };
@@ -50,7 +46,6 @@ const MAX_PARALLEL_RECOGNITIONS: usize = 1;
 
 /// 待处理任务队列最大容量
 const MAX_PENDING_QUEUE_SIZE: usize = 8;
-const LIVE_FINALIZE_TIMEOUT: Duration = Duration::from_secs(30);
 
 // ============================================================================
 // Partial/Final 事件结构定义
@@ -134,14 +129,14 @@ struct PendingTaskQueue {
     /// 任务列表
     tasks: Vec<RecognitionTask>,
     /// 最大容量
-    max_size: Option<usize>,
+    max_size: usize,
 }
 
 impl PendingTaskQueue {
     fn new(max_size: usize) -> Self {
         Self {
             tasks: Vec::with_capacity(max_size),
-            max_size: Some(max_size),
+            max_size,
         }
     }
 
@@ -167,7 +162,7 @@ impl PendingTaskQueue {
         }
 
         // 没找到同 index 的任务
-        if self.max_size.is_some_and(|max_size| self.tasks.len() >= max_size) {
+        if self.tasks.len() >= self.max_size {
             // 队列满，替换尾部
             self.tasks.pop();
             log::debug!("[Queue] Queue full, replaced tail task");
@@ -205,7 +200,7 @@ fn samples_to_ms(samples: usize) -> u64 {
 
 /// Internal command for the audio worker thread
 enum Cmd {
-    Start(String, Option<u32>), // scene_id, live_session_id
+    Start(String), // scene_id
     Stop(mpsc::Sender<Vec<f32>>),
     Cancel,
     Shutdown,
@@ -378,12 +373,12 @@ impl AudioCapture {
     }
 
     /// Start recording with scene_id
-    pub fn start(&self, scene_id: &str, live_session_id: Option<u32>) -> Result<()> {
+    pub fn start(&self, scene_id: &str) -> Result<()> {
         let start_time = std::time::Instant::now();
         log::info!("[TIMING] [Capture] AudioCapture::start() 入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
 
         if let Some(tx) = &self.cmd_tx {
-            tx.send(Cmd::Start(scene_id.to_string(), live_session_id))?;
+            tx.send(Cmd::Start(scene_id.to_string()))?;
         }
         log::info!("[TIMING] [Capture] AudioCapture::start() 完成 - elapsed: {}ms", start_time.elapsed().as_millis());
         Ok(())
@@ -527,11 +522,9 @@ fn run_consumer(
 
     // Streaming transcription state (StreamRouter + worker thread)
     let mut stream_router: Option<Arc<StreamRouter>> = None;
+    let mut stream_active: Arc<AtomicBool>;
     let mut stream_worker_handle: Option<std::thread::JoinHandle<()>> = None;
-    let mut live_stream = None;
     let mut streaming_mode = false;
-    let mut live_session_id = None;
-    let mut live_segment_text = OrderedFinalText::default();
     let mut use_streaming_channel = false; // 是否使用流式通道（基于模型能力）
     let mut segment_buffer = Vec::<f32>::new(); // Current segment being collected
     let mut in_speech_segment = false; // Track if we're currently in a speech segment
@@ -563,7 +556,7 @@ fn run_consumer(
     let mut speech_started: bool = false;
 
     /// 识别结果接收通道
-    let (mut recognition_tx, mut recognition_rx) = mpsc::channel::<RecognitionResult>();
+    let (recognition_tx, recognition_rx): (mpsc::Sender<RecognitionResult>, mpsc::Receiver<RecognitionResult>) = mpsc::channel();
 
     /// 当前活跃的识别线程数量
     let mut active_recognition_threads: usize = 0;
@@ -594,54 +587,12 @@ fn run_consumer(
         }
     }
 
-    fn recognize_samples(
-        app_handle: &AppHandle,
-        samples: &[f32],
-        scene_id: &str,
-        live_session_id: Option<u32>,
-    ) -> String {
-        let Some(services) = app_handle.try_state::<crate::config::AppServices>() else {
-            log::error!("[Capture] AppServices not available for recognition");
-            if live_session_id.is_some() {
-                emit_recognition_error(app_handle, live_session_id, "AppServices not available");
-            }
-            return String::new();
-        };
-
-        match crate::commands::transcribe::transcribe_samples_internal(
-            &services,
-            samples,
-            scene_id,
-            live_session_id.is_none().then_some(app_handle),
-        ) {
-            Ok(result) => {
-                if let Some(perf_state) =
-                    app_handle.try_state::<crate::commands::performance::PerformanceState>()
-                {
-                    perf_state.0.record(
-                        &result.model_id,
-                        &result.device,
-                        result.audio_duration_ms as f64 / 1000.0,
-                        result.transcribe_time_ms as f64 / 1000.0,
-                    );
-                }
-                result.text
-            }
-            Err(error) => {
-                log::error!("[Capture] Recognition error: {}", error);
-                emit_recognition_error(app_handle, live_session_id, &error);
-                String::new()
-            }
-        }
-    }
-
     /// 生成并行识别任务（用于 Partial/Final 实时转录）
     fn spawn_recognition_task(
         tx: &mpsc::Sender<RecognitionResult>,
         task: RecognitionTask,
         app_handle: &AppHandle,
         scene_id: &str,
-        live_session_id: Option<u32>,
     ) {
         let tx = tx.clone();
         let app_handle = app_handle.clone();
@@ -661,7 +612,39 @@ fn run_consumer(
                 segment_index, kind, audio_ms
             );
 
-            let text = recognize_samples(&app_handle, &samples, &scene_id, live_session_id);
+            // 获取 AppServices
+            let services = app_handle.try_state::<crate::config::AppServices>();
+
+            let text = if let Some(services) = services {
+                match crate::commands::transcribe::transcribe_samples_internal(
+                    &services,
+                    &samples,
+                    &scene_id,
+                    Some(&app_handle),
+                ) {
+                    Ok(result) => {
+                        // 记录性能数据
+                        if let Some(perf_state) = app_handle.try_state::<crate::commands::performance::PerformanceState>() {
+                            perf_state.0.record(
+                                &result.model_id,
+                                &result.device,
+                                result.audio_duration_ms as f64 / 1000.0,
+                                result.transcribe_time_ms as f64 / 1000.0,
+                            );
+                        }
+                        result.text
+                    }
+                    Err(e) => {
+                        log::error!("[Partial/Final] Recognition error: {}", e);
+                        // 发送错误事件到前端
+                        super::streaming::emit_streaming_error(&app_handle, &e);
+                        String::new()
+                    }
+                }
+            } else {
+                log::error!("[Partial/Final] AppServices not available");
+                String::new()
+            };
 
             let total_ms = task_start.elapsed().as_millis();
             log::debug!(
@@ -725,27 +708,6 @@ fn run_consumer(
         samples.len() as f64 / WHISPER_SAMPLE_RATE as f64
     }
 
-    fn drain_recording_audio(
-        sample_rx: &mpsc::Receiver<AudioChunk>,
-        resampler: &mut FrameResampler,
-        mut handle_remaining_frame: impl FnMut(&[f32]),
-    ) {
-        while let Ok(AudioChunk::Samples(remaining)) =
-            sample_rx.recv_timeout(Duration::from_millis(50))
-        {
-            resampler.push(&remaining, &mut handle_remaining_frame);
-        }
-        resampler.finish(&mut handle_remaining_frame);
-    }
-
-    fn set_final_preview(app_handle: &AppHandle, text: String) {
-        if let Some(state) = app_handle.try_state::<crate::AppState>() {
-            if let Ok(mut preview) = state.preview_text.lock() {
-                *preview = text;
-            }
-        }
-    }
-
     loop {
         let chunk = match sample_rx.recv_timeout(Duration::from_millis(MAX_RECV_TIMEOUT_MS)) {
             Ok(c) => c,
@@ -786,7 +748,7 @@ fn run_consumer(
                     if let Some(ref router) = stream_router {
                         router.feed(frame);
                     }
-                } else if (streaming_mode || live_session_id.is_some()) && recording {
+                } else if streaming_mode && recording {
                     // 分段模式：现有逻辑（完全保持不变）
                     if is_voice && added_len > 0 {
                         // 从 processed_samples 中提取新增的数据（包含 prefill 缓冲）
@@ -812,10 +774,7 @@ fn run_consumer(
                         total_samples_processed += added_len;
 
                         // ===== Partial/Final: Partial 识别触发 =====
-                        if live_session_id.is_none()
-                            && speech_started
-                            && total_samples_processed >= next_partial_sample
-                        {
+                        if speech_started && total_samples_processed >= next_partial_sample {
                             log::debug!("[Partial/Final] Partial trigger condition met: total_samples={}, next_partial={}",
                                 total_samples_processed, next_partial_sample);
 
@@ -964,20 +923,6 @@ fn run_consumer(
 
         // ===== Partial/Final: 处理识别结果 =====
         while let Ok(recognition) = recognition_rx.try_recv() {
-            if !recording {
-                continue;
-            }
-            active_recognition_threads = active_recognition_threads.saturating_sub(1);
-            if let Some(session_id) = live_session_id {
-                if recognition.kind == RecognitionKind::Final {
-                    if let Some(text) =
-                        live_segment_text.commit(recognition.segment_index, recognition.text)
-                    {
-                        emit_live_voice_text(&app_handle, session_id, text);
-                    }
-                }
-                continue;
-            }
             match recognition.kind {
                 RecognitionKind::Partial => {
                     // 发送 Partial 事件
@@ -1025,19 +970,15 @@ fn run_consumer(
                     });
                 }
             }
+            active_recognition_threads = active_recognition_threads.saturating_sub(1);
             log::debug!("[Queue] 任务结束, active_threads={}", active_recognition_threads);
         }
 
         // ===== Partial/Final: 从队列取任务执行 =====
         // 如果有空闲 Worker 且队列不为空，启动新任务
-        while recording
-            && active_recognition_threads < MAX_PARALLEL_RECOGNITIONS
-            && !pending_queue.is_empty()
-        {
+        while active_recognition_threads < MAX_PARALLEL_RECOGNITIONS && !pending_queue.is_empty() {
             if let Some(task) = pending_queue.pop() {
-                spawn_recognition_task(
-                    &recognition_tx, task, &app_handle, &current_scene_id, live_session_id,
-                );
+                spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
                 active_recognition_threads += 1;
                 log::debug!("[Queue] Started task from queue, active_threads={}, queue_size={}",
                     active_recognition_threads, pending_queue.tasks.len());
@@ -1047,7 +988,7 @@ fn run_consumer(
         // Check for commands
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
-                Cmd::Start(scene_id, requested_live_session_id) => {
+                Cmd::Start(scene_id) => {
                     stop_flag.store(false, Ordering::Relaxed);
                     processed_samples.clear();
                     recording = true;
@@ -1055,8 +996,6 @@ fn run_consumer(
                     in_speech_segment = false;
                     segment_buffer.clear();
                     current_scene_id = scene_id.clone(); // 保存 scene_id
-                    live_session_id = requested_live_session_id;
-                    live_segment_text = OrderedFinalText::default();
                     recording_start_time = Some(std::time::Instant::now()); // 记录音开始时间
                     full_recording.lock().unwrap().clear(); // 清空全量录音
 
@@ -1081,14 +1020,6 @@ fn run_consumer(
                     speech_started = false;
                     active_recognition_threads = 0;
                     pending_queue.clear();
-                    // Live sessions queue only finals. Keep every one so an overloaded
-                    // recognizer cannot create a gap in the committed transcript.
-                    pending_queue.max_size = if live_session_id.is_some() {
-                        None
-                    } else {
-                        Some(MAX_PENDING_QUEUE_SIZE)
-                    };
-                    (recognition_tx, recognition_rx) = mpsc::channel();
 
                     // === 模型能力检测 ===
                     // 检测当前场景绑定的模型是否支持流式转录
@@ -1142,22 +1073,19 @@ fn run_consumer(
                                         };
 
                                         // 启动 worker 线程
-                                        live_stream = requested_live_session_id
-                                            .map(|id| Arc::new(LiveVoiceStream::new(id)));
+                                        stream_active = Arc::new(AtomicBool::new(false));
                                         let worker = std::thread::spawn({
                                             let model_manager = model_manager_arc;
                                             let app_handle = app_handle.clone();
                                             let scene_id = scene_id.clone();
-                                            let stop_flag = stop_flag.clone();
-                                            let live_stream = live_stream.clone();
+                                            let stream_active = stream_active.clone();
                                             move || {
                                                 run_stream_worker(
                                                     model_manager,
                                                     rx,
                                                     app_handle,
                                                     scene_id,
-                                                    stop_flag,
-                                                    live_stream,
+                                                    stream_active,
                                                 );
                                             }
                                         });
@@ -1186,7 +1114,6 @@ fn run_consumer(
                 }
                 Cmd::Stop(reply_tx) => {
                     recording = false;
-                    let mut recognition_timed_out = false;
                     stop_flag.store(true, Ordering::Relaxed);
                     log::info!(
                         "[Capture] Stop command received, streaming_mode: {}, use_streaming_channel: {}",
@@ -1199,35 +1126,9 @@ fn run_consumer(
                         processed_samples.len() * 4 / 1024 / 1024 // f32 = 4 bytes
                     );
 
-                    if live_session_id.is_some() {
-                        // Flush the microphone and resampler before finalizing either recognizer.
-                        drain_recording_audio(&sample_rx, &mut frame_resampler, |frame| {
-                            if use_streaming_channel {
-                                if let Some(router) = &stream_router {
-                                    router.feed(frame);
-                                }
-                                full_recording.lock().unwrap().extend_from_slice(frame);
-                            } else if let Some((true, added_len)) =
-                                handle_frame(frame, true, &vad, &mut processed_samples)
-                            {
-                                if added_len > 0 {
-                                    if !speech_started {
-                                        speech_started = true;
-                                        speech_start_sample = total_samples_processed;
-                                    }
-                                    let start_idx = processed_samples.len() - added_len;
-                                    segment_buffer.extend_from_slice(&processed_samples[start_idx..]);
-                                    total_samples_processed += added_len;
-                                }
-                            }
-                        });
-                    }
-
                     // 流式转录模式停止处理
                     if use_streaming_channel {
                         log::info!("[Capture] Stopping streaming transcription session");
-                        let mut final_text = None;
-                        let finish_started_at = std::time::Instant::now();
 
                         // 发送 Finalize 命令并等待最终结果
                         if let Some(ref router) = stream_router {
@@ -1235,78 +1136,45 @@ fn run_consumer(
                                 let (finalize_reply, finalize_rx) = mpsc::channel();
                                 let _ = tx.send(StreamCmd::Finalize(finalize_reply));
 
-                                match finalize_rx.recv_timeout(LIVE_FINALIZE_TIMEOUT) {
+                                // 等待最终结果
+                                match finalize_rx.recv_timeout(Duration::from_secs(30)) {
                                     Ok(Some(text)) => {
+                                        // 注意：run_stream_worker 已经发送了 streaming-text-update 事件
+                                        // 这里只需要更新后端的 preview_text 状态
                                         log::info!(
                                             "[Capture] Stream finalized with text: {} chars",
                                             text.chars().count()
                                         );
-                                        final_text = Some(text);
+
+                                        // 更新后端的 preview_text 状态（用于 get_preview_text 命令）
+                                        if let Some(state) =
+                                            app_handle.try_state::<crate::AppState>()
+                                        {
+                                            if let Ok(mut preview) = state.preview_text.lock() {
+                                                *preview = text.clone();
+                                                log::info!(
+                                                    "[Capture] Updated preview_text to {} chars",
+                                                    text.chars().count()
+                                                );
+                                            }
+                                        }
                                     }
                                     Ok(None) => {
-                                        log::warn!("[Capture] Stream returned no transcript");
+                                        // 不支持流式，fallback 到批量转录
+                                        log::warn!("[Capture] Stream returned None, falling back to batch transcription");
+                                        // TODO: 实现批量转录 fallback
                                     }
-                                    Err(error) => {
-                                        recognition_timed_out = live_session_id.is_some()
-                                            && error == mpsc::RecvTimeoutError::Timeout;
-                                        log::error!("[Capture] Stream finalize failed: {}", error);
+                                    Err(e) => {
+                                        log::error!("[Capture] Stream finalize timeout: {}", e);
                                     }
                                 }
                             }
                         }
 
-                        if let Some(live) = live_stream.take() {
-                            if recognition_timed_out {
-                                live.cancel();
-                                final_text = Some(live.confirmed_text());
-                            } else if final_text.is_none() {
-                                let confirmed = live.confirmed_text();
-                                if !confirmed.is_empty() {
-                                    final_text = Some(confirmed);
-                                    emit_recognition_error(
-                                        &app_handle, live_session_id, LIVE_FINALIZATION_INCOMPLETE,
-                                    );
-                                }
-                            }
-                        }
-                        // Let a stalled live recognizer release its resources when its current call returns.
+                        // 等待 worker 线程结束
                         if let Some(handle) = stream_worker_handle.take() {
-                            if live_session_id.is_none() || !recognition_timed_out {
-                                let _ = handle.join();
-                                log::info!("[Capture] Stream worker thread joined");
-                            }
-                        }
-                        if final_text.is_none() && live_session_id.is_some() {
-                            let samples = std::mem::take(&mut *full_recording.lock().unwrap());
-                            if !samples.is_empty() {
-                                let task = RecognitionTask {
-                                    kind: RecognitionKind::Final,
-                                    segment_index: 0,
-                                    version: 0,
-                                    start_ms: 0,
-                                    end_ms: samples_to_ms(samples.len()),
-                                    samples,
-                                };
-                                spawn_recognition_task(
-                                    &recognition_tx,
-                                    task,
-                                    &app_handle,
-                                    &current_scene_id,
-                                    live_session_id,
-                                );
-                                let remaining = LIVE_FINALIZE_TIMEOUT
-                                    .saturating_sub(finish_started_at.elapsed());
-                                match recognition_rx.recv_timeout(remaining) {
-                                    Ok(result) => final_text = Some(result.text),
-                                    Err(error) => {
-                                        recognition_timed_out = true;
-                                        log::error!("[Capture] Batch fallback failed: {}", error);
-                                    }
-                                }
-                            }
-                        }
-                        if let Some(text) = final_text {
-                            set_final_preview(&app_handle, text);
+                            let _ = handle.join();
+                            log::info!("[Capture] Stream worker thread joined");
                         }
 
                         // 清理状态
@@ -1330,7 +1198,7 @@ fn run_consumer(
 
                         // 重置 VAD 敏感度
                         reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Stop (streaming)");
-                    } else if streaming_mode || live_session_id.is_some() {
+                    } else if streaming_mode {
                         log::info!("[Streaming] segment_buffer: {} samples ({:.2}s)",
                             segment_buffer.len(), get_duration_secs(&segment_buffer));
 
@@ -1359,11 +1227,7 @@ fn run_consumer(
                         // 等待所有识别任务完成（包括队列中的和正在执行的）
                         // 必须同时检查：1) 队列非空 2) 有活跃线程
                         // 否则队列中的任务可能永远不会被启动
-                        let max_wait = if live_session_id.is_some() {
-                            LIVE_FINALIZE_TIMEOUT
-                        } else {
-                            Duration::from_secs(10)
-                        };
+                        let max_wait = std::time::Duration::from_secs(10); // 增加到 10 秒
                         let start = std::time::Instant::now();
                         let mut last_log_time = start;
 
@@ -1371,9 +1235,7 @@ fn run_consumer(
                             // 先尝试从队列取任务执行（如果还有空闲 Worker）
                             while active_recognition_threads < MAX_PARALLEL_RECOGNITIONS && !pending_queue.is_empty() {
                                 if let Some(task) = pending_queue.pop() {
-                                    spawn_recognition_task(
-                                        &recognition_tx, task, &app_handle, &current_scene_id, live_session_id,
-                                    );
+                                    spawn_recognition_task(&recognition_tx, task, &app_handle, &current_scene_id);
                                     active_recognition_threads += 1;
                                     log::info!("[Stop] Started queued task, active_threads={}", active_recognition_threads);
                                 }
@@ -1381,15 +1243,6 @@ fn run_consumer(
 
                             // 处理已完成的识别结果
                             while let Ok(recognition) = recognition_rx.try_recv() {
-                                active_recognition_threads =
-                                    active_recognition_threads.saturating_sub(1);
-                                if live_session_id.is_some() {
-                                    if recognition.kind == RecognitionKind::Final {
-                                        live_segment_text
-                                            .commit(recognition.segment_index, recognition.text);
-                                    }
-                                    continue;
-                                }
                                 match recognition.kind {
                                     RecognitionKind::Partial => {
                                         let event = StreamingPartialEvent {
@@ -1428,6 +1281,7 @@ fn run_consumer(
                                         }
                                     }
                                 }
+                                active_recognition_threads = active_recognition_threads.saturating_sub(1);
                             }
 
                             // 检查是否所有任务都完成：队列为空 且 没有活跃线程
@@ -1445,7 +1299,6 @@ fn run_consumer(
                                     "[Stop] Timeout waiting for recognition tasks: queue_size={}, active_threads={}",
                                     pending_queue.tasks.len(), active_recognition_threads
                                 );
-                                recognition_timed_out = live_session_id.is_some();
                                 break;
                             }
 
@@ -1459,10 +1312,6 @@ fn run_consumer(
                             }
 
                             std::thread::sleep(std::time::Duration::from_millis(50));
-                        }
-
-                        if live_session_id.is_some() {
-                            set_final_preview(&app_handle, live_segment_text.text().to_owned());
                         }
 
                         // 清理 buffer
@@ -1486,27 +1335,35 @@ fn run_consumer(
                         reset_vad_sensitivity(&mut soft_threshold_active, &vad, "Stop");
                     }
 
-                    match live_session_id.take() {
-                        Some(session_id) if recognition_timed_out => emit_recognition_error(
-                            &app_handle, Some(session_id), LIVE_FINALIZATION_INCOMPLETE,
-                        ),
-                        Some(_) => (),
-                        None => drain_recording_audio(&sample_rx, &mut frame_resampler, |frame| {
-                            let _ = handle_frame(frame, true, &vad, &mut processed_samples);
-                        }),
+                    // Drain remaining audio - minimal timeout for fast response
+                    loop {
+                        match sample_rx.recv_timeout(Duration::from_millis(50)) {
+                            Ok(AudioChunk::Samples(remaining)) => {
+                                frame_resampler.push(&remaining, &mut |frame: &[f32]| {
+                                    let _ = handle_frame(frame, true, &vad, &mut processed_samples);
+                                });
+                            }
+                            Ok(AudioChunk::EndOfStream) => break,
+                            Err(_) => {
+                                log::debug!("Timeout waiting for EndOfStream, proceeding with captured audio");
+                                break;
+                            }
+                        }
                     }
+
+                    frame_resampler.finish(&mut |frame: &[f32]| {
+                        let _ = handle_frame(frame, true, &vad, &mut processed_samples);
+                    });
 
                     let _ = reply_tx.send(std::mem::take(&mut processed_samples));
                     stop_flag.store(false, Ordering::Relaxed);
 
                     // 录制结束后重建 Session，确保下次转录是全新状态
-                    if !recognition_timed_out {
-                        if let Some(services) = app_handle.try_state::<crate::config::AppServices>() {
-                            if let Some(model_manager_guard) = services.model_manager.lock().ok() {
-                                if let Some(model_manager) = model_manager_guard.as_ref() {
-                                    if let Ok(model_id) = model_manager.get_global_asr_model() {
-                                        model_manager.recreate_session(&model_id);
-                                    }
+                    if let Some(services) = app_handle.try_state::<crate::config::AppServices>() {
+                        if let Some(model_manager_guard) = services.model_manager.lock().ok() {
+                            if let Some(model_manager) = model_manager_guard.as_ref() {
+                                if let Ok(model_id) = model_manager.get_global_asr_model() {
+                                    model_manager.recreate_session(&model_id);
                                 }
                             }
                         }
@@ -1516,7 +1373,6 @@ fn run_consumer(
                 }
                 Cmd::Cancel => {
                     recording = false;
-                    live_session_id = None;
                     stop_flag.store(true, Ordering::Relaxed);
                     log::info!("[Capture] Cancel command received, discarding all audio data");
 
@@ -1567,10 +1423,6 @@ fn run_consumer(
 
                     // 清理流式转录路由器
                     if use_streaming_channel {
-                        let cancelled_live_stream = live_stream.take();
-                        if let Some(live) = &cancelled_live_stream {
-                            live.cancel();
-                        }
                         // 发送 Cancel 命令到 worker（如果有）
                         if let Some(ref router) = stream_router {
                             if let Some(tx) = router.take() {
@@ -1583,10 +1435,8 @@ fn run_consumer(
 
                         // 等待 worker 线程结束
                         if let Some(handle) = stream_worker_handle.take() {
-                            if cancelled_live_stream.is_none() {
-                                let _ = handle.join();
-                                log::info!("[Capture] Cancel: stream worker thread joined");
-                            }
+                            let _ = handle.join();
+                            log::info!("[Capture] Cancel: stream worker thread joined");
                         }
 
                         stream_router = None;

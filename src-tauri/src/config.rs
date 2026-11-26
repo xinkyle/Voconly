@@ -500,9 +500,6 @@ pub struct AppConfig {
     /// 预览窗口高度档位
     #[serde(default)]
     pub preview_height: PreviewHeight,
-    /// 录音期间将已确认的识别文字输入到目标应用，跳过 AI 后处理
-    #[serde(default)]
-    pub live_voice_input: bool,
     /// 版本信息 URL（用于自动更新检查）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_info_url: Option<String>,
@@ -613,7 +610,6 @@ impl Default for AppConfig {
             user_dictionary: UserDictionary::default(),
             segment_transcribe: true, // 默认开启分段转录
             preview_height: PreviewHeight::default(), // 默认低高度
-            live_voice_input: false,
             version_info_url: None, // 默认使用 updater.rs 中的内置 URL
             #[allow(deprecated)]
             llm_models: Vec::new(),
@@ -1077,25 +1073,6 @@ pub fn config_exists() -> bool {
 // Download status is now determined by filesystem scanning:
 // - ASR models: scan_available_asr_models() in presets/asr_scanner.rs
 // - LLM models: scan_available_llm_models() in llm_models/presets.rs
-
-#[cfg(test)]
-mod live_voice_input_tests {
-    use super::AppConfig;
-    use serde_json::{json, to_value};
-
-    #[test]
-    fn older_configs_default_live_voice_input_to_off() {
-        let config: AppConfig = serde_json::from_value(json!({ "scenes": [] })).unwrap();
-        assert_eq!(to_value(config).unwrap()["liveVoiceInput"], false);
-    }
-
-    #[test]
-    fn config_preserves_enabled_live_voice_input() {
-        let config: AppConfig =
-            serde_json::from_value(json!({ "scenes": [], "liveVoiceInput": true })).unwrap();
-        assert_eq!(to_value(config).unwrap()["liveVoiceInput"], true);
-    }
-}
 
 #[cfg(test)]
 mod global_model_config_tests {

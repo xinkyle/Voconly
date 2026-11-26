@@ -59,85 +59,6 @@ pub struct StreamingErrorEvent {
     pub saved_text: String,
 }
 
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LiveVoiceTextEvent<'a> {
-    session_id: u32,
-    text: &'a str,
-}
-
-pub(super) const LIVE_FINALIZATION_INCOMPLETE: &str = "LIVE_VOICE_FINALIZATION_INCOMPLETE";
-
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LiveVoiceErrorEvent<'a> {
-    session_id: u32,
-    error: &'a str,
-}
-
-pub(super) fn emit_live_voice_text(app: &AppHandle, session_id: u32, text: &str) {
-    if let Err(error) = app.emit_to("main", "live-voice-text", LiveVoiceTextEvent { session_id, text })
-    {
-        warn!("[LiveVoice] Failed to emit confirmed text: {}", error);
-    }
-}
-
-pub(super) fn emit_recognition_error(app: &AppHandle, session_id: Option<u32>, error: &str) {
-    if let Some(session_id) = session_id {
-        if let Err(emit_error) = app.emit_to(
-            "main",
-            "live-voice-error",
-            LiveVoiceErrorEvent { session_id, error },
-        ) {
-            warn!("[LiveVoice] Failed to emit recognition error: {}", emit_error);
-        }
-    } else {
-        emit_streaming_error(app, error);
-    }
-}
-
-pub(super) struct LiveVoiceStream {
-    session_id: u32,
-    cancelled: AtomicBool,
-    confirmed: Mutex<String>,
-}
-
-impl LiveVoiceStream {
-    pub(super) fn new(session_id: u32) -> Self {
-        Self {
-            session_id,
-            cancelled: AtomicBool::new(false),
-            confirmed: Mutex::new(String::new()),
-        }
-    }
-
-    pub(super) fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
-    }
-
-    pub(super) fn confirmed_text(&self) -> String {
-        self.confirmed.lock().unwrap().clone()
-    }
-
-    fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Relaxed)
-    }
-
-    fn update(&self, app: &AppHandle, text: &str, publish: bool) {
-        {
-            let mut confirmed = self.confirmed.lock().unwrap();
-            if *confirmed == text || self.is_cancelled() {
-                return;
-            }
-            confirmed.clear();
-            confirmed.push_str(text);
-        }
-        if publish && !self.is_cancelled() {
-            emit_live_voice_text(app, self.session_id, text);
-        }
-    }
-}
-
 // ============================================================================
 // Streaming Worker Functions
 // ============================================================================
@@ -152,8 +73,7 @@ impl LiveVoiceStream {
 /// * `rx` - StreamCmd 接收端
 /// * `app_handle` - Tauri AppHandle 用于发送事件
 /// * `scene_id` - 场景 ID（用于获取对应的模型）
-/// * `stop_flag` - Recording has stopped or been canceled.
-/// * `live_stream` - State shared with the capture worker in live mode.
+/// * `stream_active` - 流状态标志（原子布尔）
 ///
 /// # Flow
 ///
@@ -164,19 +84,13 @@ impl LiveVoiceStream {
 /// 5. 结束流：接收 `StreamCmd::Finalize`，返回最终文本
 /// 6. 取消流：接收 `StreamCmd::Cancel`，重置流
 /// 7. 不支持流式：调用 `drain_until_finalize()` 排空 channel
-pub(super) fn run_stream_worker(
+pub fn run_stream_worker(
     model_manager: Arc<Mutex<Option<ModelManager>>>,
     rx: mpsc::Receiver<StreamCmd>,
     app_handle: AppHandle,
     scene_id: String,
-    stop_flag: Arc<AtomicBool>,
-    live_stream: Option<Arc<LiveVoiceStream>>,
+    stream_active: Arc<AtomicBool>,
 ) {
-    let report_error = |error: &str| {
-        if !live_stream.as_ref().is_some_and(|live| live.is_cancelled()) {
-            emit_recognition_error(&app_handle, live_stream.as_ref().map(|live| live.session_id), error);
-        }
-    };
     // 【诊断日志】记录锁获取时间
     let lock_start = std::time::Instant::now();
     debug!("[StreamingWorker] ⏳ 正在获取 ModelManager 锁...");
@@ -191,7 +105,8 @@ pub(super) fn run_stream_worker(
             Some(m) => m,
             None => {
                 error!("[StreamingWorker] ModelManager not available");
-                report_error("ModelManager not available");
+                emit_streaming_error(&app_handle, "ModelManager not available");
+                stream_active.store(false, Ordering::Relaxed);
                 return;
             }
         };
@@ -201,7 +116,8 @@ pub(super) fn run_stream_worker(
             Ok(m) => m,
             Err(e) => {
                 error!("[StreamingWorker] Failed to load model: {}", e);
-                report_error(&e);
+                emit_streaming_error(&app_handle, &e);
+                stream_active.store(false, Ordering::Relaxed);
                 return;
             }
         };
@@ -216,31 +132,20 @@ pub(super) fn run_stream_worker(
 
     // 2. 检查流式支持并执行流式操作（不需要持有锁）
     let result = loaded_model.backend.with_stream(|stream| {
+        stream_active.store(true, Ordering::Relaxed);
         info!("[StreamingWorker] Stream started for scene: {}", scene_id);
 
         // 追踪上一次的文本，用于检测变化
         let mut last_committed_len = 0usize;
         let mut last_tentative_len = 0usize;
+
         // 3. 处理音频帧循环
         while let Ok(cmd) = rx.recv() {
-            if live_stream.as_ref().is_some_and(|live| live.is_cancelled()) {
-                stream.reset();
-                break;
-            }
             match cmd {
                 StreamCmd::Feed(pcm) => {
                     match stream.feed(&pcm) {
-                        Ok(_) => {
+                        Ok(update) => {
                             let text = stream.text();
-                            if let Some(live) = &live_stream {
-                                // The engine guarantees this prefix remains stable through finalize.
-                                live.update(
-                                    &app_handle,
-                                    &text.committed,
-                                    !stop_flag.load(Ordering::Relaxed),
-                                );
-                                continue;
-                            }
                             let committed_len = text.committed.len();
                             let tentative_len = text.tentative.len();
 
@@ -272,15 +177,8 @@ pub(super) fn run_stream_worker(
                             //emit_streaming_text(&app_handle, &text, true);
                             let _ = reply.send(Some(text.display()));
                         }
-                        Err(error) => {
-                            error!("[StreamingWorker] Stream finalize failed: {}", error);
-                            let committed = live_stream.as_ref()
-                                .map(|live| live.confirmed_text())
-                                .filter(|text| !text.is_empty());
-                            if committed.is_some() {
-                                report_error(LIVE_FINALIZATION_INCOMPLETE);
-                            }
-                            let _ = reply.send(committed);
+                        Err(_) => {
+                            let _ = reply.send(None);
                         }
                     }
                     break;
@@ -292,6 +190,7 @@ pub(super) fn run_stream_worker(
             }
         }
 
+        stream_active.store(false, Ordering::Relaxed);
         info!("[StreamingWorker] Stream ended for scene: {}", scene_id);
     });
 

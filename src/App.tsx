@@ -31,7 +31,6 @@ import {
   getAllStats,
 } from './services/performance';
 import { typeTextSafe } from './services/keyboard';
-import { LiveVoiceInput } from './services/liveVoiceInput';
 import { showFloatPanel, hideFloatPanel } from './services/floatPanel';
 import { addHistoryRecord, loadHistory, clearHistory, deleteHistoryRecord } from './services/history';
 import { checkModelExists } from './services/downloader';
@@ -339,35 +338,6 @@ function App() {
   const currentSceneRef = useRef<Scene | null>(null);
   // 双击跳过 LLM 标记
   const skipLlmRef = useRef<boolean>(false);
-  const liveInputRef = useRef<LiveVoiceInput | null>(null);
-  const liveInputId = useRef(0);
-  const liveInputCancellingRef = useRef(false);
-
-  const releaseLiveInput = useCallback(async (session: LiveVoiceInput) => {
-    session.cancel();
-    if (liveInputRef.current === session) liveInputRef.current = null;
-    try {
-      await invoke('end_live_voice_input', { sessionId: session.id });
-    } catch (error) {
-      log.error(`Failed to release live voice input: ${error}`);
-    }
-  }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    listen<{ sessionId: number; text: string }>('live-voice-text', ({ payload }) => {
-      const session = liveInputRef.current;
-      if (!disposed && session?.id === payload.sessionId) session.update(payload.text);
-    }).then(cleanup => {
-      if (disposed) cleanup();
-      else unlisten = cleanup;
-    }).catch(error => log.error(`Failed to listen for live voice input: ${error}`));
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   // Listen for tray navigation events
   useEffect(() => {
@@ -490,15 +460,13 @@ function App() {
       if (!mounted) return;
       listen<void>('recording-cancelled', () => {
         log.debug('Recording cancelled event received from float panel');
-        const session = liveInputRef.current;
-        if (session) void releaseLiveInput(session);
         // Reset recorder state to idle
         if (recorderRef.current) {
           recorderRef.current.cancel();
           log.debug('Recorder state reset via cancel()');
         }
         // Also reset the shortcut processing flag
-        if (!session && !liveInputCancellingRef.current) isProcessingShortcutRef.current = false;
+        isProcessingShortcutRef.current = false;
         // 清空分段转录相关的缓存
         isSegmentTranscribeActiveRef.current = false;
         streamingTextRef.current = '';
@@ -517,7 +485,7 @@ function App() {
       mounted = false;
       unlistenRef.current?.();
     };
-  }, [releaseLiveInput]);
+  }, []);
 
   // Listen for ESC cancel triggered event (global shortcut)
   useEffect(() => {
@@ -528,12 +496,6 @@ function App() {
       if (!mounted) return;
       listen<void>('esc-cancel-triggered', async () => {
         log.debug('[ESC] ESC cancel triggered event received');
-        const session = liveInputRef.current;
-        if (session) {
-          liveInputCancellingRef.current = true;
-          void releaseLiveInput(session);
-          void hideFloatPanel('esc-cancel').catch(err => log.error(`[ESC] Failed to hide live waveform: ${err}`));
-        }
         // 调用后端取消录音
         try {
           await invoke('cancel_recording');
@@ -547,7 +509,7 @@ function App() {
           log.debug('[ESC] Recorder state reset');
         }
         // 重置快捷键处理标记
-        if (!session) isProcessingShortcutRef.current = false;
+        isProcessingShortcutRef.current = false;
         // 清空分段转录缓存
         isSegmentTranscribeActiveRef.current = false;
         streamingTextRef.current = '';
@@ -567,7 +529,6 @@ function App() {
         } catch (err) {
           log.error(`[ESC] Failed to unregister ESC cancel: ${err}`);
         }
-        if (session) liveInputCancellingRef.current = false;
       }).then(fn => {
         if (mounted) {
           unlistenRef.current = fn;
@@ -581,71 +542,61 @@ function App() {
       mounted = false;
       unlistenRef.current?.();
     };
-  }, [releaseLiveInput]);
+  }, [hideFloatPanel]);
 
   // Listen for streaming transcription errors (from backend)
   useEffect(() => {
-    const unlisten: Array<() => void> = [];
+    const unlistenRef = { current: null as (() => void) | null };
     let mounted = true;
 
-    const handleError = async (errorMsg: string, liveSession?: LiveVoiceInput) => {
-      log.error(`Received streaming-error: ${errorMsg}`);
-      if (!errorMsg.includes('MEMORY_INSUFFICIENT') || liveInputCancellingRef.current) return;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (!mounted) return;
+      listen<{ error: string; savedText?: string }>('streaming-error', async (event) => {
+        log.error(`Received streaming-error: ${event.payload.error}`);
 
-      const asrModelId = config?.globalModelConfig?.asrModel?.modelId || '';
-      const model = config?.models?.find(m => m.id === asrModelId);
-      const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
-      if (liveSession) {
-        liveInputCancellingRef.current = true;
-        try {
-          await releaseLiveInput(liveSession);
-          await hideFloatPanel('memory-error').catch(error => log.error(`Failed to hide waveform: ${error}`));
-          await invoke('cancel_recording');
-        } catch (error) {
-          log.error(`Failed to cancel live recording after ASR failure: ${error}`);
-        } finally {
-          await invoke('unregister_esc_cancel').catch(error => log.error(`Failed to unregister Esc: ${error}`));
+        // 检查是否是内存不足错误
+        const errorMsg = event.payload.error;
+        if (errorMsg.includes('MEMORY_INSUFFICIENT')) {
+          // 使用全局 ASR 模型配置
+          const asrModelId = config?.globalModelConfig?.asrModel?.modelId || '';
+          const model = config?.models?.find(m => m.id === asrModelId);
+          const modelName = model?.name || asrModelId;
+          const memoryMatch = errorMsg.match(/需要约 (\d+MB).*可用 (\d+MB)/);
+          const requiredMemory = memoryMatch?.[1] || '未知';
+          const availableMemory = memoryMatch?.[2] || '未知';
+
+          // 隐藏浮窗
+          await hideFloatPanel('memory-error');
+          // 重置录音状态
+          if (recorderRef.current) {
+            recorderRef.current.cancel();
+          }
+          isProcessingShortcutRef.current = false;
+          isSegmentTranscribeActiveRef.current = false;
+          streamingTextRef.current = '';
+
+          // 显示内存错误对话框
+          setMemoryError({
+            visible: true,
+            modelName,
+            requiredMemory,
+            availableMemory,
+          });
         }
-      } else {
-        await hideFloatPanel('memory-error');
-      }
-
-      recorderRef.current?.cancel();
-      isProcessingShortcutRef.current = false;
-      isSegmentTranscribeActiveRef.current = false;
-      streamingTextRef.current = '';
-      if (liveSession) liveInputCancellingRef.current = false;
-      setMemoryError({
-        visible: true,
-        modelName: model?.name || asrModelId,
-        requiredMemory: memoryMatch?.[1] || '未知',
-        availableMemory: memoryMatch?.[2] || '未知',
+      }).then(fn => {
+        if (mounted) {
+          unlistenRef.current = fn;
+        } else {
+          fn(); // 如果已 unmount，立即取消监听
+        }
       });
-    };
-    const register = <T,>(event: string, callback: (payload: T) => void) => {
-      listen<T>(event, ({ payload }) => {
-        if (mounted) callback(payload);
-      }).then(cleanup => {
-        if (mounted) unlisten.push(cleanup);
-        else cleanup();
-      }).catch(error => log.error(`Failed to listen for ${event}: ${error}`));
-    };
-
-    register<{ error: string }>('streaming-error', ({ error }) => {
-      if (!liveInputRef.current) void handleError(error).catch(err => log.error(String(err)));
-    });
-    register<{ sessionId: number; error: string }>('live-voice-error', ({ sessionId, error }) => {
-      const session = liveInputRef.current;
-      if (session?.id !== sessionId) return;
-      session.markRecognitionIncomplete();
-      void handleError(error, session).catch(err => log.error(String(err)));
     });
 
     return () => {
       mounted = false;
-      unlisten.forEach(cleanup => cleanup());
+      unlistenRef.current?.();
     };
-  }, [config, releaseLiveInput]);
+  }, [config, hideFloatPanel]);
 
   // Listen for ASR model load failed event (memory insufficient during startup or model switch)
   useEffect(() => {
@@ -880,13 +831,8 @@ function App() {
       // This callback just confirms recording actually started
       log.debug('Recording actually started');
     },
-    onRecordingStopped: async (audioData, liveSessionId) => {
+    onRecordingStopped: async (audioData) => {
       log.debug(`onRecordingStopped callback triggered, audioData duration: ${audioData?.duration}`);
-      if (liveSessionId !== undefined) {
-        const session = liveInputRef.current;
-        if (session?.id === liveSessionId) await finishLiveInput(session);
-        return;
-      }
       // Recording stopped, now run the transcription workflow
       const scene = currentSceneRef.current;
       log.debug(`currentSceneRef: ${scene ? getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets) : 'null'}`);
@@ -896,16 +842,9 @@ function App() {
         log.warn('No current scene, skipping workflow');
       }
     },
-    onError: async (error, stoppedLiveSessionId) => {
+    onError: (error) => {
       log.error(`Recorder error: ${error}`);
-      const session = liveInputRef.current;
-      if (stoppedLiveSessionId !== undefined) {
-        if (session?.id === stoppedLiveSessionId) {
-          await finishLiveInput(session, session.transcript);
-        }
-      } else {
-        await hideFloatPanelStatus('recorder-error');
-      }
+      hideFloatPanelStatus('recorder-error');
     },
   });
 
@@ -1007,7 +946,6 @@ function App() {
       skipLlm?: boolean;
       // 分段转录开关
       segmentTranscribe?: boolean;
-      liveVoiceInput?: boolean;
     }>
   ) => {
     // Show the global float window
@@ -1036,50 +974,6 @@ function App() {
       log.error(`Failed to hide float panel: ${err}`);
     }
   }, []);
-
-  const finishLiveInput = async (session: LiveVoiceInput, recoveredText?: string) => {
-    let overlayHidden = false;
-    try {
-      const text = recoveredText ?? await invoke<string>('get_preview_text');
-      if (liveInputRef.current !== session) return;
-      if (recoveredText !== undefined) session.cancel();
-      else await session.finish(text);
-      if (liveInputRef.current !== session) return;
-
-      await hideFloatPanelStatus('live-voice-input-complete');
-      overlayHidden = true;
-      if (liveInputRef.current !== session) return;
-
-      if (text.trim()) {
-        const record = await addHistoryRecord({
-          timestamp: Date.now(),
-          content: text,
-          duration: Math.round(recordingDurationRef.current),
-          wordCount: countWords(text),
-        });
-        setHistory(prev => [record, ...prev]);
-        window.dispatchEvent(new CustomEvent('history-updated'));
-      }
-      if (session.interrupted || recoveredText !== undefined) {
-        showToast({
-          type: 'warning',
-          title: t('toast.liveVoiceInputInterrupted'),
-          description: text.trim() ? t('toast.liveVoiceInputHistory') : undefined,
-        });
-      }
-      await invoke('clear_preview_text');
-    } catch (error) {
-      log.error(`Failed to finish live voice input: ${error}`);
-      showToast({ type: 'error', title: t('toast.liveVoiceInputInterrupted') });
-    } finally {
-      if (liveInputRef.current === session) {
-        recordingDurationRef.current = 0;
-        if (!overlayHidden) await hideFloatPanelStatus('live-voice-input-ended');
-        await invoke('unregister_esc_cancel').catch(error => log.error(`Failed to unregister Esc: ${error}`));
-        await releaseLiveInput(session);
-      }
-    }
-  };
 
   // Keep track of workflow running state to prevent duplicate runs
   const isWorkflowRunningRef = useRef(false);
@@ -1533,7 +1427,7 @@ function App() {
   // Handle shortcut triggered - start/stop recording
   const handleShortcutTriggered = useCallback(async (sceneId: string, skipLlm: boolean) => {
     // Prevent duplicate shortcut processing
-    if (isProcessingShortcutRef.current || liveInputCancellingRef.current) {
+    if (isProcessingShortcutRef.current) {
       log.warn('[HANDLE_SHORTCUT] Shortcut already processing, ignoring duplicate');
       return;
     }
@@ -1581,17 +1475,6 @@ function App() {
 
     // Toggle recording: if not recording, start; if recording, stop
     if (currentRecorder.isRecording) {
-      const liveSession = liveInputRef.current;
-      if (liveSession) {
-        try {
-          await showFloatPanelStatus('transcribing', undefined, undefined, { liveVoiceInput: true });
-          if (liveInputRef.current !== liveSession) return;
-          await currentRecorder.stop(liveSession.id);
-        } finally {
-          isProcessingShortcutRef.current = false;
-        }
-        return;
-      }
       log.info('[HANDLE_SHORTCUT] Stopping recording with optimistic UI...');
       // 1. Immediately show "transcribing" UI (Optimistic UI)
       // 传入基本的 progressInfo 确保进度条能正确初始化，后续 workflow 会更新精确预估
@@ -1614,32 +1497,11 @@ function App() {
       }
     } else {
       log.info('[HANDLE_SHORTCUT] Starting recording with optimistic UI...');
-      const useLiveInput = config?.liveVoiceInput === true;
-      if (useLiveInput && isWorkflowRunningRef.current) {
-        isProcessingShortcutRef.current = false;
-        return;
-      }
-      let liveSession: LiveVoiceInput | undefined;
-      if (useLiveInput) {
-        const sessionId = ++liveInputId.current;
-        try {
-          await invoke('begin_live_voice_input', { sessionId });
-        } catch (error) {
-          log.error(`Failed to start live voice input: ${error}`);
-          showToast({ type: 'error', title: t('toast.liveVoiceInputInterrupted') });
-          isProcessingShortcutRef.current = false;
-          return;
-        }
-        liveSession = new LiveVoiceInput(sessionId, text => typeTextSafe(text, sessionId));
-        liveInputRef.current = liveSession;
-      }
       // 1. Immediately show float panel (Optimistic UI)
       // 【修复】传入配置中的 segment_transcribe 值,确保状态指示器正确显示
-      const panelShown = showFloatPanelStatus('recording', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
+      showFloatPanelStatus('recording', getSceneDisplayName(scene, t, config?.llmPromptPresets?.customPresets), undefined, {
         segmentTranscribe: config?.segmentTranscribe ?? true,  // 使用配置值,默认 true
-        liveVoiceInput: useLiveInput,
       });
-      if (liveSession) await panelShown;
 
       // 分段转录始终开启：初始化分段转录状态
       isSegmentTranscribeActiveRef.current = true;
@@ -1653,7 +1515,6 @@ function App() {
       // 2. Check if model exists (async, after showing panel for instant feedback)
       const modelDownloaded = await checkModelExists(fullModelId);
       if (!modelDownloaded) {
-        if (liveSession) await releaseLiveInput(liveSession);
         // Model not found, hide panel and show download dialog
         hideFloatPanelStatus('model-not-found');
         setPendingModelId(config?.globalModelConfig?.asrModel?.modelId ?? '');
@@ -1663,14 +1524,13 @@ function App() {
         return;
       }
 
-      const success = await currentRecorder.start(scene.id, liveSession?.id);
+            const success = await currentRecorder.start(scene.id);
       if (success) {
         // 3. 注册 ESC 取消快捷键（录音成功后）
         invoke('register_esc_cancel')
           .then(() => log.debug('ESC cancel shortcut registered'))
           .catch((err) => log.error(`Failed to register ESC cancel: ${err}`));
       } else {
-        if (liveSession) await releaseLiveInput(liveSession);
         // 录音失败，隐藏面板
         log.error('Failed to start recording');
         hideFloatPanelStatus('recording-start-failed');
@@ -1679,7 +1539,7 @@ function App() {
 
     log.debug('Resetting isProcessingShortcutRef to false');
     isProcessingShortcutRef.current = false;
-  }, [config?.scenes, config?.models, config?.globalModelConfig, config?.segmentTranscribe, config?.liveVoiceInput, downloadStates, showToast, t, showFloatPanelStatus, hideFloatPanelStatus, releaseLiveInput]); // 分段转录始终开启，不依赖配置
+  }, [config?.scenes, config?.models, config?.globalModelConfig, downloadStates, showToast, t, showFloatPanelStatus, hideFloatPanelStatus]); // 分段转录始终开启，不依赖配置
 
   // Register shortcuts for all scenes
   const { registerShortcutWithResult, setPaused } = useSceneShortcuts(config?.scenes || [], handleShortcutTriggered, recorder.isRecording);

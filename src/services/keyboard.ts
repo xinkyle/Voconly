@@ -15,11 +15,11 @@ const log = createLogger('Keyboard');
  * @returns Promise that resolves when input is complete
  * @throws Error if keyboard simulation fails
  */
-export async function typeText(text: string, liveSessionId?: number): Promise<void> {
+export async function typeText(text: string): Promise<void> {
   const callId = Date.now();
   log.info(`[${callId}] typeText called, text length: ${text.length}`);
   try {
-    const result = await invoke<void>('simulate_input', { text, liveSessionId });
+    const result = await invoke<void>('simulate_input', { text });
     log.info(`[${callId}] typeText completed successfully`);
     return result;
   } catch (error) {
@@ -33,10 +33,10 @@ export async function typeText(text: string, liveSessionId?: number): Promise<vo
  * @param text Text to input
  * @returns Result object with success status and optional error message
  */
-export async function typeTextSafe(text: string, liveSessionId?: number): Promise<{ success: boolean; error?: string }> {
+export async function typeTextSafe(text: string): Promise<{ success: boolean; error?: string }> {
   try {
     // 保留换行符，让 LLM 处理后的段落结构能够正确显示
-    await typeText(text, liveSessionId);
+    await typeText(text);
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

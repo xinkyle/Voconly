@@ -516,14 +516,14 @@ export default {
  * This uses Silero VAD to detect voice activity and filter silence
  * @param sceneId - The scene ID for transcription configuration
  */
-export async function startVadRecording(sceneId?: string, liveSessionId?: number): Promise<boolean> {
+export async function startVadRecording(sceneId?: string): Promise<boolean> {
   const startTime = performance.now();
   console.log(`[TIMING] [Audio] startVadRecording() 入口 - at: ${Date.now()}ms (from start: 0ms)`);
 
   try {
     console.log(`[TIMING] [Audio] invoke('start_vad_recording') 调用前 - elapsed: ${performance.now() - startTime}ms`);
     const invokeStart = performance.now();
-    await invoke('start_vad_recording', { sceneId, liveSessionId });
+    await invoke('start_vad_recording', { sceneId });
     const invokeEnd = performance.now();
     console.log(`[TIMING] [Audio] invoke('start_vad_recording') 调用后 - elapsed: ${performance.now() - startTime}ms (invoke耗时: ${invokeEnd - invokeStart}ms)`);
     return true;
@@ -537,13 +537,12 @@ export async function startVadRecording(sceneId?: string, liveSessionId?: number
  * Stop VAD-based recording and get audio file path
  * Returns the path to the recorded WAV file with silence filtered out
  */
-export async function stopVadRecording(liveSessionId?: number): Promise<string | null> {
+export async function stopVadRecording(): Promise<string | null> {
   try {
-    const audioPath = await invoke<string>('stop_vad_recording', { liveSessionId });
+    const audioPath = await invoke<string>('stop_vad_recording');
     return audioPath;
   } catch (error) {
     log.error(`Failed to stop VAD recording: ${error}`);
-    if (liveSessionId !== undefined) throw error;
     return null;
   }
 }

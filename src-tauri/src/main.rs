@@ -31,10 +31,7 @@ use windows::Win32::UI::HiDpi::{
     SetThreadDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 #[cfg(windows)]
-use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetForegroundWindow, GetWindowRect, GetWindowTextW, SetWindowPos, ShowWindow,
-    HWND_TOPMOST, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-};
+use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowTextW, SetWindowPos, ShowWindow, HWND_TOPMOST, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW};
 
 use audio::AudioCapture;
 
@@ -47,7 +44,6 @@ mod config;
 mod crash_report;
 mod dictionary;
 mod history;
-mod live_voice_input;
 mod llm;
 mod log_settings;
 mod model_manager;
@@ -63,9 +59,6 @@ use history::{
     add_history_record, clear_history, delete_history_record, get_archive_stats, get_full_stats,
     get_history_count, load_history, load_history_paged, rebuild_stats, save_history, search_history,
 };
-use live_voice_input::{ForegroundTarget, LiveVoiceInput};
-#[cfg(any(windows, target_os = "macos"))]
-use live_voice_input::WindowIdentity;
 use paths::resolve_resource_path;
 use utils::downloader::{
     cancel_model_download, check_model_exists_cmd, download_model_from_url, download_model_with_source,
@@ -79,14 +72,13 @@ const DOUBLE_TAP_WINDOW_MS: u64 = 300;
 struct AppState {
     shortcuts: Mutex<Vec<String>>,
     tray: Mutex<Option<TrayIcon>>,
-    float_panel_window: Mutex<FloatPanelWindowState>,
+    float_panel_shown: Mutex<bool>,
     audio_capture: Mutex<Option<AudioCapture>>,
     /// Tracks pending shortcut triggers for double-tap detection
     /// scene_id -> (first_trigger_time, pending_thread_handle)
     shortcut_pending: Mutex<HashMap<String, Instant>>,
     // Mutex to serialize clipboard operations (Windows clipboard is single-access)
     clipboard_lock: Mutex<()>,
-    live_voice_input: Mutex<LiveVoiceInput>,
     // Streaming mode setting (persisted across AudioCapture lifecycle)
     streaming_mode: Mutex<bool>,
     // ESC cancel shortcut registered state (for canceling recording)
@@ -529,127 +521,7 @@ fn check_signature_changed() -> bool {
 }
 
 #[tauri::command]
-fn begin_live_voice_input(app: AppHandle, session_id: u32) -> Result<(), String> {
-    let foreground = foreground_input_target();
-    app.state::<AppState>()
-        .live_voice_input
-        .lock()
-        .map_err(|error| error.to_string())?
-        .begin(session_id, foreground)
-        .map_err(str::to_owned)
-}
-
-#[tauri::command]
-fn end_live_voice_input(app: AppHandle, session_id: u32) -> Result<(), String> {
-    app.state::<AppState>()
-        .live_voice_input
-        .lock()
-        .map_err(|error| error.to_string())?
-        .end(session_id);
-    Ok(())
-}
-
-fn cancel_live_voice_input(app: &AppHandle) {
-    if let Some(state) = app.try_state::<AppState>() {
-        if let Ok(mut input) = state.live_voice_input.lock() {
-            input.cancel();
-        }
-    }
-}
-
-#[cfg(windows)]
-fn foreground_input_target() -> Option<ForegroundTarget> {
-    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
-
-    let window = unsafe { GetForegroundWindow() };
-    if window.0.is_null() {
-        return None;
-    }
-    let mut process = 0;
-    unsafe { GetWindowThreadProcessId(window, Some(&mut process)) };
-    if process == 0 || unsafe { GetForegroundWindow() } != window {
-        return None;
-    }
-    Some(ForegroundTarget {
-        process,
-        window: Some(WindowIdentity::NativeHandle(window.0 as usize)),
-    })
-}
-
-#[cfg(target_os = "macos")]
-fn foreground_input_target() -> Option<ForegroundTarget> {
-    use objc::rc::autoreleasepool;
-    use objc::runtime::Object;
-    use objc::{class, msg_send, sel, sel_impl};
-
-    let frontmost_process = || autoreleasepool(|| unsafe {
-        let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-        let frontmost: *mut Object = msg_send![workspace, frontmostApplication];
-        let process: i32 = msg_send![frontmost, processIdentifier];
-        (process > 0).then_some(process as u32)
-    });
-    let process = frontmost_process()?;
-    let window = WindowIdentity::for_process(process);
-    // The Accessibility window query may have run while another app took focus.
-    (frontmost_process() == Some(process)).then_some(ForegroundTarget { process, window })
-}
-
-#[cfg(not(any(windows, target_os = "macos")))]
-fn foreground_input_target() -> Option<ForegroundTarget> {
-    None
-}
-
-fn with_live_input_target(
-    input: &Mutex<LiveVoiceInput>,
-    session_id: Option<u32>,
-    action: impl FnOnce() -> Result<(), String>,
-) -> Result<(), String> {
-    let Some(session_id) = session_id else {
-        return action();
-    };
-    let foreground = foreground_input_target();
-    let mut input = input.lock().map_err(|error| error.to_string())?;
-    input.verify(session_id, foreground).map_err(str::to_owned)?;
-    // Keep the check and key submission together so native cancellation cannot interleave.
-    action()
-}
-
-#[cfg(any(windows, target_os = "macos"))]
-fn paste_keyboard_shortcut(
-    enigo: &mut Enigo,
-    modifier: Key,
-    paste_key: Key,
-    input: &Mutex<LiveVoiceInput>,
-    session_id: Option<u32>,
-) -> Result<(), String> {
-    with_live_input_target(input, session_id, || {
-        enigo
-            .key(modifier, enigo::Direction::Press)
-            .map_err(|error| format!("Failed to press paste modifier: {error}"))
-    })?;
-
-    thread::sleep(Duration::from_millis(30));
-    let paste = with_live_input_target(input, session_id, || {
-        enigo
-            .key(paste_key, enigo::Direction::Click)
-            .map_err(|error| format!("Failed to send paste keystroke: {error}"))
-    });
-    if paste.is_ok() {
-        thread::sleep(Duration::from_millis(30));
-    }
-
-    let release = enigo
-        .key(modifier, enigo::Direction::Release)
-        .map_err(|error| format!("Failed to release paste modifier: {error}"));
-    paste.and(release)
-}
-
-#[tauri::command]
-async fn simulate_input(
-    app: AppHandle,
-    text: String,
-    live_session_id: Option<u32>,
-) -> Result<(), String> {
+async fn simulate_input(app: AppHandle, text: String) -> Result<(), String> {
     let start_time = std::time::Instant::now();
     let thread_id = std::thread::current().id();
     info!(
@@ -683,7 +555,6 @@ async fn simulate_input(
     );
 
     // 2. Set text to clipboard
-    with_live_input_target(&app_state.live_voice_input, live_session_id, || Ok(()))?;
     clipboard.set_text(&text).map_err(|e| {
         error!("[simulate_input] FAILED to set clipboard text: {}", e);
         format!("Failed to set clipboard text: {}", e)
@@ -698,83 +569,140 @@ async fn simulate_input(
     // 4. Create enigo instance and simulate keystrokes
     // On macOS, both Enigo::new() and key() must run on main thread
     #[cfg(target_os = "macos")]
-    let paste_result = {
+    {
         use dispatch2::DispatchQueue;
-        use std::sync::Arc;
+        use std::sync::{Arc, Mutex};
 
         info!("[simulate_input] Using Cmd+V for macOS");
 
-        let result = Arc::new(Mutex::new(Ok(())));
-        let main_result = result.clone();
-        let handle = app.clone();
+        // exec_sync doesn't support return values, use Arc<Mutex> to pass errors
+        let error_msg = Arc::new(Mutex::new(None::<String>));
+        let error_msg_clone = error_msg.clone();
 
         DispatchQueue::main().exec_sync(move || {
             // 关闭 enigo 内置的系统授权弹窗：无权限时不再每次转录都弹系统窗，
-            // 而是返回结构化错误，由前端做一次性引导
+            // 而是返回结构化错误，由前端做一次性引导（文字已写入剪贴板，可手动 ⌘V）
             let settings = Settings {
                 open_prompt_to_get_permissions: false,
                 ..Settings::default()
             };
-            let state = handle.state::<AppState>();
-            let outcome = Enigo::new(&settings)
-                .map_err(|error| match error {
-                    enigo::NewConError::NoPermission => "ACCESSIBILITY_DENIED".to_owned(),
-                    error => format!("Failed to create enigo instance: {error}"),
-                })
-                .and_then(|mut enigo| {
-                    paste_keyboard_shortcut(
-                        &mut enigo,
-                        Key::Meta,
-                        Key::Unicode('v'),
-                        &state.live_voice_input,
-                        live_session_id,
-                    )
-                });
-            *main_result.lock().unwrap() = outcome;
+            let mut enigo = match Enigo::new(&settings) {
+                Ok(e) => e,
+                Err(enigo::NewConError::NoPermission) => {
+                    error!("[simulate_input] macOS accessibility permission denied; text kept in clipboard");
+                    *error_msg_clone.lock().unwrap() = Some("ACCESSIBILITY_DENIED".to_string());
+                    return;
+                }
+                Err(e) => {
+                    error!("[simulate_input] FAILED to create enigo instance: {}", e);
+                    *error_msg_clone.lock().unwrap() = Some(format!("Failed to create enigo instance: {}", e));
+                    return;
+                }
+            };
+
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Press) {
+                error!("[simulate_input] FAILED to press Meta: {}", e);
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to press Meta: {}", e));
+                return;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            if let Err(e) = enigo.key(Key::Unicode('v'), enigo::Direction::Click) {
+                error!("[simulate_input] FAILED to click V: {}", e);
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to click V: {}", e));
+                return;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            if let Err(e) = enigo.key(Key::Meta, enigo::Direction::Release) {
+                error!("[simulate_input] FAILED to release Meta: {}", e);
+                *error_msg_clone.lock().unwrap() = Some(format!("Failed to release Meta: {}", e));
+                return;
+            }
         });
 
-        let outcome = std::mem::replace(&mut *result.lock().unwrap(), Ok(()));
-        outcome
-    };
+        // Check if any error occurred
+        if let Some(err) = error_msg.lock().unwrap().take() {
+            return Err(err);
+        }
+        info!("[simulate_input] Paste operation completed");
+    }
 
     #[cfg(target_os = "windows")]
-    let paste_result = Enigo::new(&Settings::default())
-        .map_err(|error| format!("Failed to create enigo instance: {error}"))
-        .and_then(|mut enigo| {
-            let (modifier, paste_key) = if is_terminal {
-                // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
-                info!("[simulate_input] Using Shift+Insert for terminal");
-                (Key::Shift, Key::Insert)
-            } else {
-                info!("[simulate_input] Using Ctrl+V for regular application");
-                (Key::Control, Key::Unicode('v'))
-            };
-            paste_keyboard_shortcut(
-                &mut enigo,
-                modifier,
-                paste_key,
-                &app_state.live_voice_input,
-                live_session_id,
-            )
-        });
+    {
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
+            error!("[simulate_input] FAILED to create enigo instance: {}", e);
+            format!("Failed to create enigo instance: {}", e)
+        })?;
 
-    #[cfg(not(any(windows, target_os = "macos")))]
-    let paste_result: Result<(), String> = Ok(());
+        if is_terminal {
+            // Use Shift+Insert for terminals (CMD, PowerShell, Windows Terminal)
+            // Ctrl+V doesn't work in these environments
+            info!("[simulate_input] Using Shift+Insert for terminal");
 
-    if let Err(error) = &paste_result {
-        error!("[simulate_input] Paste operation failed: {error}");
-        if live_session_id.is_none() {
-            return paste_result;
+            enigo
+                .key(Key::Shift, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Shift: {}", e);
+                    format!("Failed to press Shift: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Insert, enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click Insert: {}", e);
+                    format!("Failed to click Insert: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Shift, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Shift: {}", e);
+                    format!("Failed to release Shift: {}", e)
+                })?;
+        } else {
+            // Use Ctrl+V for regular applications (Notepad, WeChat, browsers, etc.)
+            // This avoids the Insert key "overwrite mode" issue
+            info!("[simulate_input] Using Ctrl+V for regular application");
+
+            enigo
+                .key(Key::Control, enigo::Direction::Press)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to press Control: {}", e);
+                    format!("Failed to press Control: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Unicode('v'), enigo::Direction::Click)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to click V: {}", e);
+                    format!("Failed to click V: {}", e)
+                })?;
+
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            enigo
+                .key(Key::Control, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("[simulate_input] FAILED to release Control: {}", e);
+                    format!("Failed to release Control: {}", e)
+                })?;
         }
-    } else {
+
         info!("[simulate_input] Paste operation completed");
     }
 
     // 4. Restore old clipboard content after a delay
     if let Some(old_text) = old_clipboard {
-        if paste_result.is_ok() {
-            thread::sleep(Duration::from_millis(300));
-        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
         // Check if clipboard content has changed (user may have copied something else)
         match clipboard.get_text() {
@@ -809,7 +737,6 @@ async fn simulate_input(
         thread_id
     );
 
-    paste_result?;
     let elapsed = start_time.elapsed();
     info!(
         "[simulate_input] END - SUCCESS, total time: {}ms",
@@ -866,7 +793,6 @@ async fn set_window_visible(window: WebviewWindow, visible: bool) -> Result<(), 
 pub struct FloatPanelState {
     pub visible: bool,
     pub status: String,
-    pub live_voice_input: Option<bool>,
     pub scene_name: Option<String>,
     pub text: Option<String>,
     // 进度条相关字段
@@ -882,48 +808,6 @@ pub struct FloatPanelState {
     pub skip_llm: Option<bool>,
     // 分段转录开关（用于控制状态指示器）
     pub segment_transcribe: Option<bool>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FloatPanelMode {
-    Pill,
-    Waveform,
-}
-
-#[derive(Default)]
-struct FloatPanelWindowState {
-    mode: Option<FloatPanelMode>,
-    revision: u64,
-    hiding: bool,
-}
-
-impl FloatPanelWindowState {
-    fn show(&mut self, mode: FloatPanelMode, starts_recording: bool) -> bool {
-        let already_shown = self.mode.is_some() && !self.hiding && !starts_recording;
-        if !already_shown {
-            self.mode = Some(mode);
-            self.revision += 1;
-            self.hiding = false;
-        }
-        already_shown
-    }
-
-    fn begin_hide(&mut self) -> Option<(FloatPanelMode, u64)> {
-        let mode = self.mode?;
-        if self.hiding {
-            return None;
-        }
-        self.hiding = true;
-        Some((mode, self.revision))
-    }
-
-    fn should_finish_hide(&self, revision: u64) -> bool {
-        self.hiding && self.revision == revision
-    }
-
-    fn allows_preview(&self, revision: u64) -> bool {
-        self.mode == Some(FloatPanelMode::Pill) && !self.hiding && self.revision == revision
-    }
 }
 
 /// Forces a window to be topmost using Win32 API (Windows only)
@@ -944,7 +828,7 @@ fn force_overlay_topmost(window: &WebviewWindow) {
                             hwnd,
                             HWND_TOPMOST,
                             0, 0, 0, 0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
                         );
                         info!("[force_overlay_topmost] Window set as topmost via Win32 API");
                     }
@@ -966,24 +850,12 @@ struct FloatPanelPosition {
 
 const FLOAT_PANEL_WIDTH: f64 = 480.0;
 const FLOAT_PANEL_HEIGHT: f64 = 40.0;
-const LIVE_WAVEFORM_WIDTH: f64 = 48.0;
-const LIVE_WAVEFORM_HEIGHT: f64 = 28.0;
 const FLOAT_PANEL_BOTTOM_OFFSET: i32 = 80;
 
 fn float_panel_target_monitor(app: &AppHandle, panel: &WebviewWindow) -> Option<Monitor> {
     app.get_webview_window("main")
         .and_then(|main| main.current_monitor().ok().flatten())
         .or_else(|| panel.primary_monitor().ok().flatten())
-}
-
-#[cfg(windows)]
-fn foreground_window_monitor(panel: &WebviewWindow) -> Option<Monitor> {
-    let mut bounds = windows::Win32::Foundation::RECT::default();
-    // Place the live overlay on the screen containing the window receiving dictation.
-    unsafe { GetWindowRect(GetForegroundWindow(), &mut bounds) }.ok()?;
-    let x = (f64::from(bounds.left) + f64::from(bounds.right)) / 2.0;
-    let y = (f64::from(bounds.top) + f64::from(bounds.bottom)) / 2.0;
-    panel.monitor_from_point(x, y).ok().flatten()
 }
 
 fn float_panel_origin(
@@ -1059,45 +931,6 @@ mod float_panel_position_tests {
     use super::*;
 
     #[test]
-    fn live_float_panel_stays_waveform_only_until_hidden() {
-        let mut panel = FloatPanelWindowState::default();
-        assert!(!panel.show(FloatPanelMode::Waveform, true));
-        assert!(panel.show(FloatPanelMode::Pill, false));
-        assert_eq!(panel.mode, Some(FloatPanelMode::Waveform));
-        assert!(!panel.allows_preview(panel.revision));
-        assert!(panel.begin_hide().is_some());
-        assert_eq!(panel.mode, Some(FloatPanelMode::Waveform));
-        assert!(!panel.show(FloatPanelMode::Pill, true));
-        assert_eq!(panel.mode, Some(FloatPanelMode::Pill));
-        assert!(panel.allows_preview(panel.revision));
-        assert!(!panel.allows_preview(panel.revision - 1));
-    }
-
-    #[test]
-    fn earlier_hide_cannot_close_a_new_float_panel_session() {
-        let mut panel = FloatPanelWindowState::default();
-        panel.show(FloatPanelMode::Pill, true);
-        let (_, previous_session) = panel.begin_hide().unwrap();
-        panel.show(FloatPanelMode::Waveform, true);
-
-        assert!(!panel.should_finish_hide(previous_session));
-        assert_eq!(panel.mode, Some(FloatPanelMode::Waveform));
-        let (_, current_session) = panel.begin_hide().unwrap();
-        assert!(panel.should_finish_hide(current_session));
-    }
-
-    #[test]
-    fn new_recording_replaces_a_previous_pill_still_showing_an_error() {
-        let mut panel = FloatPanelWindowState::default();
-        panel.show(FloatPanelMode::Pill, true);
-        let previous_revision = panel.revision;
-
-        assert!(!panel.show(FloatPanelMode::Waveform, true));
-        assert_eq!(panel.mode, Some(FloatPanelMode::Waveform));
-        assert_ne!(panel.revision, previous_revision);
-    }
-
-    #[test]
     fn ignores_saved_position_on_another_monitor() {
         let work_area = PhysicalRect {
             position: PhysicalPosition::new(-2560, -1440),
@@ -1149,12 +982,7 @@ fn load_float_panel_position() -> Option<FloatPanelPosition> {
 }
 
 #[tauri::command]
-async fn save_float_panel_position(app: AppHandle) -> Result<(), String> {
-    let app_state = app.state::<AppState>();
-    let panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-    if !panel.allows_preview(panel.revision) {
-        return Ok(());
-    }
+fn save_float_panel_position(app: AppHandle) -> Result<(), String> {
     let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
     let position = window.outer_position().map_err(|e| e.to_string())?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
@@ -1175,12 +1003,7 @@ fn write_float_panel_position(saved: FloatPanelPosition) -> Result<(), String> {
 
 /// Restore the original bottom-center placement without interrupting recording.
 #[tauri::command]
-async fn reset_float_panel_position(app: AppHandle) -> Result<(), String> {
-    let app_state = app.state::<AppState>();
-    let panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-    if !panel.allows_preview(panel.revision) {
-        return Ok(());
-    }
+fn reset_float_panel_position(app: AppHandle) -> Result<(), String> {
     let window = app.get_webview_window("float-panel").ok_or("Float panel window not found")?;
     let monitor = float_panel_target_monitor(&app, &window).ok_or("Display monitor not found")?;
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
@@ -1194,7 +1017,7 @@ async fn reset_float_panel_position(app: AppHandle) -> Result<(), String> {
 
 /// Show the float panel at the bottom center of the screen
 #[tauri::command]
-async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<(), String> {
+async fn show_float_panel(app: AppHandle, state: FloatPanelState) -> Result<(), String> {
     info!("[show_float_panel] ===== START =====");
     info!("[show_float_panel] Received state: {:?}", state);
     info!("[show_float_panel] STATUS: {:?}", state.status);
@@ -1206,6 +1029,12 @@ async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<
         .get_webview_window("float-panel")
         .ok_or("Float panel window not found")?;
     info!("[show_float_panel] Float panel window found");
+
+    // Emit state update to the float panel window
+    app.emit_to("float-panel", "float-panel-update", &state)
+        .map_err(|e| format!("Failed to emit float panel update: {}", e))?;
+
+    info!("[show_float_panel] Event emitted to float-panel window");
 
     // 【优化】首次显示时预初始化音频捕获（减少首次录音延迟）
     // 如果 audio_capture 未初始化，异步调用预初始化
@@ -1228,34 +1057,17 @@ async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<
         });
     }
 
-    let mut panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-    let requested_mode = if state.live_voice_input == Some(true) {
-        FloatPanelMode::Waveform
-    } else {
-        FloatPanelMode::Pill
-    };
-    // A new recording can begin while the previous session's LLM error is still visible.
-    let already_shown = panel.show(requested_mode, state.status == "recording");
-    let live = panel.mode == Some(FloatPanelMode::Waveform);
-    state.live_voice_input = Some(live);
+    // Check if the panel is already shown using our tracked state
+    let already_shown = app
+        .try_state::<AppState>()
+        .and_then(|s| s.float_panel_shown.lock().ok().map(|g| *g))
+        .unwrap_or(false);
 
+    // 只在首次显示时设置药丸高度，已显示时保持当前高度
     if !already_shown {
-        let (size, saved_position) = if live {
-            (LogicalSize::new(LIVE_WAVEFORM_WIDTH, LIVE_WAVEFORM_HEIGHT), None)
-        } else {
-            (LogicalSize::new(FLOAT_PANEL_WIDTH, FLOAT_PANEL_HEIGHT), load_float_panel_position())
-        };
-        #[cfg(windows)]
-        let foreground_monitor = if live {
-            foreground_window_monitor(&float_window)
-        } else {
-            None
-        };
-        #[cfg(not(windows))]
-        let foreground_monitor: Option<Monitor> = None;
-        let monitor = foreground_monitor.or_else(|| float_panel_target_monitor(&app, &float_window));
-        let placement = if let Some(monitor) = monitor {
-            place_float_panel(&float_window, &monitor, size, saved_position).map(|_| ())
+        let size = LogicalSize::new(FLOAT_PANEL_WIDTH, FLOAT_PANEL_HEIGHT);
+        let placement = if let Some(monitor) = float_panel_target_monitor(&app, &float_window) {
+            place_float_panel(&float_window, &monitor, size, load_float_panel_position()).map(|_| ())
         } else {
             float_window.set_size(size)
         };
@@ -1264,46 +1076,35 @@ async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<
             let _ = float_window.set_size(size);
         }
 
-        if let Err(error) = float_window.set_ignore_cursor_events(live) {
-            warn!("Failed to set float panel mouse interaction: {error}");
-        }
-    }
-
-    #[derive(Serialize, Clone)]
-    #[serde(rename_all = "camelCase")]
-    struct FloatPanelUpdate {
-        #[serde(flatten)]
-        state: FloatPanelState,
-        panel_revision: u64,
-    }
-    app.emit_to("float-panel", "float-panel-update", &FloatPanelUpdate {
-        state,
-        panel_revision: panel.revision,
-    })
-    .map_err(|e| format!("Failed to emit float panel update: {e}"))?;
-
-    if !already_shown {
         // 【关键修复】使用 Windows API 显示窗口但不激活（不抢焦点）
         // SW_SHOWNOACTIVATE: 显示窗口但不激活，不改变当前焦点
         #[cfg(windows)]
         {
-            let window = float_window.clone();
-            float_window
-                .run_on_main_thread(move || {
-                    match window.hwnd() {
-                        Ok(hwnd) => unsafe {
-                            let _ = ShowWindow(HWND(hwnd.0), SW_SHOWNOACTIVATE);
-                        },
-                        Err(error) => {
-                            warn!("Failed to get float panel window handle: {error}");
-                            if let Err(error) = window.show() {
-                                warn!("Failed to show float panel: {error}");
-                            }
+            // 使用 raw_window_handle 获取原始窗口句柄
+            use raw_window_handle::HasWindowHandle;
+            match float_window.window_handle() {
+                Ok(handle) => {
+                    unsafe {
+                        // 获取原始 Win32 句柄
+                        if let raw_window_handle::RawWindowHandle::Win32(win32_handle) = handle.as_raw() {
+                            let raw_hwnd = win32_handle.hwnd.get() as *mut std::ffi::c_void;
+                            let _ = ShowWindow(HWND(raw_hwnd), SW_SHOWNOACTIVATE);
+                            info!("[show_float_panel] Window shown with SW_SHOWNOACTIVATE (no focus steal)");
+                        } else {
+                            warn!("[show_float_panel] Not a Win32 window, falling back to show()");
+                            float_window.show().map_err(|e| format!("Failed to show float panel: {}", e))?;
                         }
                     }
-                    force_overlay_topmost(&window);
-                })
-                .map_err(|e| format!("Failed to schedule float panel show: {e}"))?;
+                }
+                Err(e) => {
+                    warn!("[show_float_panel] Failed to get window handle: {:?}, falling back to show()", e);
+                    float_window.show().map_err(|e| format!("Failed to show float panel: {}", e))?;
+                }
+            }
+
+            // 【关键】在显示窗口后强制重新设置 topmost
+            // 这解决了 Tauri 的 always_on_top 在 Windows 上不可靠的问题
+            force_overlay_topmost(&float_window);
         }
 
         #[cfg(target_os = "macos")]
@@ -1313,15 +1114,7 @@ async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<
             float_window
                 .run_on_main_thread(move || {
                     dispatch2::DispatchQueue::main().exec_async(move || {
-                        if live {
-                            use objc::{msg_send, sel, sel_impl};
-                            match window.ns_window() {
-                                Ok(handle) => unsafe {
-                                    let _: () = msg_send![handle.cast::<objc::runtime::Object>(), orderFrontRegardless];
-                                },
-                                Err(error) => warn!("Failed to show live waveform: {error}"),
-                            }
-                        } else if let Err(error) = window.show() {
+                        if let Err(error) = window.show() {
                             warn!("Failed to show float panel: {error}");
                         }
                     });
@@ -1339,8 +1132,13 @@ async fn show_float_panel(app: AppHandle, mut state: FloatPanelState) -> Result<
         info!("[show_float_panel] Float panel shown successfully");
 
         // Mark as shown
-        if let Ok(mut preview_visible) = app_state.preview_window_visible.lock() {
-            *preview_visible = !live;
+        if let Some(s) = app.try_state::<AppState>() {
+            if let Ok(mut shown) = s.float_panel_shown.lock() {
+                *shown = true;
+            }
+            if let Ok(mut preview_visible) = s.preview_window_visible.lock() {
+                *preview_visible = true;
+            }
         }
     } else {
         info!("Float panel already visible, keeping current height, only updating state");
@@ -1360,55 +1158,40 @@ async fn hide_float_panel(app: AppHandle, reason: Option<String>) -> Result<(), 
     let caller = reason.unwrap_or_else(|| "unknown".to_string());
     info!("[HIDE] hide_float_panel called by: {}", caller);
 
-    let app_state = app.state::<AppState>();
-    let (mode, revision) = {
-        let mut panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-        let Some(hide) = panel.begin_hide() else {
-            return Ok(());
-        };
-        if let Err(error) = app.emit_to("float-panel", "float-panel-hide", hide.1) {
-            warn!("Failed to emit float panel hide: {error}");
-        }
-        if let Err(error) = app.emit_to("float-panel", "preview-window-hide", ()) {
-            warn!("Failed to emit preview window hide: {error}");
-        }
-        hide
-    };
-    if mode == FloatPanelMode::Pill {
-        // Let the regular preview's exit animation finish.
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-    }
+    // Emit hide event directly to the float panel window first (for animation)
+    app.emit_to("float-panel", "float-panel-hide", ())
+        .map_err(|e| format!("Failed to emit float panel hide: {}", e))?;
 
-    let mut panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-    if !panel.should_finish_hide(revision) {
-        return Ok(());
-    }
+    // Emit hide event to preview window (now integrated in float-panel)
+    app.emit_to("float-panel", "preview-window-hide", ())
+        .map_err(|e| format!("Failed to emit preview window hide: {}", e))?;
+
+    // Wait for animation (150ms), then hide the windows
+    // 使用异步等待避免阻塞主线程（修复 IPC 通信阻塞问题）
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+
+    // Get the float panel window and hide it
     if let Some(float_window) = app.get_webview_window("float-panel") {
         // 【关键修复】先将窗口大小设置为最小，避免隐藏后仍遮挡鼠标事件
         // 透明窗口即使隐藏后，其区域仍可能接收鼠标事件
         // 使用逻辑像素，与显示时保持一致
         let _ = float_window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1.0, 1.0)));
 
-        #[cfg(target_os = "macos")]
-        {
-            let window = float_window.clone();
-            // Use the same queue as show so a pending show cannot outlive this hide.
-            float_window.run_on_main_thread(move || {
-                dispatch2::DispatchQueue::main().exec_async(move || {
-                    if let Err(error) = window.hide() {
-                        warn!("Failed to hide float panel: {error}");
-                    }
-                });
-            }).map_err(|e| format!("Failed to schedule float panel hide: {e}"))?;
-        }
-        #[cfg(not(target_os = "macos"))]
-        float_window.hide().map_err(|e| format!("Failed to hide float panel: {e}"))?;
+        float_window
+            .hide()
+            .map_err(|e| format!("Failed to hide float panel: {}", e))?;
     }
 
-    panel.mode = None;
-    panel.hiding = false;
-    if let Ok(mut preview_visible) = app_state.preview_window_visible.lock() {
-        *preview_visible = false;
+    // preview window is no longer used (integrated into float-panel)
+    // but we keep the state update
+    // Mark as hidden
+    if let Some(s) = app.try_state::<AppState>() {
+        if let Ok(mut shown) = s.float_panel_shown.lock() {
+            *shown = false;
+        }
+        if let Ok(mut preview_visible) = s.preview_window_visible.lock() {
+            *preview_visible = false;
+        }
     }
 
     info!(
@@ -1426,13 +1209,7 @@ async fn set_float_panel_height(
     app: AppHandle,
     expanded: bool,
     preview_height: Option<String>,
-    panel_revision: u64,
 ) -> Result<(), String> {
-    let app_state = app.state::<AppState>();
-    let panel = app_state.float_panel_window.lock().map_err(|e| e.to_string())?;
-    if !panel.allows_preview(panel_revision) {
-        return Ok(());
-    }
     info!(
         "Setting float panel height: expanded={}, preview_height={:?}",
         expanded, preview_height
@@ -1750,11 +1527,7 @@ async fn is_autostart_enabled() -> Result<bool, String> {
 
 /// Start VAD-based recording
 #[tauri::command]
-async fn start_vad_recording(
-    app: AppHandle,
-    scene_id: String,
-    live_session_id: Option<u32>,
-) -> Result<(), String> {
+async fn start_vad_recording(app: AppHandle, scene_id: String) -> Result<(), String> {
     let start_time = std::time::Instant::now();
     info!("[TIMING] [Main] start_vad_recording 命令入口 - at: {}ms (from start: 0ms)", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
 
@@ -1818,7 +1591,7 @@ async fn start_vad_recording(
     let record_start = std::time::Instant::now();
     info!("[TIMING] [Main] 调用 capture.start() 前 - elapsed: {}ms", start_time.elapsed().as_millis());
     capture
-        .start(&scene_id, live_session_id)
+        .start(&scene_id)
         .map_err(|e| format!("Failed to start recording: {}", e))?;
     info!("[TIMING] [Main] 调用 capture.start() 后 - elapsed: {}ms (start耗时: {}ms)", start_time.elapsed().as_millis(), record_start.elapsed().as_millis());
 
@@ -1907,7 +1680,7 @@ async fn preinit_audio_capture(app: AppHandle) -> Result<(), String> {
 
 /// Stop VAD-based recording
 #[tauri::command]
-async fn stop_vad_recording(app: AppHandle, live_session_id: Option<u32>) -> Result<(), String> {
+async fn stop_vad_recording(app: AppHandle) -> Result<(), String> {
     info!("[Capture] Stopping VAD recording...");
 
     let state = app.state::<AppState>();
@@ -1956,7 +1729,7 @@ async fn stop_vad_recording(app: AppHandle, live_session_id: Option<u32>) -> Res
     info!("[Capture] is_recording flag set to false");
 
     // 流式模式下音频已通过流式转录处理
-    if is_streaming_mode || live_session_id.is_some() {
+    if is_streaming_mode {
         info!("[Capture] Streaming mode: audio already processed");
         return Ok(());
     }
@@ -1973,7 +1746,6 @@ async fn stop_vad_recording(app: AppHandle, live_session_id: Option<u32>) -> Res
 /// Cancel VAD-based recording and discard audio
 #[tauri::command]
 async fn cancel_recording(app: AppHandle) -> Result<(), String> {
-    cancel_live_voice_input(&app);
     info!("[Capture] Cancelling VAD recording...");
 
     let state = app.state::<AppState>();
@@ -2059,9 +1831,8 @@ async fn register_esc_cancel(app: AppHandle) -> Result<(), String> {
 
     // Register ESC shortcut with callback
     app.global_shortcut()
-        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+        .on_shortcut(shortcut, move |app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
-                cancel_live_voice_input(&app_handle);
                 info!("[ESC] ESC key pressed, emitting esc-cancel-triggered event");
                 // Emit event to frontend to handle cancellation
                 if let Err(e) = app_handle.emit("esc-cancel-triggered", ()) {
@@ -2462,11 +2233,10 @@ fn main() {
         .manage(AppState {
             shortcuts: Mutex::new(Vec::new()),
             tray: Mutex::new(None),
-            float_panel_window: Mutex::new(FloatPanelWindowState::default()),
+            float_panel_shown: Mutex::new(false),
             audio_capture: Mutex::new(None),
             shortcut_pending: Mutex::new(HashMap::new()),
             clipboard_lock: Mutex::new(()),
-            live_voice_input: Mutex::new(LiveVoiceInput::default()),
             streaming_mode: Mutex::new(true), // 分段转录默认值，实际值从配置读取
             esc_cancel_registered: Mutex::new(false),
             preview_text: Mutex::new(String::new()),
@@ -2511,8 +2281,6 @@ fn main() {
             unregister_shortcut,
             unregister_all_shortcuts,
             get_registered_shortcuts,
-            begin_live_voice_input,
-            end_live_voice_input,
             simulate_input,
             check_accessibility_permission,
             request_accessibility_permission,
